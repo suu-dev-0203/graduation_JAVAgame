@@ -1,7 +1,4 @@
-[README (1).md](https://github.com/user-attachments/files/33039333/README.1.md)
-
-
-
+[Java_Learning_System_README_完成版.md](https://github.com/user-attachments/files/33040744/Java_Learning_System_README_.md)
 # Java Learning System
 ## ゲーム要素を取り入れたJava学習管理Webシステム
 
@@ -131,6 +128,8 @@ HOME
   ↓
 CHAPTER / STAGE選択
   ↓
+StageSession開始
+  ↓
 問題をランダム出題
   ↓
 制限時間内に回答
@@ -147,7 +146,7 @@ CHAPTER / STAGE選択
   ↓
 全問終了
   ↓
-STAGE CLEAR / RESULT
+STAGE CLEAR または RESULT
   ↓
 間違えた問題を振り返る
   ↓
@@ -156,7 +155,7 @@ STAGE CLEAR / RESULT
 
 ## 3.2 ステージ例
 
-1-1を4問構成とした場合、正解1回につき敵HPを1減らす。
+4問構成の1-1を例にすると、正解1回につき敵HPを1減らす。
 
 ```text
 1-1 START
@@ -176,10 +175,82 @@ Enemy HP = 0
 1-2 OPEN
 ```
 
-※不正解時・時間切れ時のペナルティやステージ終了条件は、実装前に詳細仕様を確定する。
+### ステージ状態の考え方
 
----
+`Stage` は「ステージの定義」、`StageSession` は「ユーザーがそのステージをプレイしている状態」と分ける。
 
+```text
+Stage
+ └─ マスターデータ
+    ・4問構成
+    ・忍者
+    ・Java Robot A
+
+StageSession
+ └─ プレイ中の状態
+    ・現在何問目か
+    ・正解数
+    ・現在コンボ
+    ・最大コンボ
+    ・スコア
+    ・残りHP
+```
+
+これにより、ステージの固定情報と、プレイ中に変化する値を混ぜない。
+
+## 3.3 ステージクリア条件
+
+MVPでは、
+
+```text
+ステージ内の全問題を回答
+AND
+全問題を正解
+↓
+STAGE CLEAR
+```
+
+を基本仕様とする。
+
+1問でも不正解または時間切れがあった場合、そのプレイはクリアにならず、RESULT → REVIEW / REVENGEへ進む。
+
+## 3.4 不正解時
+
+```text
+不正解
+ ↓
+Enemy HPは減らさない
+ ↓
+コンボを0
+ ↓
+スコア加算なし
+ ↓
+短い解説
+ ↓
+次の問題
+```
+
+ステージ終了後、間違えた問題を確認して再挑戦できる。
+
+## 3.5 時間切れ時
+
+```text
+タイマー = 0
+ ↓
+入力をロック
+ ↓
+不正解として確定
+ ↓
+回答履歴を保存
+ ↓
+コンボを0
+ ↓
+解説を表示
+ ↓
+次の問題
+```
+
+部分点は与えない。
 # 4. 問題仕様
 
 ## 4.1 問題形式
@@ -247,7 +318,9 @@ D boolean
 
 ---
 
-# 5. 制限時間
+# 5. 制限時間・スコア・コンボ
+
+## 5.1 問題ごとの制限時間
 
 回答時間は1つの固定値ではなく、**問題ごとに設定する**。
 
@@ -260,12 +333,51 @@ D boolean
 - 想定回答時間
 - Java Bronze試験で必要になる時間感覚
 
-また、章・ステージによって時間設定を変えられる構造を目指す。
+基本的な実装上の責務は `Question.timeLimitSeconds` に持たせる。
 
-> 実際の試験仕様が変更された場合は、その時点の公式情報を確認して設定値を更新する。
+## 5.2 Stageの標準時間との関係
 
----
+章・ステージごとに時間感覚を変えたい場合に対応できるよう、`Stage.defaultTimeLimitSeconds` を持たせる。
 
+ただし、実際にその問題へ適用する時間は次の優先順位とする。
+
+```text
+Question.timeLimitSeconds が設定されている
+        ↓
+その問題の個別制限時間を使用
+
+Question側に個別設定がない
+        ↓
+Stage.defaultTimeLimitSeconds を使用
+```
+
+これにより、「1問ごとに違う制限時間」と「章・ステージによる時間設定」の両方に対応する。
+
+実際の試験仕様を参考にした数値は、実装時点の公式情報を確認して設定する。
+
+## 5.3 コンボ
+
+基本ルール：
+
+```text
+正解       → currentCombo + 1
+不正解     → currentCombo = 0
+時間切れ   → currentCombo = 0
+```
+
+ステージ終了時には `maxCombo` を保存する。
+
+## 5.4 スコア
+
+MVPでは複雑な計算式を避け、次のシンプルな方式を基本案とする。
+
+```text
+正解       → +100
+不正解     → +0
+時間切れ   → +0
+```
+
+残り時間ボーナスなどは、MVP完成後の拡張候補とする。
 # 6. ステージ内ランダム出題
 
 同じ1-1を繰り返しても同じ問題順にならないように、ステージごとに問題プールを持たせる。
@@ -714,7 +826,7 @@ UI完成度を上げる
 
 # 14. データモデル
 
-## User
+## 14.1 User
 
 ```text
 User
@@ -723,7 +835,7 @@ User
 └ ...
 ```
 
-## Question
+## 14.2 Question
 
 ```text
 Question
@@ -731,14 +843,22 @@ Question
 ├ question_text
 ├ code_block
 ├ choice_count
-├ correct_answer_count
-├ time_limit
+├ required_answer_count
+├ time_limit_seconds
 ├ difficulty
 ├ category
 └ explanation
 ```
 
-## Choice
+`required_answer_count` は、何個の選択肢を選ぶ必要があるかを表す。
+
+```text
+1 → 単一選択
+2 → 2つ選択
+3 → 3つ選択
+```
+
+## 14.3 Choice
 
 ```text
 Choice
@@ -749,7 +869,11 @@ Choice
 └ is_correct
 ```
 
-## Stage
+正解となる選択肢は `is_correct = true` で管理する。
+
+## 14.4 Stage
+
+`Stage` はマスターデータとして、ステージそのものの固定情報を持つ。
 
 ```text
 Stage
@@ -757,26 +881,76 @@ Stage
 ├ chapter
 ├ round
 ├ question_count
+├ default_time_limit_seconds
 ├ player_type
 ├ enemy_type
 ├ action_pattern
 └ background
 ```
 
-## AnswerHistory
+## 14.5 StageSession
+
+`StageSession` は、ユーザーが現在プレイしているステージの状態を管理する。
+
+```text
+StageSession
+├ stage_session_id
+├ user_id
+├ stage_id
+├ current_question_index
+├ correct_count
+├ current_combo
+├ max_combo
+├ score
+├ remaining_enemy_hp
+├ started_at
+└ completed_at
+```
+
+### HPの扱い
+
+MVPでは、最大HPをステージ問題数から求める。
+
+```text
+maximumEnemyHp = Stage.questionCount
+remainingEnemyHp = maximumEnemyHp - StageSession.correctCount
+```
+
+これにより、`Stage`に「現在HP」を持たせず、プレイ中の可変値は `StageSession` で管理する。
+
+## 14.6 AnswerHistory
 
 ```text
 AnswerHistory
 ├ history_id
 ├ user_id
 ├ question_id
-├ selected_answers
 ├ correct
-├ answer_time
+├ answer_time_seconds
 └ answered_at
 ```
 
-## GameResult
+複数選択の回答は、文字列1列に押し込めず、選択したChoiceとの関連を別に保持する。
+
+```text
+AnswerHistorySelectedChoice
+├ history_id
+└ choice_id
+```
+
+例えばAとCを選択した場合、
+
+```text
+history_id = 101
+choice_id  = A
+
+history_id = 101
+choice_id  = C
+```
+
+のように保存する。
+
+## 14.7 GameResult
 
 ```text
 GameResult
@@ -787,10 +961,11 @@ GameResult
 ├ max_combo
 ├ correct_count
 ├ total_count
+├ cleared
 └ completed_at
 ```
 
-## ReviewItem
+## 14.8 ReviewItem
 
 ```text
 ReviewItem
@@ -804,6 +979,27 @@ ReviewItem
 
 ---
 
+# 15. データ整合性の基本ルール
+
+設計モデルと要求仕様がずれないよう、以下を共通ルールとする。
+
+| 仕様 | 設計上の対応 |
+|---|---|
+| 単一・複数選択 | `required_answer_count` + `Choice.is_correct` |
+| 複数選択判定 | 選択されたChoice集合と正解Choice集合を完全一致比較 |
+| 部分点なし | 一部一致では正解にしない |
+| 問題ごとの時間 | `Question.time_limit_seconds` |
+| Stageの標準時間 | `Stage.default_time_limit_seconds` |
+| プレイ中のHP | `StageSession.remaining_enemy_hp` |
+| スコア | `StageSession.score` → `GameResult.score` |
+| コンボ | `StageSession.current_combo` / `max_combo` |
+| 回答履歴 | `AnswerHistory` + `AnswerHistorySelectedChoice` |
+| ステージクリア | 全問回答 AND 全問正解 |
+| 時間切れ | 不正解扱い、入力ロック、コンボ0 |
+
+この表を、要求モデル・UML・DB実装をつなぐ基準とする。
+
+---
 # 15. システム全体像
 
 ## 15.1 基本アーキテクチャ
@@ -1020,27 +1216,49 @@ Databaseとのデータアクセスを担当する。
 
 # 20. クラス図（Javaコア領域）
 
+Spring BootのController - Service - Repositoryを基本構造とする。
+
 ```mermaid
 classDiagram
 
 class QuestionController {
   -QuestionService questionService
-  +showQuestion(model) String
+  +showQuestion(stageId, model) String
   +submitAnswer(questionId, selectedAnswers, model) String
+}
+
+class AnswerController {
+  -AnswerService answerService
+  +submitAnswer(questionId, selectedAnswers) AnswerResult
 }
 
 class QuestionService {
   -QuestionRepository questionRepository
+  +getRandomQuestion(stageId, excludedIds) Question
+}
+
+class AnswerService {
+  -QuestionRepository questionRepository
   -AnswerHistoryRepository historyRepository
-  +getRandomQuestion(stageId) Question
+  -StageSessionService stageSessionService
   +checkAnswer(questionId, selectedAnswers) boolean
-  +saveAnswerHistory(...) void
+  +saveAnswerHistory(...)
+  +processAnswer(...)
+  +processTimeout(...)
 }
 
 class StageService {
   -StageRepository stageRepository
   +getStage(stageId) Stage
-  +clearStage(stageId) boolean
+}
+
+class StageSessionService {
+  -StageSessionRepository stageSessionRepository
+  +startStage(userId, stageId) StageSession
+  +updateCorrect(sessionId)
+  +updateIncorrect(sessionId)
+  +updateTimeout(sessionId)
+  +finishStage(sessionId) GameResult
 }
 
 class ReviewService {
@@ -1049,13 +1267,14 @@ class ReviewService {
   +getStatistics(userId)
 }
 
-class MiniGameSelector {
-  +selectGame(question, stage) MiniGame
+class GameEffectSelector {
+  +selectEffect(actionPattern) GameEffect
 }
 
 class QuestionRepository {
   <<interface>>
-  +findRandomByStage(stageId) Question
+  +findByStageId(stageId) List~Question~
+  +findById(questionId) Question
 }
 
 class AnswerHistoryRepository {
@@ -1064,13 +1283,24 @@ class AnswerHistoryRepository {
   +findByUserId(userId)
 }
 
+class StageRepository {
+  <<interface>>
+  +findById(stageId) Stage
+}
+
+class StageSessionRepository {
+  <<interface>>
+  +save(session)
+  +findById(sessionId) StageSession
+}
+
 class Question {
   Long id
   String questionText
   String codeBlock
   int choiceCount
-  int correctAnswerCount
-  int timeLimit
+  int requiredAnswerCount
+  int timeLimitSeconds
   String difficulty
   String category
   String explanation
@@ -1089,106 +1319,171 @@ class Stage {
   int chapter
   int round
   int questionCount
+  int defaultTimeLimitSeconds
   String playerType
   String enemyType
   String actionPattern
+  String background
+}
+
+class StageSession {
+  Long id
+  Long userId
+  Long stageId
+  int currentQuestionIndex
+  int correctCount
+  int currentCombo
+  int maxCombo
+  int score
+  int remainingEnemyHp
 }
 
 class AnswerHistory {
   Long id
   Long userId
   Long questionId
-  String selectedAnswers
   boolean correct
-  int answerTime
+  int answerTimeSeconds
 }
 
-class MiniGame {
+class GameResult {
+  Long id
+  Long userId
+  Long stageId
+  int score
+  int maxCombo
+  int correctCount
+  int totalCount
+  boolean cleared
+}
+
+class GameEffect {
   <<interface>>
   +playCorrectEffect()
   +playStageClearEffect()
 }
 
 QuestionController --> QuestionService
+QuestionController --> AnswerController
+
 QuestionService --> QuestionRepository
-QuestionService --> AnswerHistoryRepository
-QuestionService --> Question
+AnswerService --> QuestionRepository
+AnswerService --> AnswerHistoryRepository
+AnswerService --> StageSessionService
+
+StageService --> StageRepository
+StageSessionService --> StageSessionRepository
+StageSessionService --> Stage
+
 Question --> Choice
-StageService --> Stage
-StageService --> MiniGameSelector
-MiniGameSelector --> MiniGame
 ReviewService --> AnswerHistoryRepository
+
+Stage --> GameEffectSelector
+GameEffectSelector --> GameEffect
 ```
 
----
+### 設計上のポイント
 
+- `Question` は問題そのものを表す。
+- `Stage` はステージの固定設定を表す。
+- `StageSession` はプレイ中の可変状態を表す。
+- `AnswerHistory` は個々の回答履歴を表す。
+- `GameEffect` は問題判定とは別のゲーム演出を表す。
+- 複数選択の正誤判定は `AnswerService` が担当する。
+- DBアクセスはRepositoryに集約する。
+
+---
 # 21. シーケンス図：回答判定
 
 ```mermaid
 sequenceDiagram
     autonumber
+
     actor User as ユーザー
     participant Game as GameScreen
     participant Controller as AnswerController
     participant Service as AnswerService
-    participant Question as QuestionRepository
-    participant History as AnswerHistoryRepository
-    participant Effect as MiniGameEngine
+    participant QuestionRepo as QuestionRepository
+    participant HistoryRepo as AnswerHistoryRepository
+    participant Session as StageSessionService
+    participant Effect as GameEffect
 
     User->>Game: 選択肢を回答
-    Game->>Controller: submitAnswer()
-    Controller->>Service: answer(questionId, selectedAnswers)
-    Service->>Question: 問題・正解を取得
-    Question-->>Service: Question
-    Service->>Service: 正誤判定
+    Game->>Controller: submitAnswer(questionId, selectedAnswers)
+    Controller->>Service: processAnswer(...)
+
+    Service->>QuestionRepo: findById(questionId)
+    QuestionRepo-->>Service: Question + Choices
+    Service->>Service: selectedAnswersと正解集合を完全一致比較
 
     alt 正解
-        Service->>History: 正解履歴を保存
-        Service->>Effect: 正解イベント
-        Effect-->>Game: 攻撃・シュート等の演出
-        Game-->>User: 正解・解説・演出
+        Service->>HistoryRepo: 正解履歴を保存
+        Service->>Session: updateCorrect()
+        Session-->>Service: HP・コンボ・スコア更新
+        Service->>Effect: playCorrectEffect()
+        Effect-->>Game: 攻撃・シュート等
+        Game-->>User: 正解・短い解説・演出
     else 不正解
-        Service->>History: 不正解履歴を保存
-        Game-->>User: 不正解・解説
+        Service->>HistoryRepo: 不正解履歴を保存
+        Service->>Session: updateIncorrect()
+        Session-->>Service: コンボ0
+        Game-->>User: 不正解・短い解説
     end
 ```
 
 ---
-
 # 22. シーケンス図：ステージ進行
 
 ```mermaid
 sequenceDiagram
     autonumber
+
     participant User as ユーザー
     participant Stage as StageController
     participant Question as QuestionService
-    participant Effect as MiniGameEngine
+    participant Session as StageSessionService
+    participant Effect as GameEffect
     participant DB as Database
 
     User->>Stage: 1-1開始
-    Stage->>Question: ステージ問題取得
-    Question->>DB: Question Pool検索
-    DB-->>Question: 複数問題
-    Question-->>Stage: ランダム問題
+    Stage->>Session: StageSession開始
+    Session->>DB: StageSession保存
 
     loop ステージ問題数分
+        Stage->>Question: 問題プール取得
+        Question->>DB: ステージ問題検索
+        DB-->>Question: 複数問題
+        Question-->>Stage: ランダム問題
+
         User->>Stage: 回答
-        Stage->>Effect: 正解イベント
+
         alt 正解
-            Effect-->>User: 攻撃・シュート等
-            Stage->>Stage: Enemy HP - 1
+            Stage->>Session: updateCorrect()
+            Session->>Session: correctCount + 1
+            Session->>Session: remainingEnemyHp - 1
+            Session->>Session: currentCombo + 1
+            Session->>Session: score + 100
+            Session->>Effect: 正解演出
         else 不正解
-            Effect-->>User: 不正解演出
+            Stage->>Session: updateIncorrect()
+            Session->>Session: currentCombo = 0
+        else 時間切れ
+            Stage->>Session: updateTimeout()
+            Session->>Session: currentCombo = 0
         end
     end
 
-    Stage-->>User: STAGE CLEAR
-    Stage-->>User: 1-2を開放
+    alt 全問正解
+        Session->>DB: GameResult(cleared=true)
+        Stage-->>User: STAGE CLEAR
+        Stage-->>User: 1-2 OPEN
+    else 不正解または時間切れあり
+        Session->>DB: GameResult(cleared=false)
+        Stage-->>User: RESULT / REVIEW
+    end
 ```
 
 ---
-
 # 23. Python / FastAPI連携シーケンス（採用時）
 
 Pythonを採用する場合の参考構成。
@@ -1210,6 +1505,92 @@ sequenceDiagram
 Pythonサーバー停止時でもJavaシステム全体が落ちないようにする場合は、Java側で例外処理・フォールバックを設ける。
 
 ただし、これはMVP完成後の拡張候補であり、期限を圧迫する場合は削る。
+
+---
+
+# 24. 設計整合性チェック
+
+実装開始前に、要求・データモデル・クラス図・シーケンス図の間で、同じ仕様が同じルールで表現されているか確認する。
+
+## 24.1 複数選択
+
+要求：A～Gのうち2つ・3つ選択などに対応する。
+
+設計：
+
+```text
+Question.requiredAnswerCount
+Choice.isCorrect
+AnswerHistorySelectedChoice
+```
+
+回答判定：
+
+```text
+selectedChoiceSet == correctChoiceSet
+```
+
+部分点はなし。
+
+## 24.2 ステージHP
+
+要求：1問正解ごとに敵HPを1減らす。
+
+設計：
+
+```text
+Stage.questionCount
+        ↓
+最大HP
+
+StageSession.correctCount
+        ↓
+残HP = 最大HP - 正解数
+```
+
+`enemyCurrentHp` をStageマスターに持たせず、プレイ中の状態として `StageSession` に保持する。
+
+## 24.3 制限時間
+
+要求：問題ごとに時間が異なる。
+
+設計：
+
+```text
+Question.timeLimitSeconds
+```
+
+Stageに標準値がある場合は、Questionの個別値を優先する。
+
+## 24.4 時間切れ
+
+```text
+TIME = 0
+ ↓
+入力ロック
+ ↓
+不正解確定
+ ↓
+履歴保存
+ ↓
+コンボ0
+ ↓
+解説
+ ↓
+次問題
+```
+
+## 24.5 ステージクリア
+
+```text
+全問回答
+AND
+全問正解
+↓
+STAGE CLEAR
+```
+
+このチェックを、UML・実装・テストケースの共通基準にする。
 
 ---
 
@@ -1559,27 +1940,26 @@ RESULT
 
 ---
 
-# 34. 今後の設計で決める項目
+# 34. 今後の詳細設計で決める項目
 
-実装前に以下を確定する。
+基本的な業務ルールは上記で確定した。残りは実装規模・UI・データ量に関する詳細設計で決定する。
 
-- 不正解時のステージ進行
-- 時間切れ時の処理
-- コンボが切れる条件
-- ステージクリア条件
-- 問題の重複出題ルール
-- ランダム出題方式
-- 長文問題の表示方法
-- 正解演出の切り替えルール
-- プレイヤー・敵の素材管理
-- 音声・効果音の有無
-- スコア計算式
-- グラフに表示する統計値
-- ユーザー認証の有無
+- 実際の問題数とQuestion Poolの件数
+- Java Bronzeの学習範囲ごとの具体的な問題配分
+- 各問題の具体的な制限時間
+- 問題の重複出題防止ルール
+- スコア演出・残り時間ボーナスをMVPに入れるか
+- 具体的なゲーム演出パターンと素材
+- 効果音・BGMの有無
+- ユーザー認証をMVPに含めるか
 - Python / FastAPIをMVPに含めるか
+- DBのINDEX・UNIQUE・FKなどの物理設計
+- APIの詳細なrequest / response形式
+- 長文問題のスクロール量・レスポンシブ表示
+
+**ここにある項目は「基本仕様が未定」という意味ではなく、実装時に具体値を決める詳細設計項目である。**
 
 ---
-
 # 35. ポートフォリオとして伝えたいこと
 
 この作品では、ゲームの見た目だけではなく、開発プロセス全体を説明できることを重視する。
@@ -1722,6 +2102,7 @@ AIをどこに使い、どこを自分で判断・実装したのか。
 - AI活用方針を整理
 - アジャイル的な開発・Git / GitHubによるタスク管理方針を追加
 - 初心者とSE / SESの双方が読みやすい「概要 → 機能 → 設計 → 実装」の順番に整理
+- 複数選択・HP・時間切れ・ステージクリア条件など、要求と設計モデルの整合性を整理
 
 ---
 
