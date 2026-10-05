@@ -1,0 +1,45 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### 🔒 実務セキュリティ対策：機密情報の流出防止 ###
+# ローカル開発環境（Local）や本番環境（Prod）の接続パスワード・秘密鍵が書かれたファイル
+/src/main/resources/application-local.properties
+/src/main/resources/application-prod.properties
+/src/main/resources/application-*.properties
+/src/main/resources/application-*.yml
+
+### 💻 OS・個人環境のゴミデータ除外 ###
+# MacやWindowsが自動生成する不要なインデックスファイル
+.DS_Store
+Thumbs.db
