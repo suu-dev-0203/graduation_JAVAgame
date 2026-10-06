@@ -1,5 +1,5 @@
-[Java_Learning_System_README_最終統合版_20261006.md](https://github.com/user-attachments/files/33084451/Java_Learning_System_README_._20261006.md)
-# JAVA QUEST
+[Java_Learning_System_README_64plus_初心者向け図解版_20261006.md](https://github.com/user-attachments/files/33090085/Java_Learning_System_README_64plus_._20261006.md)
+# JAVA QUEST（仮称）
 ## ゲーム要素を取り入れたJava学習管理Webシステム
 
 > **Javaの問題を1問解くたび、ゲームの世界が動く。**
@@ -11,6 +11,8 @@ Java Bronzeを学習している初学者を対象に、**問題演習・ゲー�
 ---
 
 # 0. READMEの読み方
+
+> **このREADMEは、最初から全部理解・暗記する必要はありません。まずは1～23で「何を作るか」を理解し、24以降の設計図は「どう作るか」を確認する資料として使います。**
 
 このREADMEは、学校の卒業制作資料としても、GitHubのポートフォリオとしても読めるように構成している。
 
@@ -163,72 +165,84 @@ RESULT / REVIEW
 
 # 3. 学習体験の基本ループ
 
-## 3.1 基本ループ
+## 3.1 まず「1 Stage = 5問」と考える
+
+この作品の基本は、**5問を1つの小さなゲームバトルとして進めること**です。
 
 ```text
-① Chapterを選択
+① Chapterを選ぶ
         ↓
-② 出題数を5 / 10 / 20問から選択
+② 5 / 10 / 20問を選ぶ
         ↓
-③ Question Poolから出題候補を決定
+③ Stage開始
+   敵は1体・HP5
         ↓
-④ 問題表示・タイマー開始
+④ 問題を見る
         ↓
-⑤ キーボード / マウスで回答
+⑤ 考える → キーを押す
         ↓
-⑥ 正誤判定
-   ┌──────┴──────┐
-   ↓             ↓
- 正解           不正解・時間切れ
-   ↓             ↓
-ゲームアクション   MISS / TIME UP
-   ↓             ↓
-短い解説
-   └──────┬──────┘
-          ↓
-       次の問題
-          ↓
-      5問終了？
-       ↓      ↓
-      No      Yes
-      ↓        ↓
-   次問題   STAGE CLEAR
-               ↓
-        次Stage or RESULT
-               ↓
-        成績・復習・再挑戦
+⑥ すぐに正誤が分かる
+       ┌─────────────┐
+       │             │
+      正解           不正解 / 時間切れ
+       ↓             ↓
+  キャラが攻撃       MISS / TIME UP
+       ↓             ↓
+   敵HP -1         敵HPそのまま
+       └──────┬──────┘
+              ↓
+          短い解説
+              ↓
+          次の問題
+              ↓
+           5問終了？
+            ↓     ↓
+           No     Yes
+            ↓      ↓
+        次の問題  Stage Clear
+                     ↓
+             5問すべて正解？
+                ↓        ↓
+               Yes       No
+                ↓         ↓
+             PERFECT     CLEAR
+                ↓         ↓
+             次Stage / Result
 ```
 
-## 3.2 学習とゲームの関係
+### 3.2 このゲームの「気持ちよさ」
 
-正解すると、
+Typing Landなどを参考にするのは、**キーを押したら画面がすぐ反応すること**です。
 
 ```text
-🥷 攻撃
-🏀 シュート
-🎣 釣る
-🎳 倒す
-🏎️ 追い抜く
-🚆 追い抜く
-🐧 捕まえる
+考える
+ ↓
+キーを押す
+ ↓
+即反応
+ ↓
+キャラクターが動く
+ ↓
+成功 / MISS
+ ↓
+すぐ次へ
 ```
 
-などのゲームイベントを発生させる。
+長い待ち時間を作らず、学習のテンポを保つことを重要な設計方針とします。
 
-不正解の場合は、
+### 3.3 5問の意味
+
+1問ごとにゲームが完全に終わるのではなく、**同じ敵との5問バトルが続きます。**
 
 ```text
-MISS!
+問題1 → 正解 → HP4
+問題2 → 正解 → HP3
+問題3 → 正解 → HP2
+問題4 → 正解 → HP1
+問題5 → 正解 → HP0 → PERFECT
 ```
 
-時間切れの場合は、
-
-```text
-TIME UP!
-MISS!
-```
-
-を表示し、解説後に次へ進む。
+そのため、**問題を解くこと = Stageを攻略すること**になります。
 
 ---
 
@@ -657,51 +671,36 @@ Typing LandやOzawa-Kenなどは、**UI/UXの考え方やゲームとしての�
 
 ## 11.1 問題ごとの制限時間
 
-回答時間は固定値ではなく、Questionごとに設定する。
+回答時間は**問題ごと**に設定します。
 
-考慮する要素：
+```text
+Question
+ └ 制限時間
+```
+
+考慮するもの：
 
 - 問題文の長さ
 - コード量
-- 問題難易度
+- 問題の難しさ
 - 問題形式
-- 学習分野
 - 想定回答時間
-- 実際の試験で必要とされる時間感覚
 
-```text
-Question.timeLimitSeconds
-```
+MVPでは、**Questionに設定した時間を唯一の基準**とします。
 
-を基本値とする。
-
-Stage側に標準値を持たせる場合は、
-
-```text
-Question.timeLimitSeconds
-    ↓ 設定あり
-個別値を採用
-
-設定なし
-    ↓
-Stage.defaultTimeLimitSeconds
-```
-
-とする。
+「Stageの時間」「問題の時間」の2種類を作らず、最初は1つに絞ることで、実装を分かりやすくします。
 
 ## 11.2 コンボ
 
 ```text
-正解       → currentCombo + 1
-不正解     → currentCombo = 0
-時間切れ   → currentCombo = 0
+正解       → コンボ +1
+不正解     → コンボ 0
+時間切れ   → コンボ 0
 ```
-
-`maxCombo` は結果に保存する。
 
 ## 11.3 スコア
 
-MVPではシンプルにする。
+MVPではシンプルにします。
 
 ```text
 正解       → +100
@@ -709,7 +708,7 @@ MVPではシンプルにする。
 時間切れ   → +0
 ```
 
-残り時間ボーナスや難易度倍率などは拡張候補とする。
+残り時間ボーナスなどは余裕があれば追加します。
 
 ---
 
@@ -814,53 +813,41 @@ Stage 4：5問
 
 # 14. Game ProgressとHP
 
-全ゲームを「敵HP」で表現すると、釣りやレースなどに合わない。
+## 14. Game ProgressとHP
 
-そのため、共通概念を**GameProgress**とする。
-
-```text
-GameProgress
-```
-
-### 戦闘系
+今のMVPで一番大切なのは、**敵HPを正解数に合わせて減らすこと**です。
 
 ```text
+Stage開始
+ ↓
+敵HP = 5
+ ↓
 正解
  ↓
-敵HP - 1
+敵HP -1
 ```
 
-### スポーツ系
+5問すべて正解すると、
 
 ```text
-正解
- ↓
-シュート成功数 + 1
+HP 5 → 4 → 3 → 2 → 1 → 0
+                         ↓
+                      PERFECT
 ```
 
-### 釣り
+### 14.1 将来の別ゲーム
+
+将来的に釣り・レース・スポーツなどを追加するときは、「HP」以外の進み方も使えます。
 
 ```text
-正解
- ↓
-魚GET数 + 1
+釣り    ：魚を1匹GET
+レース  ：1台追い抜く
+バスケ  ：1ゴール決める
 ```
 
-### レース
+これらをまとめて「ゲームの進み具合」として扱う考え方が `GameProgress` です。
 
-```text
-正解
- ↓
-追い抜き数 + 1
-```
-
-つまり、
-
-> **正解 → GameProgress + 1**
-
-を共通ルールにし、ゲームごとに見せ方を変える。
-
-これにより、戦闘・スポーツ・動物・乗り物を同じゲームシステム上で扱える。
+ただし、**MVPではまず敵HP5のゲームを完成させることを優先**します。
 
 ---
 
@@ -1148,39 +1135,43 @@ HOMEへ戻る場合は、
 
 # 21. 画面遷移
 
+## 21. 画面遷移図
+
+画面遷移図は、**「次にどこへ進むのか」**を表す地図です。
+
 ```mermaid
 flowchart TD
-    HOME[HOME] --> CHAPTER[Chapter Select]
-
-    CHAPTER --> SETTING[Play Setting<br/>5 / 10 / 20問]
-
-    SETTING --> PLAY[Game Screen]
-
-    PLAY --> CORRECT[Correct]
-    PLAY --> MISS[MISS]
-    PLAY --> TIMEUP[TIME UP]
-
-    CORRECT --> FEEDBACK[Short Explanation]
-    MISS --> FEEDBACK
-    TIMEUP --> FEEDBACK
-
-    FEEDBACK --> NEXT{5問終了?}
-
-    NEXT -- No --> PLAY
-    NEXT -- Yes --> CLEAR[Stage Clear / Perfect]
-
-    CLEAR --> MORE{次Stageあり?}
-    MORE -- Yes --> PLAY
-    MORE -- No --> RESULT[Result]
-
-    RESULT --> REVIEW[Review]
-    REVIEW --> RETRY[Re-Challenge]
-    RETRY --> PLAY
-
-    PLAY --> PAUSE[Pause Overlay]
-    PAUSE --> PLAY
-    PAUSE --> HOME
+    A[ホーム] --> B[Chapterを選ぶ]
+    B --> C[5 / 10 / 20問を選ぶ]
+    C --> D[Stage開始]
+    D --> E[問題を表示]
+    E --> F[キーで回答]
+    F --> G{正解？}
+    G -- はい --> H[キャラクターが攻撃]
+    H --> I[敵HPを1減らす]
+    G -- いいえ --> J[MISS / TIME UP]
+    I --> K[短い解説]
+    J --> K
+    K --> L{5問終了？}
+    L -- いいえ --> E
+    L -- はい --> M[Stage Clear]
+    M --> N{5問すべて正解？}
+    N -- はい --> O[PERFECT]
+    N -- いいえ --> P[CLEAR]
+    O --> Q{次Stageあり？}
+    P --> Q
+    Q -- はい --> D
+    Q -- いいえ --> R[Result]
+    R --> S[Review / 復習]
 ```
+
+### 21.1 図の見方
+
+- 四角 = 画面や処理
+- 「？」の形 = 条件を確認する場所
+- 矢印 = 次に進む方向
+
+この図で覚えるべきことは、**「Chapterを選ぶ → Stageで5問 → 結果 → 復習」**という流れです。
 
 ---
 
@@ -1285,237 +1276,214 @@ RESULT
 
 # 24. データモデル
 
-## User
+## 24. データモデル
+
+データモデルは難しそうに見えますが、簡単にいうと、
+
+> **「このシステムは、何を覚えておく必要がある？」**
+
+を整理したものです。
+
+まずは名前より役割を理解します。
+
+| データ | 簡単な意味 | 例 |
+|---|---|---|
+| User | 使っている人 | 学習者 |
+| Course | 学習コース | Java Bronze |
+| Chapter | 勉強するテーマ | 変数、条件分岐 |
+| Stage | ステージの設定 | 忍者・城・敵 |
+| Question | 問題 | 「intは何型？」 |
+| Choice | 選択肢 | A int / B double |
+| GameSession | 今回のプレイ全体 | 20問プレイ中 |
+| StageSession | 今回の5問バトルの状態 | 3問目・HP2 |
+| AnswerHistory | 過去の回答記録 | Q001を不正解 |
+| QuestionProgress | 問題の現在の学習状態 | 要復習 |
+| GameResult | プレイ結果 | 16/20正解 |
+
+### 24.1 1問答えると何を覚える？
 
 ```text
-User
-├ userId
-├ username
-└ ...
+どの問題？
+ ↓
+何を選んだ？
+ ↓
+正解？
+ ↓
+何秒かかった？
+ ↓
+今のStageは何問目？
+ ↓
+敵HPはいくつ？
 ```
 
-認証をMVPに含めるかは実装規模を見て決定する。
+これらを保存・管理する「箱」がデータモデルです。
 
-## Chapter
+### 24.2 Javaコード上の名前
+
+実際のプログラムでは、上の「箱」を次の英語名で作る予定です。
 
 ```text
-Chapter
-├ chapterId
-├ chapterNumber
-├ name
-├ description
-├ difficultyStars
-└ ...
+User             = 利用者
+Course           = 学習コース
+Chapter          = 学習テーマ
+StageDefinition  = Stageの設定
+Question         = 問題
+Choice           = 選択肢
+GameSession      = 今回のプレイ全体
+StageSession     = 今回のStageの状態
+AnswerHistory    = 回答履歴
+QuestionProgress = 問題の現在の学習状態
+GameResult       = プレイ結果
 ```
 
-## Question
-
-```text
-Question
-├ questionId
-├ chapterId
-├ questionText
-├ codeBlock
-├ choiceCount
-├ requiredAnswerCount
-├ timeLimitSeconds
-├ difficulty
-├ category
-└ explanation
-```
-
-## Choice
-
-```text
-Choice
-├ choiceId
-├ questionId
-├ choiceLabel
-├ choiceText
-└ isCorrect
-```
-
-## QuestionProgress
-
-```text
-QuestionProgress
-├ userId
-├ questionId
-├ attemptCount
-├ correctCount
-├ incorrectCount
-├ consecutiveCorrect
-├ currentStatus
-├ firstAnsweredAt
-└ lastAnsweredAt
-```
-
-## ChapterProgress
-
-```text
-ChapterProgress
-├ userId
-├ chapterId
-├ answeredCount
-├ correctCount
-├ masteredCount
-├ reviewCount
-├ accuracyRate
-└ lastPlayedAt
-```
-
-## GameSession
-
-1回の5 / 10 / 20問プレイ全体を管理する。
-
-```text
-GameSession
-├ sessionId
-├ userId
-├ chapterId
-├ requestedQuestionCount
-├ currentQuestionIndex
-├ currentStageNumber
-├ totalCorrectCount
-├ totalScore
-├ maxCombo
-├ startedAt
-└ completedAt
-```
-
-## StageSession
-
-5問単位の実行状態を管理する。
-
-```text
-StageSession
-├ stageSessionId
-├ gameSessionId
-├ stageNumber
-├ questionCount
-├ currentQuestionIndex
-├ correctCount
-├ currentCombo
-├ maxCombo
-├ score
-├ gameProgress
-├ startedAt
-└ completedAt
-```
-
-戦闘系ゲームでは `gameProgress` を敵HPの減少に変換して表示する。
-
-## AnswerHistory
-
-```text
-AnswerHistory
-├ historyId
-├ userId
-├ questionId
-├ stageSessionId
-├ correct
-├ answerTimeSeconds
-└ answeredAt
-```
-
-## AnswerHistorySelectedChoice
-
-複数選択を文字列1列に押し込めず、子データとして保持する。
-
-```text
-AnswerHistorySelectedChoice
-├ historyId
-└ choiceId
-```
-
-## GameResult
-
-```text
-GameResult
-├ resultId
-├ userId
-├ gameSessionId
-├ chapterId
-├ score
-├ maxCombo
-├ correctCount
-├ totalCount
-├ cleared
-└ completedAt
-```
+**英語を暗記することではなく、「この箱は何を入れる箱か」を理解することが大切です。**
 
 ---
 
 # 25. データの関係
 
+## 25. データの関係図
+
+この図は、**「どのデータとどのデータがつながっているか」**を表します。
+
 ```mermaid
-erDiagram
-    USER ||--o{ GAME_SESSION : plays
-    USER ||--o{ ANSWER_HISTORY : creates
-    USER ||--o{ QUESTION_PROGRESS : learns
-    USER ||--o{ CHAPTER_PROGRESS : tracks
+flowchart TD
+    A[Java Bronze
+学習コース]
+    B[Chapter
+勉強するテーマ]
+    C[問題の集まり
+Question Pool]
+    D[問題
+Question]
+    E[選択肢
+Choice]
 
-    CHAPTER ||--o{ QUESTION : contains
-    QUESTION ||--o{ CHOICE : has
+    F[今回のプレイ
+GameSession]
+    G[5問のStage
+StageSession]
+    H[回答履歴
+AnswerHistory]
+    I[今の学習状態
+QuestionProgress]
+    J[結果
+GameResult]
 
-    GAME_SESSION ||--o{ STAGE_SESSION : contains
-    GAME_SESSION ||--|| GAME_RESULT : produces
+    A --> B
+    B --> C
+    C --> D
+    D --> E
 
-    STAGE_SESSION ||--o{ ANSWER_HISTORY : records
-    ANSWER_HISTORY ||--o{ ANSWER_HISTORY_SELECTED_CHOICE : stores
-    CHOICE ||--o{ ANSWER_HISTORY_SELECTED_CHOICE : selected
-
-    QUESTION ||--o{ ANSWER_HISTORY : answered
-    QUESTION ||--o{ QUESTION_PROGRESS : tracked
-
-    CHAPTER ||--o{ CHAPTER_PROGRESS : summarized
-    CHAPTER ||--o{ GAME_SESSION : played
+    B --> F
+    F --> G
+    G --> H
+    D --> H
+    H --> I
+    F --> J
 ```
+
+### 25.1 もっと簡単にすると
+
+```text
+何を勉強する？
+ ↓
+Chapter
+ ↓
+問題を解く
+ ↓
+その結果を記録する
+ ↓
+今の苦手・習得状態を更新する
+```
+
+一方、プレイそのものは、
+
+```text
+Chapter
+ ↓
+今回のプレイ
+ ↓
+5問のStage
+ ↓
+結果
+```
+
+と考えます。
+
+**「問題そのもの」と「今回のプレイ結果」を分ける**ことが、この図の一番大事なポイントです。
 
 ---
 
 # 26. システム全体像
 
-## 26.1 基本アーキテクチャ
+## 26. システム全体像
 
-```text
-┌────────────────────────────────────┐
-│ Web Browser                        │
-│ HTML / CSS / JavaScript            │
-│ HOME / GAME / RESULT / REVIEW      │
-└──────────────────┬─────────────────┘
-                   │ HTTP / REST
-                   ▼
-┌────────────────────────────────────┐
-│ Java / Spring Boot                 │
-│ Controller                         │
-│ Service                            │
-│ Repository                         │
-└──────────────────┬─────────────────┘
-                   │
-                   ▼
-┌────────────────────────────────────┐
-│ Database                           │
-│ Chapter / Question / Choice        │
-│ History / Progress / Result        │
-└────────────────────────────────────┘
+システム全体は、まず次の3つに分けて考えます。
+
+```mermaid
+flowchart LR
+    A[ブラウザ
+問題表示・キー入力・ゲーム演出]
+    -->|データを送る| B[Java / Spring Boot
+問題確認・正誤判定・Stage管理]
+    -->|保存・取得| C[データベース
+問題・履歴・結果を保存]
 ```
 
-## 26.2 技術スタック
+### 26.1 基本アーキテクチャ
 
-| 技術 | 主な役割 |
-|---|---|
-| Java | アプリケーションの中心ロジック |
-| Spring Boot | Web / API / 業務処理 |
-| HTML | 画面構造 |
-| CSS | UI・アニメーション |
-| JavaScript | タイマー・操作・ゲーム演出・画面制御 |
-| SQL / Database | 問題・履歴・成績の保存 |
-| Git / GitHub | ソースコード管理・変更履歴 |
-| Python | 必要性が明確な問題データ処理等 |
-| FastAPI | Python連携を採用する場合のAPI候補 |
-| Mermaid | UML等のドキュメント可視化 |
-| Blender | 余裕がある場合のオリジナル3D素材制作 |
+初心者は、まずこの3段階だけ覚えれば大丈夫です。
+
+```text
+┌─────────────────────────────┐
+│ ① 画面                     │
+│ ブラウザ                   │
+│ HTML / CSS / JavaScript    │
+│                            │
+│ 問題を表示                 │
+│ キー入力を受け取る         │
+│ キャラクターを動かす       │
+└─────────────┬──────────────┘
+              ↓
+┌─────────────────────────────┐
+│ ② Java側                   │
+│ Spring Boot                │
+│                            │
+│ 正解・不正解を判定         │
+│ Stageを進める              │
+│ スコアなどを計算           │
+└─────────────┬──────────────┘
+              ↓
+┌─────────────────────────────┐
+│ ③ データ保存               │
+│ Database                   │
+│                            │
+│ 問題・回答履歴・結果を保存 │
+└─────────────────────────────┘
+```
+
+### 26.2 Java側の役割分担
+
+コードが大きくなったら、Java側をさらに分けます。
+
+```text
+画面からのお願い
+ ↓
+Controller
+ ↓
+Service
+ ↓
+Repository
+ ↓
+Database
+```
+
+- Controller = 画面からのお願いを受け取る
+- Service = どう処理するか考える
+- Repository = データを保存・取得する
+
+つまり、**仕事を分担しているだけ**です。
 
 ---
 
@@ -1554,98 +1522,58 @@ Python / FastAPIはMVP必須ではない。
 
 # 28. 要求モデル
 
-学校で学習したICONIXの考え方に沿って、
+## 28.3 Use Case Diagram（利用者ができることの図）
 
-```text
-なぜ作るのか
- ↓
-誰が使うのか
- ↓
-何ができるのか
- ↓
-どのようなシナリオがあるのか
-```
+Use Case Diagramは、難しい図ではなく、
 
-を整理する。
+> **「このシステムで、利用者は何ができる？」**
 
-## 28.1 ビジネスモデリング
-
-### なぜ作るのか
-
-Java資格学習の反復を続けやすくし、苦手分野の把握と復習を支援するため。
-
-### 誰が使うのか
-
-Java Bronze等を学習する初学者。
-
-### 何を提供するのか
-
-```text
-問題演習
-+
-ゲームフィードバック
-+
-回答履歴
-+
-復習
-+
-学習分析
-```
-
-## 28.2 主なユースケース
-
-```text
-利用者
- ├ Chapterを選択する
- ├ 出題数を選択する
- ├ 学習を開始する
- ├ 問題を見る
- ├ 問題に回答する
- ├ 解説を見る
- ├ ゲーム演出を見る
- ├ Pauseする
- ├ Stageをクリアする
- ├ 結果を見る
- ├ 苦手分野を見る
- ├ 回答履歴を見る
- ├ 問題を復習する
- └ 再挑戦する
-```
-
-## 28.3 Use Case Diagram
+を整理する図です。
 
 ```mermaid
 flowchart LR
-    User((学習者))
+    U((学習者))
+    A[Chapterを選ぶ]
+    B[問題数を選ぶ]
+    C[問題を解く]
+    D[ゲームアクションを見る]
+    E[結果を見る]
+    F[間違えた問題を復習する]
+    G[もう一度挑戦する]
+    H[一時停止する]
 
-    UC1((Chapter選択))
-    UC2((出題数選択))
-    UC3((問題を解く))
-    UC4((回答する))
-    UC5((解説を見る))
-    UC6((ゲーム演出))
-    UC7((結果を見る))
-    UC8((復習する))
-    UC9((成績を見る))
-    UC10((再挑戦する))
-    UC11((Pause / Resume))
+    U --> A
+    U --> B
+    U --> C
+    U --> D
+    U --> E
+    U --> F
+    U --> G
+    U --> H
 
-    User --> UC1
-    User --> UC2
-    User --> UC3
-    User --> UC4
-    User --> UC5
-    User --> UC6
-    User --> UC7
-    User --> UC8
-    User --> UC9
-    User --> UC10
-    User --> UC11
-
-    UC3 -. include .-> UC4
-    UC4 -. include .-> UC5
-    UC4 -. include .-> UC6
+    C --> D
+    C --> E
+    E --> F
+    F --> G
 ```
+
+### 28.3.1 この図を日本語で説明すると
+
+```text
+選ぶ
+ ↓
+問題を解く
+ ↓
+ゲームが動く
+ ↓
+結果を見る
+ ↓
+復習する
+ ↓
+もう一度挑戦する
+```
+
+これが、この作品の利用者の基本的な流れです。
 
 ---
 
@@ -1748,97 +1676,53 @@ GameResult
 
 # 31. ロバストネス分析
 
-Boundary（画面）、Control（処理）、Entity（データ）に分離する。
+## 31. ロバストネス分析
+
+「ロバストネス分析」という名前は難しいですが、ここでは、
+
+> **「画面」「処理」「データ」の役割分担を考える方法**
+
+として理解します。
 
 ```mermaid
 flowchart LR
-    U[学習者]
-
-    B1[ChapterSelectScreen]
-    B2[PlaySettingScreen]
-    B3[GameScreen]
-    B4[ResultScreen]
-    B5[ReviewScreen]
-
-    C1((ChapterController))
-    C2((GameController))
-    C3((AnswerController))
-    C4((ResultController))
-    C5((ReviewController))
-
-    E1[(Chapter)]
-    E2[(Question)]
-    E3[(Choice)]
-    E4[(QuestionProgress)]
-    E5[(AnswerHistory)]
-    E6[(GameSession)]
-    E7[(StageSession)]
-    E8[(GameResult)]
-
-    U --> B1
-    B1 --> C1
-    C1 --> E1
-
-    U --> B2
-    B2 --> C2
-    C2 --> E6
-
-    U --> B3
-    B3 --> C3
-    C3 --> E2
-    C3 --> E3
-    C3 --> E4
-    C3 --> E5
-    C3 --> E7
-
-    B4 --> C4
-    C4 --> E8
-
-    B5 --> C5
-    C5 --> E4
-    C5 --> E5
+    A[画面
+利用者が見る・操作する]
+    --> B[処理
+答えを判定・Stageを進める]
+    --> C[データ
+問題・履歴・学習状態]
+    C --> B
+    B --> A
 ```
 
-## Boundary
+### 31.1 3つの意味
 
-- HomeScreen
-- ChapterSelectScreen
-- PlaySettingScreen
-- GameScreen
-- QuestionDisplay
-- ChoiceDisplay
-- TimerDisplay
-- ScoreDisplay
-- ComboDisplay
-- GameArea
-- PauseOverlay
-- ResultScreen
-- ReviewScreen
+```text
+画面 = 見る・操作する
+処理 = 考える・判断する
+データ = 覚えておく
+```
 
-## Control
+例えば問題に答えると、
 
-- ChapterController
-- GameController
-- QuestionController
-- AnswerController
-- StageController
-- ResultController
-- ReviewController
-- MiniGameController
+```text
+画面
+「Aキーが押された」
+       ↓
+処理
+「Aは正解？」
+       ↓
+データ
+「この問題は正解だった」と記録
+       ↓
+画面
+「CORRECT！攻撃！」
+```
 
-## Entity
+となります。
 
-- User
-- Chapter
-- Question
-- Choice
-- QuestionProgress
-- ChapterProgress
-- GameSession
-- StageSession
-- AnswerHistory
-- AnswerHistorySelectedChoice
-- GameResult
+この関係を整理するのがロバストネス分析です。
 
 ---
 
@@ -1888,266 +1772,247 @@ Databaseへのアクセスを担当する。
 
 # 33. クラス図
 
+## 33. クラス図
+
+クラス図は、**プログラムの中にどんな「役割の箱」を作るか**を表す図です。
+
+細かい型名を暗記する必要はありません。
+
+まずは次の関係だけ理解します。
+
+```text
+        学習する内容
+             │
+        ┌────┴────┐
+        ↓         ↓
+      Chapter   Question
+                   │
+                   ↓
+                 Choice
+
+今回のプレイ
+      │
+      ↓
+GameSession
+      │
+      ↓
+StageSession
+      │
+      ├→ 回答履歴
+      └→ Result
+```
+
+### 33.1 今回の設計で追加・整理した考え方
+
+```text
+StageDefinition
+= Stageの設定
+（キャラクター・敵・フィールド・ゲーム種類）
+
+StageSession
+= 今回プレイ中のStageの状態
+（何問目・敵HP・正解数など）
+```
+
+この2つを分けることで、例えば、
+
+```text
+「Stage 2は忍者・城・敵B」
+```
+
+という設定と、
+
+```text
+「今回のStage 2は3問目・敵HP2」
+```
+
+という現在の状態を混同しません。
+
+### 33.2 詳細クラス図
+
 ```mermaid
 classDiagram
+    class Course {
+        Long id
+        String name
+        String level
+    }
 
-class Chapter {
-    Long id
-    int chapterNumber
-    String name
-    String description
-    int difficultyStars
-}
+    class Chapter {
+        Long id
+        String name
+        String description
+    }
 
-class Question {
-    Long id
-    Long chapterId
-    String questionText
-    String codeBlock
-    int choiceCount
-    int requiredAnswerCount
-    int timeLimitSeconds
-    Difficulty difficulty
-    String category
-    String explanation
-}
+    class StageDefinition {
+        Long id
+        int stageNumber
+        String playerCharacter
+        String enemy
+        String field
+        String miniGameId
+        int maxEnemyHp
+    }
 
-class Choice {
-    Long id
-    Long questionId
-    String choiceLabel
-    String choiceText
-    boolean correct
-}
+    class Question {
+        Long id
+        String questionText
+        String codeBlock
+        int timeLimitSeconds
+        String category
+        String explanation
+    }
 
-class User {
-    Long id
-    String username
-}
+    class Choice {
+        Long id
+        String choiceLabel
+        String choiceText
+        boolean correct
+    }
 
-class QuestionProgress {
-    Long userId
-    Long questionId
-    int attemptCount
-    int correctCount
-    int incorrectCount
-    int consecutiveCorrect
-    ProgressStatus currentStatus
-}
+    class GameSession {
+        Long id
+        int requestedQuestionCount
+        int currentStageNumber
+        int totalScore
+    }
 
-class ChapterProgress {
-    Long userId
-    Long chapterId
-    int answeredCount
-    int correctCount
-    int masteredCount
-    int reviewCount
-    double accuracyRate
-}
+    class StageSession {
+        Long id
+        int questionCount
+        int currentQuestionIndex
+        int correctCount
+        int enemyHp
+    }
 
-class GameSession {
-    Long id
-    Long userId
-    Long chapterId
-    int requestedQuestionCount
-    int currentQuestionIndex
-    int currentStageNumber
-    int totalCorrectCount
-    int totalScore
-    int maxCombo
-}
+    class AnswerHistory {
+        Long id
+        boolean correct
+        boolean timeout
+        int answerTimeSeconds
+    }
 
-class StageSession {
-    Long id
-    Long gameSessionId
-    int stageNumber
-    int questionCount
-    int currentQuestionIndex
-    int correctCount
-    int currentCombo
-    int maxCombo
-    int score
-    int gameProgress
-}
+    class QuestionProgress {
+        Long userId
+        Long questionId
+        int attemptCount
+        String currentStatus
+    }
 
-class AnswerHistory {
-    Long id
-    Long userId
-    Long questionId
-    Long stageSessionId
-    boolean correct
-    int answerTimeSeconds
-    datetime answeredAt
-}
-
-class AnswerHistorySelectedChoice {
-    Long historyId
-    Long choiceId
-}
-
-class GameResult {
-    Long id
-    Long userId
-    Long gameSessionId
-    Long chapterId
-    int score
-    int maxCombo
-    int correctCount
-    int totalCount
-    boolean cleared
-}
-
-class QuestionService {
-    +selectQuestions(chapterId, count, userId) List~Question~
-}
-
-class AnswerService {
-    +checkAnswer(questionId, selectedChoiceIds) boolean
-    +processAnswer(...)
-    +processTimeout(...)
-}
-
-class ProgressService {
-    +updateQuestionProgress(...)
-    +updateChapterProgress(...)
-}
-
-class StageService {
-    +startStage(gameSessionId, stageNumber) StageSession
-    +completeStage(stageSessionId)
-}
-
-class ResultService {
-    +createResult(gameSessionId) GameResult
-    +getStatistics(userId)
-}
-
-class ReviewService {
-    +getReviewQuestions(userId, chapterId)
-}
-
-class GameEffectSelector {
-    +selectEffect(actionPattern) GameEffect
-}
-
-Chapter "1" --> "many" Question
-Question "1" --> "many" Choice
-
-User "1" --> "many" QuestionProgress
-User "1" --> "many" ChapterProgress
-User "1" --> "many" GameSession
-User "1" --> "many" AnswerHistory
-
-GameSession "1" --> "many" StageSession
-GameSession "1" --> "1" GameResult
-
-StageSession "1" --> "many" AnswerHistory
-AnswerHistory "1" --> "many" AnswerHistorySelectedChoice
-Choice "1" --> "many" AnswerHistorySelectedChoice
-
-Question "1" --> "many" QuestionProgress
-Chapter "1" --> "many" ChapterProgress
-
-QuestionService --> Question
-AnswerService --> Question
-AnswerService --> AnswerHistory
-ProgressService --> QuestionProgress
-ProgressService --> ChapterProgress
-StageService --> StageSession
-ResultService --> GameResult
-ReviewService --> AnswerHistory
-GameEffectSelector --> GameEffect
-```
+    Course "1" --> "many" Chapter
+    Chapter "1" --> "many" StageDefinition
+    Chapter "1" --> "many" Question
+    Question "1" --> "many" Choice
+    GameSession "1" --> "many" StageSession
+    StageSession "1" --> "many" AnswerHistory
+    Question "1" --> "many" AnswerHistory
+    Question "1" --> "many" QuestionProgress
 
 ---
 
 # 34. MiniGame / GameEffectの設計
 
-問題データとゲーム演出を分離する。
+## 34. MiniGame / GameEffectの設計
 
-```mermaid
-classDiagram
+ここは、**「正解したとき、ゲームをどう動かすか」**を整理する場所です。
 
-class MiniGame {
-    <<interface>>
-    +playCorrect()
-    +playMiss()
-    +playStageClear()
-}
+最初はシンプルに考えます。
 
-class AttackGame
-class BasketballGame
-class FishingGame
-class BowlingGame
-class RaceGame
-class PenguinGame
-
-MiniGame <|.. AttackGame
-MiniGame <|.. BasketballGame
-MiniGame <|.. FishingGame
-MiniGame <|.. BowlingGame
-MiniGame <|.. RaceGame
-MiniGame <|.. PenguinGame
-
-class MiniGameSelector {
-    +select(questionType, actionPattern) MiniGame
-}
-
-MiniGameSelector --> MiniGame
+```text
+問題に正解
+    ↓
+ゲームアクション
+    ↓
+敵HP -1
 ```
 
-新しいミニゲームを追加しても、
+### 34.1 Stageによってアクションを変える
 
-- Question
-- AnswerService
-- AnswerHistory
-- ProgressService
+```text
+Stage 1
+正解 → 剣士が斬る → HP -1
 
-を直接書き換えなくて済む構造を目指す。
+Stage 2
+正解 → サラリーマンが攻撃 → HP -1
+
+Stage 3
+正解 → 忍者が手裏剣 → HP -1
+```
+
+### 34.2 後から新しいゲームを追加する
+
+```text
+                共通のミニゲーム
+                       │
+          ┌────────────┼─────────────┐
+          ↓            ↓             ↓
+      Target        Samurai      Code Breaker
+
+                  ＋後から追加＋
+                       ↓
+                   Java Shoot
+```
+
+### 34.3 QuestionとMiniGameを分ける理由
+
+- Question = **何を答えるか**
+- MiniGame = **答えた後どう動くか**
+
+この2つを分けておくと、同じ問題を別のゲームで復習できます。
 
 ---
 
 # 35. シーケンス図：回答判定
 
+## 35. シーケンス図：回答判定
+
+シーケンス図は、
+
+> **「1問に答えたとき、何がどの順番で動くか」**
+
+を表します。
+
+まずは利用者から見た流れだけ覚えれば十分です。
+
 ```mermaid
 sequenceDiagram
     autonumber
+    participant 学習者
+    participant 画面
+    participant Java
+    participant 履歴
+    participant Stage
 
-    actor User as 学習者
-    participant Game as GameScreen
-    participant Controller as AnswerController
-    participant Answer as AnswerService
-    participant QuestionRepo as QuestionRepository
-    participant History as AnswerHistoryRepository
-    participant Progress as ProgressService
-    participant Stage as StageService
-    participant Effect as MiniGame
-
-    User->>Game: 選択肢を入力
-    Game->>Controller: submitAnswer(questionId, selectedChoiceIds)
-
-    Controller->>Answer: processAnswer(...)
-    Answer->>QuestionRepo: findById(questionId)
-    QuestionRepo-->>Answer: Question + Choice
-
-    Answer->>Answer: 正解Choice集合を作成
-    Answer->>Answer: selectedChoiceSet == correctChoiceSet
+    学習者->>画面: A～Gキーを押す
+    画面->>Java: 答えを送る
+    Java->>Java: 正解か確認
+    Java->>履歴: 回答を記録
 
     alt 正解
-        Answer->>History: 正解履歴保存
-        Answer->>Progress: QuestionProgress更新
-        Answer->>Stage: updateCorrect()
-        Stage-->>Answer: combo / score / gameProgress更新
-        Answer->>Effect: playCorrect()
-        Effect-->>Game: 攻撃・シュート・釣る等
-        Game-->>User: CORRECT + 短い解説
+        Java->>Stage: 正解を反映
+        Stage->>Stage: 敵HP -1
+        Java-->>画面: CORRECT + 攻撃
     else 不正解
-        Answer->>History: 不正解履歴保存
-        Answer->>Progress: REVIEWへ更新
-        Answer->>Stage: updateIncorrect()
-        Stage-->>Answer: combo = 0
-        Game-->>User: MISS + 短い解説
+        Java->>Stage: HPはそのまま
+        Java-->>画面: MISS
     end
+
+    画面-->>学習者: 短い解説
+    画面-->>学習者: 次の問題
+```
+
+### 35.1 一言で覚える
+
+```text
+キー
+ ↓
+判定
+ ↓
+記録
+ ↓
+攻撃 / MISS
+ ↓
+次の問題
 ```
 
 ---
@@ -2184,45 +2049,59 @@ sequenceDiagram
 
 # 37. シーケンス図：Stage進行
 
+## 37. シーケンス図：Stage進行
+
+Stageは**5問で1セット**です。
+
 ```mermaid
 sequenceDiagram
     autonumber
+    participant 学習者
+    participant ゲーム画面
+    participant Stage
+    participant 問題
+    participant 結果
 
-    actor User as 学習者
-    participant Game as GameScreen
-    participant Stage as StageService
-    participant Question as QuestionService
-    participant Answer as AnswerService
-    participant Session as StageSession
-
-    User->>Game: Stage開始
-    Game->>Stage: startStage(gameSessionId, stageNumber)
-    Stage->>Session: StageSession作成
+    学習者->>ゲーム画面: Stage開始
+    ゲーム画面->>Stage: Stageを開始
+    Stage-->>ゲーム画面: 敵HP 5
 
     loop 5問
-        Game->>Question: selectQuestion(chapterId, remainingIds)
-        Question-->>Game: Question
-
-        User->>Game: 回答
-        Game->>Answer: processAnswer(...)
+        ゲーム画面->>問題: 次の問題を取得
+        問題-->>ゲーム画面: 問題を表示
+        学習者->>ゲーム画面: キーで回答
+        ゲーム画面->>Stage: 正解 / 不正解
 
         alt 正解
-            Answer->>Session: correctCount + 1
-            Answer->>Session: combo + 1
-            Answer->>Session: score + 100
-            Answer->>Session: gameProgress + 1
+            Stage->>Stage: HP -1
+            Stage-->>ゲーム画面: キャラクターが攻撃
         else 不正解 / 時間切れ
-            Answer->>Session: combo = 0
+            Stage-->>ゲーム画面: MISS / TIME UP
         end
     end
 
-    Stage->>Session: completeStage()
-
+    Stage->>結果: 5問の結果を確定
     alt 5問すべて正解
-        Stage-->>Game: STAGE CLEAR + PERFECT
+        結果-->>ゲーム画面: PERFECT
     else 1問以上不正解
-        Stage-->>Game: STAGE CLEAR
+        結果-->>ゲーム画面: STAGE CLEAR
     end
+```
+
+### 37.1 つまり何が起きる？
+
+```text
+Stage開始 → HP5
+ ↓
+5問を1問ずつ解く
+ ↓
+正解した回数だけHPが減る
+ ↓
+5問終了
+ ↓
+Clear
+ ↓
+5問全部正解ならPerfect
 ```
 
 ---
@@ -2260,6 +2139,8 @@ sequenceDiagram
 
 # 39. REST API候補
 
+APIは、**画面とJava側がやり取りするための窓口**です。最初は「画面からJavaへお願いを送る場所」と考えれば十分です。
+
 ```text
 GET  /api/chapters
 GET  /api/chapters/{chapterId}
@@ -2286,28 +2167,43 @@ Python / FastAPI連携を行う場合は別APIとして分離する。
 
 # 40. 設計整合性チェック
 
-要求仕様・データモデル・UML・実装で同じルールを共有する。
+## 40. 設計整合性チェック
 
-| 仕様 | 設計上の対応 |
+ここは、
+
+> **「READMEで決めたことと、実際のプログラムの動きが同じか」**
+
+を確認するための場所です。
+
+| 決めたこと | プログラムでどうする？ |
 |---|---|
-| A～E / A～G | `Choice` の件数で管理 |
-| 単一・複数選択 | `requiredAnswerCount` |
-| 複数選択判定 | 正解Choice集合との完全一致 |
-| 部分点 | なし |
-| 問題ごとの時間 | `Question.timeLimitSeconds` |
-| Stage標準時間 | `Stage.defaultTimeLimitSeconds` を使う場合は個別値を優先 |
-| 未回答 | `QuestionProgress.UNSEEN` |
-| 間違い | `QuestionProgress.REVIEW` |
-| 継続正解 | `CLEAR / MASTERED` |
-| 回答履歴 | `AnswerHistory` |
-| 選択内容 | `AnswerHistorySelectedChoice` |
-| 5問Stage | `StageSession.questionCount = 5` |
-| 正解イベント | `gameProgress + 1` |
-| コンボ | `currentCombo / maxCombo` |
-| スコア | `score` |
-| 時間切れ | 不正解扱い + 入力ロック + 履歴保存 |
-| Stage Clear | 5問すべて回答 |
-| Perfect | 5問すべて正解 |
+| 1 Stage = 5問 | 5問回答したらStage終了 |
+| 敵は1体・HP5 | Stage開始時にHP5 |
+| 正解 | キャラクターが動き、HP -1 |
+| 不正解 | MISS、HPはそのまま |
+| 時間切れ | TIME UP、不正解として扱う |
+| 5問終了 | Stage Clear |
+| 5問すべて正解 | Perfect |
+| A～Gで回答 | キーボード入力に対応 |
+| 複数選択 | 選んだ答えを全部確認 |
+| 問題ごとの時間 | 問題ごとに制限時間を設定 |
+| 間違えた問題 | 復習対象にする |
+| Stageごとの世界 | キャラクター・敵・フィールドを設定 |
+| 新しいゲーム | 共通の仕組みを使って追加する |
+
+### 40.1 4つを見比べる
+
+```text
+README
+  ↓
+設計図
+  ↓
+Java / JavaScriptのコード
+  ↓
+実際の画面
+```
+
+この4つの説明がズレていないかを確認します。
 
 ---
 
@@ -2441,43 +2337,47 @@ Progress更新
 
 # 44. ICONIXによる開発・設計の流れ
 
-学校で学んだ流れを次のように対応させる。
+## 44. ICONIXによる開発・設計の流れ
 
-```text
-① Business Modeling
-   なぜ作るのか
-       ↓
-② Use Case / Event Flow
-   何ができるのか
-       ↓
-③ Domain Modeling
-   どんなデータ・ルールがあるのか
-       ↓
-④ Robustness Analysis
-   Boundary / Control / Entity
-       ↓
-⑤ Sequence Diagram
-   時系列でどのメソッドが呼ばれるか
-       ↓
-⑥ Design / MVC / Implementation
-   Controller / Service / Repository / Entity
+学校で学んだ流れを、初心者にも分かる言葉でまとめます。
+
+```mermaid
+flowchart TD
+    A[① なぜ作る？
+目的を決める] --> B[② 何ができる？
+利用者の操作を決める]
+    B --> C[③ 何が必要？
+問題・Stage・履歴などを整理]
+    C --> D[④ どう分ける？
+画面・処理・データを整理]
+    D --> E[⑤ どう動く？
+キー→判定→攻撃の順番を整理]
+    E --> F[⑥ プログラムにする]
 ```
 
-これにより、
+### 44.1 今回の作品に当てはめると
 
 ```text
-企画
+① 目的
+Javaの勉強を続けやすくしたい
  ↓
-要求
+② 利用者がすること
+Chapterを選ぶ → 問題を解く → 復習する
  ↓
-分析
+③ 必要なもの
+問題・選択肢・Stage・履歴・結果
  ↓
-設計
+④ 役割分担
+画面 / Javaの処理 / データ保存
  ↓
-実装
+⑤ 1問の流れ
+キー → 正誤判定 → 攻撃 → HP更新
+ ↓
+⑥ 実装
+Java / HTML / CSS / JavaScript / DB
 ```
 
-を段階的につなげる。
+「ICONIX」という言葉を覚えることより、**この順番で考えてから作る**ことが大切です。
 
 ---
 
@@ -2543,100 +2443,102 @@ Sprint Planning
 
 # 46. Git / GitHubの実務的な運用
 
-タスクを機能単位に分割する。
+## 46. Git / GitHubの実務的な運用
 
-```text
-Todo
- ↓
-In Progress
- ↓
-Review
- ↓
-Done
+Git / GitHubは、簡単にいうと、
+
+> **「プログラムがどう変わってきたかを残しておく仕組み」**
+
+です。
+
+### 46.1 基本の流れ
+
+```mermaid
+flowchart LR
+    A[機能を作る] --> B[動かして確認]
+    B --> C{問題なし？}
+    C -- はい --> D[コミット
+変更内容を記録]
+    D --> E[GitHubへ保存]
+    C -- いいえ --> F[修正する]
+    F --> B
 ```
 
-## Issue例
+### 46.2 変更内容が分かる名前を付ける
 
 ```text
-#01 Spring Bootプロジェクト作成
-#02 Chapter取得API
-#03 Question取得
-#04 Answer判定
-#05 Timer
-#06 Stage進行
-#07 GameEffect
-#08 AnswerHistory
-#09 Result
-#10 Review
-```
-
-## コミット例
-
-```text
-プロジェクト初期構成を作成
-Chapter取得機能を実装
-問題表示機能を実装
+Chapter画面を作成
+問題表示を実装
 回答判定を実装
-タイマーを実装
-回答履歴保存を実装
-ゲーム演出を追加
+タイマーを追加
+StageのHP処理を追加
 Review画面を追加
-回答処理のバグを修正
 ```
 
-何を変更したか分かるコミットを残す。
+### 46.3 初心者向けの覚え方
+
+```text
+作る
+ ↓
+動かす
+ ↓
+確認する
+ ↓
+記録する
+```
+
+一度に大量の変更を入れるより、**小さく作って小さく記録する**方が、バグを見つけやすくなります。
 
 ---
 
 # 47. AI活用方針
 
-AIは**開発補助ツール**として利用する。
+## 47. AI活用方針
 
-## AIを利用する部分
+AIは、**全部作ってもらうためではなく、自分の開発を助けてもらうため**に使います。
 
-- Java問題の案出し
-- オリジナル問題のバリエーション生成
-- UIアイデア
-- 画面構成
-- 設計相談
-- エラー原因の調査
-- コードレビュー
-- テスト観点整理
-- README文章整理
-
-## 自分で担当する部分
-
-- 要求・仕様の最終決定
-- UML設計
-- クラス設計
-- Javaコードの入力・実装
-- HTML / CSS / JavaScript
-- DB設計
-- 動作確認
-- デバッグ
-- リファクタリング
-
-## 開発サイクル
+### 47.1 AIに相談すること
 
 ```text
-AIに相談
- ↓
-内容を理解
- ↓
-自分で判断
- ↓
-自分でコードを書く
- ↓
-実行
- ↓
-エラー
- ↓
-AIに原因を相談
- ↓
-自分で修正
+問題のアイデア
+設計の相談
+エラーの原因
+UIのアイデア
+テストの観点
+READMEの整理
 ```
 
-> **「AIに作ってもらった作品」ではなく、「AIを開発補助として使い、自分で設計・実装・完成させた作品」を目指す。**
+### 47.2 自分で担当すること
+
+```text
+最終仕様を決める
+設計図を理解する
+Javaコードを書く
+HTML / CSS / JavaScriptを書く
+DBを作る
+実際に動かす
+デバッグする
+```
+
+### 47.3 開発の流れ
+
+```mermaid
+flowchart LR
+    A[自分の疑問] --> B[AIに相談]
+    B --> C[説明を読む]
+    C --> D[自分で理解・判断]
+    D --> E[自分でコードを書く]
+    E --> F[実行する]
+    F --> G{エラー？}
+    G -- いいえ --> H[次の機能へ]
+    G -- はい --> B
+```
+
+### 47.4 大切なルール
+
+> **AIが出した答えを、そのまま「分かったつもり」で使わない。**
+
+自分の言葉で説明できるようにしてから使います。
 
 ---
 
@@ -3316,6 +3218,24 @@ GitHub
 - 学校提出物との対応表を追加
 - SES / SE向けの技術的な見どころを整理
 
+
+## 2026/10/06 追加更新：初心者向け図解・説明の改善
+
+- 1 Stage = 5問・敵1体・HP5を中心とする図に更新
+- 「考える → キーを押す → 即反応 → キャラクターが動く」の流れを基本ループに反映
+- Stageごとのキャラクター・敵・フィールド変更を図と説明に反映
+- データモデルを「何を覚える箱なのか」という日本語中心の説明に変更
+- データの関係図を、初心者が追いやすい日本語の関係図に変更
+- システム全体像を「ブラウザ → Java → データ保存」の3段階で説明
+- Use Case Diagramを「利用者に何ができるか」が分かる図に変更
+- ロバストネス分析を「画面 = 見る / 処理 = 考える / データ = 覚える」で説明
+- 回答判定・Stage進行のシーケンス図を日本語中心に更新
+- 設計整合性チェックを基本ルール中心に整理
+- ICONIXを「目的 → できること → 必要なもの → 役割分担 → 処理順 → 実装」の流れで説明
+- Git / GitHubを「作る → 動かす → 確認する → 記録する」で説明
+- AI活用を「相談 → 理解 → 自分で判断 → 自分で実装」の流れで説明
+- 初心者向け用語集・先生／面接向け説明を追加
+- Stage標準時間の二重管理を避け、MVPではQuestion単位の時間制限に整理
 ---
 
 ## License / Notes
@@ -3325,3 +3245,30 @@ GitHub
 既存の書籍・試験問題・ゲーム作品等の文章、問題、画像、キャラクター、ロゴ、画面デザイン等をそのまま転載・複製しない。
 
 本READMEに記載された機能のうち、実装前のものは設計・予定であり、完成後に実装状況を更新する。
+
+---
+
+# 65. 初心者向け用語集
+
+このREADMEに出てくる英語は、最初から全部暗記しなくて大丈夫です。
+
+| 言葉 | この作品での意味 |
+|---|---|
+| Course | 学習コース。例：Java Bronze |
+| Chapter | 勉強するテーマのまとまり |
+| Question | 問題 |
+| Choice | 選択肢 |
+| Stage | 5問で1セットのゲーム |
+| GameSession | 今回のプレイ全体 |
+| StageSession | 今回プレイしているStageの状態 |
+| AnswerHistory | 過去の回答記録 |
+| QuestionProgress | 今の学習状態 |
+| GameResult | プレイ結果 |
+| API | 画面とJava側がやり取りする窓口 |
+| Controller | 画面からのお願いを受け取る役 |
+| Service | 受け取った内容を処理する役 |
+| Repository | データを保存・取得する役 |
+| Database | データを保存する場所 |
+| Use Case | 利用者ができること |
+| Sequence Diagram | 処理の順番を表す図 |
+| Robustness Analysis | 画面・処理・データの役割を整理する方法 |
