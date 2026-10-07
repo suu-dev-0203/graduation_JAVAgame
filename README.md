@@ -1,3 +1,4 @@
+
 # Java Learning System
 
 Java
@@ -62,111 +63,90 @@ Stage Clear / Perfect
 ```
 
 ## 2. 作成する理由
+
 ### 現状の課題と本アプリ
 
-```text
-一般的な問題演習
-問題を解く
-  ↓
-間違える
-  ↓
-解説を読む
-  ↓
-もう一度解く
-  ↓
-「勉強している感じ」が強く、繰り返しが単調になりやすい
+```mermaid
+flowchart LR
+    subgraph OLD[一般的な問題演習]
+        A[問題を解く] --> B[間違える]
+        B --> C[解説を読む]
+        C --> D[もう一度解く]
+        D --> E[単調な繰り返しになりやすい]
+    end
 
-            ↓ 改善
+    E -->|ゲームの反応を加える| F
 
-Java Learning System
-問題を見る
-  ↓
-考える
-  ↓
-キーを押す
-  ↓
-すぐ反応
-  ↓
-キャラクターが攻撃
-  ↓
-HP / Combo / Scoreが変化
-  ↓
-短い説明
-  ↓
-次の問題
+    subgraph NEW[Java Learning System]
+        F[問題を見る] --> G[考える]
+        G --> H[キーを押す]
+        H --> I[すぐに反応]
+        I --> J[キャラクターが攻撃]
+        J --> K[HP / Combo / Scoreが変化]
+        K --> L[短い説明]
+        L --> M[次の問題]
+    end
 ```
 
-
-通常の資格学習では「問題を解く→間違える→解説を読む」の繰り返しになりやすいため、ゲームの反応を加えて繰り返し学習しやすくすることを目的とします。
+通常の資格学習では「問題を解く→間違える→解説を読む」の繰り返しになりやすいため、問題演習にゲームの反応を加えて、繰り返し学習しやすくすることを目的とします。
 
 ## 3. 学習体験の基本ループ
+
 ### Mermaid図
 
 ```mermaid
 flowchart LR
     A[問題を見る] --> B[考える]
     B --> C[キーを押す]
-    C --> D{正誤判定}
+    C --> D{正誤・時間判定}
+
     D -->|正解| E[キャラクター攻撃]
     E --> F[敵HP - 1]
-    F --> G[Combo + 1 / Score + 100]
+    F --> G[Combo + 1<br/>Score + 100]
+
     D -->|不正解| H[MISS]
-    H --> I[HPそのまま / Combo 0]
+    H --> I[HPそのまま<br/>Combo 0]
+
     D -->|時間切れ| J[TIME UP]
-    J --> K[HPそのまま / Combo 0]
-    G --> L[履歴保存・説明]
+    J --> K[HPそのまま<br/>Combo 0]
+
+    G --> L[履歴保存・短い説明]
     I --> L
     K --> L
+
     L --> M{5問終了?}
     M -->|いいえ| N[次の問題]
     N --> A
-    M -->|はい| O[Stage Clear判定]
-    O --> P{5問すべて正解?}
-    P -->|はい| Q[Perfect]
-    P -->|いいえ| R[Stage Clear]
+    M -->|はい| O{5問すべて正解?}
+    O -->|はい| P[Perfect + Stage Clear]
+    O -->|いいえ| Q[Stage Clear]
 ```
 
-この図をゲーム処理の最重要ルールとして扱います。
-
-
-``` text
-問題を見る → 考える → キーを押す → すぐに正誤判定
-                         ↓
-          正解 → キャラクター攻撃・HP-1・Combo+1
-          不正解 → MISS・Combo0
-          時間切れ → TIME UP・Combo0
-                         ↓
-                       説明
-                         ↓
-                       次の問題
-```
+この図をゲーム処理の最重要ルールとして扱います。回答からゲーム上の反応までをできるだけ短くすることを重視します。
 
 ## 4. Chapter / Question / Stage
+
 ### Chapter / Pool / Stageの関係
 
-```text
-Chapter（学習テーマ）
-│
-├─ Question Pool（そのChapterの問題群）
-│   ├─ Question 1
-│   ├─ Question 2
-│   ├─ Question 3
-│   └─ ...
-│
-└─ Stage（ゲームとしてプレイする単位）
-    ├─ 1問目
-    ├─ 2問目
-    ├─ 3問目
-    ├─ 4問目
-    └─ 5問目
+```mermaid
+flowchart TD
+    C[Chapter<br/>学習テーマ] --> P[Question Pool<br/>出題候補]
+    P --> Q[Question<br/>問題データ]
+
+    C --> S[Stage<br/>ゲーム単位]
+    S --> SQ[StageQuestion × 5<br/>今回プレイする5問]
+    SQ --> Q
+
+    P -. Stage開始時に5問を選択 .-> SQ
 ```
 
-Question PoolはChapterに属する「出題候補の集まり」です。Stage開始時に、その中から今回プレイする5問を決定します。
+- **Chapter**：学習テーマ
+- **Question Pool**：そのChapterで出題できる問題の集まり
+- **Question**：実際に解く問題
+- **Stage**：5問をゲームとしてプレイする単位
+- **StageQuestion**：今回のStageで選ばれた5問を固定するデータ
 
-
--   Chapter：学習テーマ
--   Question：実際に解く問題
--   Stage：5問をゲームとしてプレイする単位
+Stage開始時にQuestion Poolから5問を決め、その5問をStageQuestionとして保存します。
 
 ## 5. Chapterの進め方
 
@@ -207,39 +187,42 @@ Chapterは自由に選択できる方式を基本とします。苦手な分野�
 複数選択は正解の組み合わせと完全一致した場合を正解とします。
 
 ## 10. 長い問題への対応
+
 ### 画面レイアウトイメージ
 
-```text
-┌────────────────────────────────────────────────────────────┐
-│ Chapter 1        Stage 1 / 5       TIME 08s               │
-├──────────────────────────────┬─────────────────────────────┤
-│                              │                             │
-│  Javaの問題                  │         Player              │
-│                              │            ↓                │
-│  次のコードの結果は？        │          ⚔                  │
-│                              │                             │
-│  A. 10                       │        Enemy                │
-│  B. 20                       │        HP █████              │
-│  C. 30                       │        Combo ×3             │
-│  D. 40                       │        Score 300            │
-│                              │                             │
-│  [ A ][ B ][ C ][ D ]        │                             │
-└──────────────────────────────┴─────────────────────────────┘
+```mermaid
+flowchart TB
+    H[Game Header<br/>Chapter / Stage / Timer / Pause]
+
+    subgraph SCREEN[Game画面]
+        direction LR
+        subgraph LEFT[問題エリア]
+            Q1[問題文]
+            Q2[コードブロック]
+            Q3[A〜Gの選択肢]
+            Q4[キーボード操作案内]
+        end
+
+        subgraph RIGHT[ゲームエリア]
+            P[Player]
+            E[Enemy]
+            HP[Enemy HP]
+            CMB[Combo]
+            SC[Score]
+            FX[攻撃 / MISS / TIME UP演出]
+        end
+    end
+
+    F[回答結果 + 短い説明]
+    N[次の問題]
+
+    H --> SCREEN
+    Q3 --> F
+    FX --> F
+    F --> N
 ```
 
-左側は「考えるための情報」、右側は「ゲームの反応」を担当します。
-
-
-PC画面を問題部分とゲーム部分に分けます。
-
-``` text
-┌─────────────────┬─────────────────┐
-│ 問題・選択肢・時間 │ キャラクター・敵   │
-│ Java問題         │ Player          │
-│ A ...            │ Enemy           │
-│ B ...            │ HP / Combo      │
-└─────────────────┴─────────────────┘
-```
+左側は「考えるための情報」、右側は「ゲームの反応」を担当します。問題の読みやすさを優先しながら、回答直後のゲーム反応も見える構成にします。
 
 ## 11. キーボード操作
 
@@ -251,20 +234,37 @@ PC画面を問題部分とゲーム部分に分けます。
 
 ## 13. 正解時
 
-``` text
-正解 → 敵HP -1 → Combo +1 → Score +100 → キャラクター攻撃 → 説明 → 次の問題
+```mermaid
+flowchart LR
+    A[正解] --> B[敵HP - 1]
+    B --> C[Combo + 1]
+    C --> D[Score + 100]
+    D --> E[キャラクター攻撃]
+    E --> F[履歴保存・説明]
+    F --> G[次の問題]
 ```
 
 ## 14. 不正解時
 
-``` text
-MISS → 敵HPそのまま → Combo 0 → Score +0 → 説明 → 次の問題
+```mermaid
+flowchart LR
+    A[MISS] --> B[敵HPそのまま]
+    B --> C[Combo 0]
+    C --> D[Score + 0]
+    D --> E[履歴保存・説明]
+    E --> F[次の問題]
 ```
 
 ## 15. 時間切れ
 
-``` text
-TIME UP → 入力停止 → 時間切れ確定 → HPそのまま → Combo 0 → 履歴保存 → 説明 → 次の問題
+```mermaid
+flowchart LR
+    A[TIME UP] --> B[入力停止]
+    B --> C[Java側で時間を再確認]
+    C --> D[HPそのまま]
+    D --> E[Combo 0]
+    E --> F[履歴保存・説明]
+    F --> G[次の問題]
 ```
 
 1問につき回答結果は1回だけ確定します。
@@ -292,94 +292,90 @@ Clearです。派手な必殺技はMVP完成後に余裕があれば追加しま
 / オフィス、Stage3＝忍者 / Code Samurai / 城。ゲーム処理は共通化します。
 
 ## 21. 画面遷移図
+
 ### Mermaid図
 
 ```mermaid
 flowchart TD
-    A[HOME / タイトル] --> B[Chapter選択]
-    B --> C[Stage選択]
-    C --> D[Game]
-    D --> E{5問終了?}
-    E -->|いいえ| D
-    E -->|はい| F[Stage Result]
-    F --> G[Review]
-    G --> B
-    F --> B
-    D --> H[Pause]
-    H -->|Resume| D
-    H -->|Home| A
+    HOME[HOME / タイトル] --> CH[Chapter選択]
+    CH --> ST[Stage選択]
+    ST --> GAME[Game]
+
+    GAME -->|回答を5問完了| RESULT[Stage Result]
+    RESULT --> REVIEW[Review]
+    RESULT --> CH
+    REVIEW --> CH
+
+    GAME --> PAUSE[Pause]
+    PAUSE -->|Resume| GAME
+    PAUSE -->|Home| HOME
 ```
 
+画面遷移は「次にどの画面へ進むか」と「途中でPauseした場合の戻り先」を確認するために使用します。
 
-``` text
-タイトル → Chapter選択 → Stage選択 → Game → Stage結果 → 復習 → Chapterへ
+## 22. 画面一覧・一時停止
+
+### 画面と状態の関係
+
+```mermaid
+flowchart TD
+    HOME[HOME]
+    CH[Chapter Select]
+    ST[Stage Select]
+    GAME[Game]
+    PAUSE[Pause]
+    RESULT[Stage Result]
+    REVIEW[Review]
+
+    HOME --> CH --> ST --> GAME
+    GAME --> RESULT --> REVIEW
+    REVIEW --> CH
+
+    GAME --> PAUSE
+    PAUSE -->|Resume| GAME
+    PAUSE -->|Home| HOME
+
+    subgraph PLAY[Game中の状態]
+        INPUT[回答入力]
+        TIMER[タイマー進行]
+        EFFECT[攻撃 / MISS / TIME UP]
+    end
+
+    GAME --> INPUT
+    GAME --> TIMER
+    GAME --> EFFECT
+    PAUSE -. 停止 .-> INPUT
+    PAUSE -. 停止 .-> TIMER
 ```
 
-## 22. 画面一覧
-### 画面設計で確認すること
+### 一時停止のルール
 
-```text
-HOME
- ↓
-Chapter Select
- ↓
-Stage Select
- ↓
-Game
- ├─ Pause → Resume → Game
- └─ Pause → Home → HOME
- ↓
-Stage Result
- ↓
-Review
-```
+- Pause中は回答入力を受け付けない
+- Pause中はタイマーを進めない
+- ResumeするとGameへ戻る
+- Homeを選ぶとHOMEへ戻る
 
-
--   タイトル
--   Chapter選択
--   Stage選択
--   Game
--   結果
--   復習
-
-
-
-## 一時停止の設計
-
-```text
-Game
-│
-└─ Pause
-   ├─ Resume → Gameへ戻る
-   └─ Home → タイトルへ戻る
-```
-
-一時停止中は回答入力とタイマー進行を停止します。Resumeすると、停止前のGame状態に戻ります。
+画面一覧：HOME、Chapter Select、Stage Select、Game、Pause、Stage Result、Review。
 
 ## 23. デザイン方針
+
 ### デザイン優先度
 
-```text
-読みやすい
-   ↓
-押しやすい
-   ↓
-押した結果がすぐ分かる
-   ↓
-キャラクターが反応する
-   ↓
-気持ちいい
-   ↓
-楽しい
+```mermaid
+flowchart LR
+    A[読みやすい] --> B[押しやすい]
+    B --> C[押した結果がすぐ分かる]
+    C --> D[キャラクターが反応する]
+    D --> E[気持ちいい]
+    E --> F[楽しい]
 ```
 
 見た目だけを派手にするのではなく、まず「問題が読みやすい」「答えやすい」「反応が分かる」を優先します。
 
-
-ポップ、分かりやすい、ゲームらしい、キー入力が気持ちいい、Java問題が読みやすい画面を目指します。Typing
-LandやOzawa-Kenは操作テンポの参考とし、キャラクター・ロゴ・画面・素材をコピーしません。
+Typing LandやOzawa-Kenは**操作テンポやゲームとしての気持ちよさ**の参考とし、キャラクター・ロゴ・画面・素材をコピーしません。
 
 ## 24. データの関係
+
 ### Mermaid図
 
 ```mermaid
@@ -387,193 +383,252 @@ flowchart TD
     C[Chapter] --> Q[Question]
     Q --> CH[Choice]
     C --> SD[StageDefinition]
-    SD --> SS[StageSession]
-    SD --> MG[MiniGameType]
-    GS[GameSession] --> SS
+
+    GS[GameSession] --> SS[StageSession]
+    SD --> SS
     SS --> SQ[StageQuestion]
     SQ --> Q
-    SQ --> AH[AnswerHistory]
+
+    GS --> AH[AnswerHistory]
+    SS --> AH
+    SQ --> AH
     AH --> AHC[AnswerHistoryChoice]
     AHC --> CH
-    Q --> AHP[QuestionProgress]
-    GS --> AH
+
+    Q -. 将来拡張 .-> QP[QuestionProgress]
 ```
 
 ### 重要な関係
 
-```text
-StageSession
-  ↓
-StageQuestion × 5
-  ↓
-Question
-```
-
-これにより「今回のStageで出す5問」を固定できます。
-
-
-``` text
-Chapter
- ├── Question ── Choice
- └── StageDefinition ── MiniGame
-             │
-             ↓
-        StageSession
-          │     │
-          ↓     ↓
-   AnswerHistory GameSession
-          ↑
-       Question
-          │
-          ↓
-   QuestionProgress
-
-GameSession ── AnswerHistory
-```
-
-## 25. システム全体像
-### Mermaid図
-
 ```mermaid
 flowchart LR
-    U[学習者] --> F[HTML / CSS / JavaScript]
-    F -->|HTTP / REST| C[Spring Boot Controller]
-    C --> S[Service]
-    S --> R[Repository]
-    R --> DB[(Database)]
-    S -->|結果| F
-    F --> G[キャラクター / 敵 / HP / Combo表示]
+    SS[StageSession] --> SQ1[1問目]
+    SS --> SQ2[2問目]
+    SS --> SQ3[3問目]
+    SS --> SQ4[4問目]
+    SS --> SQ5[5問目]
+
+    SQ1 --> Q1[Question]
+    SQ2 --> Q2[Question]
+    SQ3 --> Q3[Question]
+    SQ4 --> Q4[Question]
+    SQ5 --> Q5[Question]
 ```
 
-「画面 → API → Java → DB → 結果 → 画面演出」の流れを一つにつなげています。
+`StageQuestion`によって「今回のStageで出す5問」を固定します。`AnswerHistoryChoice`によって「実際に選んだ選択肢」も保存できます。
 
+`QuestionProgress`はMVP完成後に追加する候補として扱い、現在のコアゲーム処理から分離します。
 
-``` text
-学習者
- ↓
-HTML / CSS / JavaScript
- ↓ HTTP
-Spring Boot / Controller
- ↓
-Service
- ↓
-Repository
- ↓
-Database
+## 25. システム全体像
 
-Java側の結果
- ↓
-画面へ返却
- ↓
-キャラクター・敵・HP・Combo更新
-```
-
-## 26. 基本アーキテクチャ
-
-``` text
-HTML / CSS / JavaScript
-        ↓
-Controller
-        ↓
-Service
-        ↓
-Repository
-        ↓
-Database
-```
-
-Controllerは受付、Serviceはゲームルール、RepositoryはDBとのやり取りを担当します。
-
-## 27. 要求モデル
-
-  ID       要求
-  -------- ------------------------------
-  REQ-01   Chapterを選択できる
-  REQ-02   Stageを開始できる
-  REQ-03   問題に回答できる
-  REQ-04   正誤判定できる
-  REQ-05   制限時間を管理できる
-  REQ-06   HP・Combo・Scoreを更新できる
-  REQ-07   回答履歴を保存できる
-  REQ-08   結果を確認できる
-  REQ-09   間違えた問題を復習できる
-
-## 28. Use Case Diagram
 ### Mermaid図
 
 ```mermaid
 flowchart LR
     U[学習者]
-    U --> A[Chapterを選択する]
-    U --> B[Stageを開始する]
-    U --> C[問題に回答する]
-    U --> D[結果を確認する]
-    U --> E[問題を復習する]
-    U --> F[進捗を確認する]
+    F[Browser<br/>HTML / CSS / JavaScript]
+    API[REST API]
+    C[Controller]
+    S[Service]
+    R[Repository]
+    DB[(Database)]
+    UI[画面更新<br/>Player / Enemy / HP / Combo / Score]
+
+    U --> F
+    F -->|HTTP / JSON| API
+    API --> C
+    C --> S
+    S --> R
+    R --> DB
+    S -->|結果| C
+    C -->|JSON| F
+    F --> UI
 ```
 
-Use Caseは「学習者がシステムを使って何をするか」を表します。
+「ユーザー → 画面 → REST API → Java → DB → 結果 → 画面演出」という一連の流れを表します。
 
+## 26. 基本アーキテクチャ
 
-``` text
-             ┌──────────────────────────┐
-             │ Java Learning System     │
-             │                          │
-学習者 ────→ │ Chapterを選択する        │
-             │ 学習を開始する           │
-             │ 問題に回答する           │
-             │ Stageを進める            │
-             │ 結果を見る               │
-             │ 復習する                 │
-             │ 進捗を見る               │
-             └──────────────────────────┘
+### Mermaid図
+
+```mermaid
+flowchart TB
+    subgraph FRONT[画面側]
+        HTML[HTML]
+        CSS[CSS]
+        JS[JavaScript]
+    end
+
+    subgraph BACK[Spring Boot]
+        CTRL[Controller]
+        SERVICE[Service]
+        REPO[Repository]
+    end
+
+    DB[(Database)]
+
+    HTML --> JS
+    CSS --> HTML
+    JS -->|HTTP / JSON| CTRL
+    CTRL --> SERVICE
+    SERVICE --> REPO
+    REPO --> DB
+    SERVICE --> CTRL
+    CTRL --> JS
 ```
+
+- **Controller**：画面からのリクエストを受け取る
+- **Service**：正誤・HP・Combo・Score・Stageなどのルールを処理する
+- **Repository**：DBとのやり取りを担当する
+- **JavaScript**：入力・表示・ゲーム演出を担当する
+
+画面から直接DBを操作せず、役割を分けて実装します。
+
+## 27. 要求モデル
+
+### Mermaid図
+
+「学習者がしたいこと」から「実装する機能」までをつなげて整理します。
+
+```mermaid
+flowchart LR
+    U([学習者])
+
+    subgraph REQ[要求]
+        R1[Chapterを選択したい]
+        R2[Stageを開始したい]
+        R3[問題に回答したい]
+        R4[正誤を知りたい]
+        R5[時間を管理したい]
+        R6[HP / Combo / Scoreを見たい]
+        R7[回答履歴を残したい]
+        R8[結果を確認したい]
+        R9[間違えた問題を復習したい]
+    end
+
+    subgraph IMPLEMENT[主な実装]
+        I1[Chapter API / 画面]
+        I2[GameSession / StageSession]
+        I3[Answer API]
+        I4[AnswerService]
+        I5[Timer + 時間判定]
+        I6[StageSession / GameSession]
+        I7[AnswerHistory]
+        I8[ResultService / Result画面]
+        I9[ReviewService / Review画面]
+    end
+
+    U --> R1 & R2 & R3 & R8 & R9
+    R1 --> I1
+    R2 --> I2
+    R3 --> I3
+    R4 --> I4
+    R5 --> I5
+    R6 --> I6
+    R7 --> I7
+    R8 --> I8
+    R9 --> I9
+```
+
+### 要求一覧
+
+| ID | 要求 |
+|---|---|
+| REQ-01 | Chapterを選択できる |
+| REQ-02 | Stageを開始できる |
+| REQ-03 | 問題に回答できる |
+| REQ-04 | 正誤判定できる |
+| REQ-05 | 制限時間を管理できる |
+| REQ-06 | HP・Combo・Scoreを更新できる |
+| REQ-07 | 回答履歴を保存できる |
+| REQ-08 | 結果を確認できる |
+| REQ-09 | 間違えた問題を復習できる |
+
+## 28. Use Case Diagram
+
+### Mermaid図
+
+Use Caseは「学習者がシステムで何をできるか」を表します。
+
+```mermaid
+flowchart LR
+    USER([学習者])
+
+    subgraph SYSTEM[Java Learning System]
+        UC1([Chapterを選択する])
+        UC2([Stageを開始する])
+        UC3([問題に回答する])
+        UC4([結果を確認する])
+        UC5([問題を復習する])
+    end
+
+    USER --> UC1
+    USER --> UC2
+    USER --> UC3
+    USER --> UC4
+    USER --> UC5
+
+    UC3 -->|回答完了| UC4
+    UC4 -->|間違いを確認| UC5
+```
+
+Use Caseは要求モデルより「利用者の操作」に寄せて整理し、その後のシーケンス図につなげます。
 
 ## 29. ロバストネス分析
+
 ### ロバストネス図
 
-```text
-┌──────────────────────────────┐
-│ Boundary：画面                │
-│ Game / Result / Review       │
-└──────────────┬───────────────┘
-               ↓
-┌──────────────────────────────┐
-│ Control：処理                 │
-│ AnswerController              │
-│ AnswerService                 │
-│ GameSessionService            │
-│ ResultService / ReviewService │
-└──────────────┬───────────────┘
-               ↓
-┌──────────────────────────────┐
-│ Entity：データ                │
-│ Question / Choice             │
-│ StageSession / GameSession    │
-│ AnswerHistory / StageQuestion│
-└──────────────────────────────┘
+ロバストネス分析では、**画面・処理・データの責任を分ける**ことで、「どこに何のコードを書くのか」を整理します。
+
+```mermaid
+flowchart LR
+    subgraph B[Boundary：画面]
+        direction TB
+        GAME[Game画面]
+        RESULT[Result画面]
+        REVIEW[Review画面]
+    end
+
+    subgraph C[Control：処理]
+        direction TB
+        AC[AnswerController]
+        AS[AnswerService]
+        GS[GameSessionService]
+        RS[ResultService]
+        RV[ReviewService]
+    end
+
+    subgraph E[Entity：データ]
+        direction TB
+        Q[Question]
+        CH[Choice]
+        SS[StageSession]
+        SQ[StageQuestion]
+        GSN[GameSession]
+        AH[AnswerHistory]
+        AHC[AnswerHistoryChoice]
+    end
+
+    GAME --> AC
+    AC --> AS
+    AS --> Q
+    AS --> SS
+    AS --> GSN
+    AS --> AH
+    AS --> SQ
+    RESULT --> RS
+    RS --> GSN
+    RS --> AH
+    REVIEW --> RV
+    RV --> AH
+    RV --> Q
+    AH --> AHC
+    AHC --> CH
 ```
 
-Boundary = 画面、Control = 処理、Entity = 保存するデータ、という3分割です。
+**Boundary**はユーザーが見る・操作する画面、**Control**はゲームルールや処理、**Entity**は問題・Stage・回答履歴などのデータを表します。
 
-
-``` text
-【Boundary：画面】
-Game / Result / Review
-        ↓
-【Control：処理】
-AnswerController
-AnswerService
-GameSessionService
-ReviewService
-        ↓
-【Entity：データ】
-Question
-StageSession
-GameSession
-AnswerHistory
-QuestionProgress
-```
+この図は、次のクラス図やシーケンス図へ進む前の「責任分担の確認」に使います。
 
 ## 30. シーケンス図：回答判定
 ### Mermaid図
@@ -700,7 +755,10 @@ sequenceDiagram
 5問目：`5問目回答 → 正誤判定 → 履歴保存 → 5問終了 → Perfect判定 → Stage Clear判定 → Result`
 
 ## 33. クラス図
+
 ### Mermaid図
+
+クラス図では、実装する主要なEntityと回答処理の関係を確認します。
 
 ```mermaid
 classDiagram
@@ -772,11 +830,6 @@ classDiagram
         +Long answerHistoryId
         +Long choiceId
     }
-    class QuestionProgress {
-        +Long questionProgressId
-        +Long questionId
-        +String status
-    }
     class AnswerController {
         +submitAnswer()
     }
@@ -785,14 +838,14 @@ classDiagram
         +updateStage()
         +saveHistory()
     }
-    class AnswerHistoryRepository {
-        +save()
-    }
     class QuestionRepository {
         +findById()
     }
     class StageSessionRepository {
         +findById()
+        +save()
+    }
+    class AnswerHistoryRepository {
         +save()
     }
 
@@ -808,90 +861,47 @@ classDiagram
     StageQuestion --> AnswerHistory
     AnswerHistory --> AnswerHistoryChoice
     AnswerHistoryChoice --> Choice
-    Question --> QuestionProgress
     AnswerController --> AnswerService
     AnswerService --> QuestionRepository
     AnswerService --> StageSessionRepository
     AnswerService --> AnswerHistoryRepository
 ```
 
-この図は「データを表すクラス」と「回答処理を担当するクラス」を一つの全体像として確認するための図です。
+### クラスを役割で分けると
 
+```mermaid
+flowchart LR
+    subgraph ENTITY[Entity：データ]
+        E1[Chapter]
+        E2[Question]
+        E3[Choice]
+        E4[StageDefinition]
+        E5[GameSession]
+        E6[StageSession]
+        E7[StageQuestion]
+        E8[AnswerHistory]
+        E9[AnswerHistoryChoice]
+    end
 
-``` mermaid
-classDiagram
-class Chapter {
-  Long chapterId
-  String name
-}
-class Question {
-  Long questionId
-  Long chapterId
-  String questionText
-  int timeLimitSeconds
-}
-class Choice {
-  Long choiceId
-  Long questionId
-  String choiceText
-  boolean correct
-}
-class StageDefinition {
-  Long stageId
-  Long chapterId
-  int stageNumber
-  String name
-  String playerCharacter
-  String enemy
-  String field
-  String miniGameId
-  String actionPattern
-  int maxEnemyHp
-}
-class MiniGame {
-  String miniGameId
-  String name
-}
-class GameSession {
-  Long gameSessionId
-  int questionCount
-  int score
-  int currentStage
-}
-class StageSession {
-  Long stageSessionId
-  Long gameSessionId
-  Long stageId
-  int currentQuestionIndex
-  int correctCount
-  int enemyHp
-  String status
-}
-class AnswerHistory {
-  Long answerHistoryId
-  Long gameSessionId
-  Long stageSessionId
-  Long questionId
-  boolean correct
-  boolean timeout
-  int answerTime
-}
-class QuestionProgress {
-  Long questionProgressId
-  Long questionId
-  String status
-}
-Chapter --> Question
-Question --> Choice
-Chapter --> StageDefinition
-StageDefinition --> MiniGame
-GameSession --> StageSession
-StageSession --> StageDefinition
-StageSession --> AnswerHistory
-GameSession --> AnswerHistory
-Question --> AnswerHistory
-Question --> QuestionProgress
+    subgraph CONTROL[Control：処理]
+        C1[AnswerController]
+        C2[AnswerService]
+    end
+
+    subgraph REPO[Repository：DBアクセス]
+        R1[QuestionRepository]
+        R2[StageSessionRepository]
+        R3[AnswerHistoryRepository]
+    end
+
+    C1 --> C2
+    C2 --> R1 & R2 & R3
+    R1 --> E2
+    R2 --> E6
+    R3 --> E8
 ```
+
+MVPでは`QuestionProgress`はコアゲーム実装から外し、学習進捗機能として後から追加できる構成にします。
 
 ## 33.1 Javaクラス名
 
@@ -911,7 +921,7 @@ Entity：`Chapter`, `Question`, `Choice`, `StageDefinition`,
 
 ## 33.2 詳細クラス図
 
-``` mermaid
+```mermaid
 classDiagram
 class AnswerController {
   +submitAnswer()
@@ -938,99 +948,83 @@ AnswerService --> AnswerHistoryRepository
 ```
 
 ## 34. MiniGame / GameEffectの設計
+
 ### QuestionとMiniGameの分離
 
-```text
-┌─────────────────────┐
-│ Question            │
-│ 「何を答えるか」    │
-└──────────┬──────────┘
-           +
-┌──────────▼──────────┐
-│ MiniGame            │
-│ 「どう遊ぶか」      │
-└──────────┬──────────┘
-           ↓
-┌─────────────────────┐
-│ 共通の回答結果      │
-│ correct / HP /      │
-│ Combo / Score       │
-└─────────────────────┘
+```mermaid
+flowchart LR
+    Q[Question<br/>何を答えるか]
+
+    subgraph MINI[MiniGame：どう遊ぶか]
+        M1[Code Target]
+        M2[Code Whack-a-Mole]
+        M3[Typing Samurai]
+        M4[Code Breaker]
+    end
+
+    J[共通の回答判定]
+    RESULT[共通結果<br/>correct / HP / Combo / Score / History]
+    FX[GameEffect<br/>攻撃 / MISS / TIME UP / Stage演出]
+
+    Q --> J
+    M1 --> J
+    M2 --> J
+    M3 --> J
+    M4 --> J
+    J --> RESULT
+    RESULT --> FX
 ```
 
-Questionの内容とゲーム演出を分けることで、同じ問題を別のMiniGameでも利用できます。
+Questionは「何を答えるか」、MiniGameは「どう遊ぶか」、GameEffectは「結果をどう見せるか」を担当します。
 
-
-Questionは「何を答えるか」、MiniGameは「どう遊ぶか」を担当します。
-
-MVP：Code Target、Code Whack-a-Mole、Typing Samurai、Code Breaker。
-
-共通処理は回答判定・Score・Combo・履歴・Stage進行。MiniGameごとの処理は入力方法・キャラクター動作・攻撃演出です。
+この分離によって、同じQuestionを別のMiniGameで利用できます。新しいMiniGameを追加するときは、新しいゲーム処理のコードを実装します。
 
 ## 35. REST APIの事前確認
+
 ### REST APIの位置付け
 
+```mermaid
+flowchart LR
+    B[Browser<br/>HTML / CSS / JavaScript]
+    API[REST API]
+    C[Controller]
+    S[Service]
+    R[Repository]
+    DB[(Database)]
+
+    B -->|HTTP Request / JSON| API
+    API --> C
+    C --> S
+    S --> R
+    R --> DB
+    S --> C
+    C -->|JSON Response| B
+```
+
+APIは「画面とJavaをつなぐ窓口」です。
+
+### MVPで使う主なAPI
+
 ```text
-┌───────────────┐
-│ Browser       │
-│ HTML / JS     │
-└───────┬───────┘
-        │ HTTP / JSON
-        ↓
-┌───────────────┐
-│ Controller    │
-└───────┬───────┘
-        ↓
-┌───────────────┐
-│ Service       │
-└───────┬───────┘
-        ↓
-┌───────────────┐
-│ Repository / DB│
-└───────────────┘
-```
-
-APIは「画面とJavaをつなぐ窓口」です。URL、Request、Response、エラー時の扱いを同じ仕様で実装します。
-
-
-APIは画面とJavaをつなぐ窓口です。
-
-``` text
 GET  /api/chapters
-GET  /api/stages?chapterId=1
+GET  /api/stages?chapterId={chapterId}
 GET  /api/questions/{questionId}
+POST /api/game-sessions
 POST /api/answers
-GET  /api/results/{gameSessionId}
+GET  /api/game-sessions/{gameSessionId}/result
+GET  /api/game-sessions/{gameSessionId}/review
 ```
 
-`POST /api/answers` Request：
+### 回答API
 
-``` json
+```json
 {
-  "gameSessionId": 1,
-  "stageSessionId": 1,
-  "questionId": 10,
-  "selectedChoices": [2],
-  "timeout": false
+  "stageQuestionId": 101,
+  "selectedChoiceIds": [12, 15]
 }
 ```
 
-Response：
-
-``` json
-{
-  "correct": true,
-  "timeout": false,
-  "enemyHp": 4,
-  "combo": 1,
-  "score": 100,
-  "stageClear": false,
-  "perfect": false,
-  "nextQuestionId": 11
-}
-```
-
-5問目は`stageClear=true`、5/5は`perfect=true`、次がなければ`nextQuestionId=null`とします。
+回答の正誤・時間切れ・HP・Combo・Score・Stage Clear・Perfectの最終判定はJava側で行います。クライアント側から`timeout=true`のような結果を信用しない方針です。
 
 ## 36. 設計整合性チェック
 
@@ -1108,30 +1102,37 @@ Java側：正誤判定、HP、Combo、Score、履歴、Stage判定。
 JavaScript側：キー入力、画面更新、キャラクター演出、敵アニメーション、表示更新。
 
 ## 44. 設計から実装への流れ
+
 ### 将来の拡張イメージ
 
-```text
-Java Bronze
-   ↓
-Chapter追加
-   ↓
-Stage追加
-   ↓
-Question追加
-   ↓
-MiniGame追加
-   ↓
-Java Silver
-   ↓
-Java Gold
+```mermaid
+flowchart LR
+    B[Java Bronze] --> C[Chapter追加]
+    C --> S[Stage追加]
+    S --> Q[Question追加]
+    Q --> M[MiniGame追加]
+    M --> SI[Java Silver]
+    SI --> GO[Java Gold]
 ```
 
-問題やChapterなどのデータ追加は既存処理をできるだけ変更せずに行える構造を目指します。新しいMiniGameは新しい処理コードの追加が必要です。
+データ追加は既存コードへの影響をできるだけ小さくし、新しいMiniGameは必要なゲーム処理コードを追加する方針です。
 
+### 設計から実装への流れ
 
-``` text
-要求 → Use Case → データモデル → ロバストネス → シーケンス → クラス → REST API → Java実装 → HTML/CSS/JavaScript → テスト
+```mermaid
+flowchart LR
+    A[要求] --> B[Use Case]
+    B --> C[データモデル]
+    C --> D[ロバストネス]
+    D --> E[シーケンス]
+    E --> F[クラス]
+    F --> G[REST API]
+    G --> H[Java実装]
+    H --> I[HTML / CSS / JavaScript]
+    I --> J[テスト]
 ```
+
+各図を「何となく作る」のではなく、前の設計を次の設計へつなげるために使用します。
 
 ## 45. 開発手順
 
