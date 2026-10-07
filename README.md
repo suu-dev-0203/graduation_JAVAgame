@@ -1,1654 +1,809 @@
-[README(2).md](https://github.com/user-attachments/files/33090922/README.2.md)
+[README(3).md](https://github.com/user-attachments/files/33160216/README.3.md)
 # Java Learning System
 
-Java Bronzeを、**問題を解くだけで終わらない「遊びながら学べる体験」**にする学習Webアプリです。
+Java
+Bronzeを学習している初学者を対象とした、ゲーム感覚でJavaの問題を学習できるWebアプリケーションです。
 
-> **考える → キーを押す → 即反応 → キャラクターが動く → 成功 / 失敗 → 気持ちいい → すぐ次**
+## 1. プロジェクト概要
 
-Java Bronzeを学習している初学者が、問題を繰り返し解きながら、正解・不正解・復習をゲーム感覚で体験できることを目指します。
+Java Bronzeの問題をゲーム形式で解くWebアプリです。
 
----
+基本ループ：
 
-# 0. READMEの読み方
-
-このREADMEは、次の順番で読めるようにしています。
-
-1. **何を作るか**
-2. **どのように遊ぶか**
-3. **どのような画面・データ・処理で作るか**
-4. **実装するときに何を作るか**
-5. **今後どこまで拡張できるか**
-
-学校提出用の専門用語の説明を増やすことより、**実際のコードを書く・画面を作る・他の人に説明するために必要な情報を残す**ことを優先します。
-
----
-
-# 1. プロジェクト概要
-
-| 項目 | 内容 |
-|---|---|
-| 作品名 | Java Learning System |
-| 対象 | Java Bronzeを学習する初学者 |
-| 種類 | Java学習支援Webアプリ |
-| 学習方法 | 選択式問題 + キーボード操作 + ミニゲーム |
-| 1 Stage | 5問 |
-| 敵HP | 5 |
-| 主な技術 | Java / Spring Boot / HTML / CSS / JavaScript / Database |
-| 最優先 | Java Bronze学習ゲームを最後まで完成させる |
-
----
-
-# 2. 開発背景と解決したい課題
-
-Java資格の学習では、
-
-```text
-問題を解く
-   ↓
-間違える
-   ↓
-解説を読む
-   ↓
-もう一度解く
-```
-
-という学習を繰り返します。
-
-この方法は知識を身につけるために重要ですが、同じ形式の問題を何度も解くと「勉強しているだけ」という感覚になり、継続しにくくなることがあります。
-
-そこで、問題を解く行為そのものにゲームの反応を加えます。
-
-```text
-問題を解く
-   ↓
-キーを押す
-   ↓
-キャラクターが動く
-   ↓
-敵にダメージ
-   ↓
-コンボ・結果が表示される
-   ↓
-短い解説
-   ↓
-次の問題
-```
-
-### 解決したいこと
-
-- 問題演習を続けやすくする
-- 正解した瞬間に結果が分かるようにする
-- キーボード操作でテンポよく回答できるようにする
-- 間違えた問題をあとから復習できるようにする
-
----
-
-# 3. 学習体験の基本ループ
-
-本作品で最も重要なルールです。
-
-```mermaid
-flowchart LR
-    A[問題を見る] --> B[キーを押す]
-    B --> C{正解?}
-    C -- Yes --> D[キャラクターが攻撃]
-    D --> E[敵HP -1 / コンボ +1]
-    C -- No --> F[MISS / コンボ0]
-    C -- TIME UP --> F
-    E --> G[短い解説]
-    F --> G
-    G --> H{5問終了?}
-    H -- No --> A
-    H -- Yes --> I[Stage Clear]
-```
-
-### 正解
-
-- 入力を受け付ける
-- すぐに正解表示
-- キャラクターが攻撃する
-- 敵HPを1減らす
-- コンボを1増やす
-- 短い解説を表示
-- 次の問題へ進む
-
-### 不正解
-
-- MISSを表示
-- 敵HPは減らさない
-- コンボをリセット
-- 短い解説を表示
-- 次の問題へ進む
-
-### 時間切れ
-
-- TIME UPを表示
-- 入力を停止
-- 敵HPは減らさない
-- コンボをリセット
-- 回答履歴を保存
-- 解説を表示
-- 次の問題へ進む
-
----
-
-# 4. Chapter・Question Pool・Stageの関係
-
-この3つを分けて考えます。
-
-```text
-Chapter
-「何を学ぶか」
-   ↓
-Question Pool
-「そのChapterの問題一覧」
-   ↓
-Stage
-「今回は5問を使ってゲームする」
-```
-
-### Chapter
-
-学習テーマです。
-
-例：
-
-- 変数
-- 演算子
-- 条件分岐
-- 繰り返し
-- 配列
-
-### Question Pool
-
-Chapterに属する問題の集まりです。
-
-### Stage
-
-Question Poolから選ばれた5問を使って、1つのゲームステージをプレイします。
-
----
-
-# 5. Stageの基本仕様
-
-**1 Stage = 5問 = 敵HP5** を基本ルールとします。
-
-```text
+``` text
+Chapterを選ぶ
+↓
 Stage開始
-  ↓
-1問目 → 正解なら敵HP4
-2問目 → 正解なら敵HP3
-3問目 → 正解なら敵HP2
-4問目 → 正解なら敵HP1
-5問目 → 正解なら敵HP0
-  ↓
-Stage Clear
+↓
+Java問題を表示
+↓
+キーボードで回答
+↓
+正解・不正解・時間切れを判定
+↓
+キャラクターが反応
+↓
+敵HP・コンボ・スコアを更新
+↓
+説明
+↓
+次の問題
+↓
+5問終了
+↓
+Stage Clear / Perfect
+↓
+結果・復習
 ```
 
-### Perfect
+## 2. 作成する理由
 
-5問すべて正解した場合をPerfectとします。
+通常の資格学習では「問題を解く→間違える→解説を読む」の繰り返しになりやすいため、ゲームの反応を加えて繰り返し学習しやすくすることを目的とします。
 
-```text
-5問 / 5問 正解
-   ↓
-敵HP 0
-   ↓
-Perfect
-   ↓
-Stage Clear
+## 3. 学習体験の基本ループ
+
+``` text
+問題を見る → 考える → キーを押す → すぐに正誤判定
+                         ↓
+          正解 → キャラクター攻撃・HP-1・Combo+1
+          不正解 → MISS・Combo0
+          時間切れ → TIME UP・Combo0
+                         ↓
+                       説明
+                         ↓
+                       次の問題
 ```
 
-派手な必殺技演出は追加候補であり、MVPではPerfect表示・HP0・Stage Clearまでを完成条件とします。
+## 4. Chapter / Question / Stage
 
----
+-   Chapter：学習テーマ
+-   Question：実際に解く問題
+-   Stage：5問をゲームとしてプレイする単位
 
-# 6. 5問・10問・20問のプレイ設定
+## 5. Chapterの進め方
 
-プレイする問題数は変更できます。
+Chapterは自由に選択できる方式を基本とします。苦手な分野を選んですぐ練習できるようにします。
 
-| プレイ問題数 | Stage数 |
-|---:|---:|
-| 5問 | 1 Stage |
-| 10問 | 2 Stage |
-| 20問 | 4 Stage |
+## 6. 1 Stage = 5問
 
-ただし、**1 Stage = 5問**は変えません。
+1 Stageは必ず5問です。
 
-同じGameSession内では、同じ問題が重複して出題されないようにします。
-
----
-
-# 7. 問題形式
-
-対応する問題形式は次の7種類です。
-
-| 形式 | 内容 |
-|---|---|
-| A～E 単一選択 | 1つ選ぶ |
-| A～G 単一選択 | 1つ選ぶ |
-| A～E 複数選択 | 2つ選ぶ |
-| A～G 複数選択 | 2つ選ぶ |
-| A～G 複数選択 | 3つ選ぶ |
-| コード選択 A～E | 1つ選ぶ |
-| コード選択 A～G | 2つ選ぶ |
-
-複数選択では、**正解の組み合わせと完全一致した場合のみ正解**とします。
-
----
-
-# 8. キーボード操作
-
-キーボード入力を中心にします。
-
-### 単一選択
-
-A～Gのキーを押した時点で回答します。
-
-```text
-A → 選択肢Aを回答
-B → 選択肢Bを回答
-...
-G → 選択肢Gを回答
+``` text
+1問目 → 2問目 → 3問目 → 4問目 → 5問目
 ```
 
-### 複数選択
+## 7. 敵HP
 
-```text
-A～G → 選択状態を切り替える
-Enter → 回答を確定
+1 Stageの敵HPは5です。正解するたびに1減ります。
+
+## 8. プレイ問題数
+
+``` text
+5問 = 1 Stage
+10問 = 2 Stage
+20問 = 4 Stage
 ```
 
-### その他
+同じGameSession内では同じ問題を重複させない方針です。
 
-```text
-Esc → Pause
+## 9. 問題形式
+
+-   A～Eから1つ
+-   A～Gから1つ
+-   A～Eから2つ
+-   A～Gから2つ
+-   A～Gから3つ
+-   コード選択 A～Eから1つ
+-   コード選択 A～Gから2つ
+
+複数選択は正解の組み合わせと完全一致した場合を正解とします。
+
+## 10. 長い問題への対応
+
+PC画面を問題部分とゲーム部分に分けます。
+
+``` text
+┌─────────────────┬─────────────────┐
+│ 問題・選択肢・時間 │ キャラクター・敵   │
+│ Java問題         │ Player          │
+│ A ...            │ Enemy           │
+│ B ...            │ HP / Combo      │
+└─────────────────┴─────────────────┘
 ```
 
-マウス操作は補助として残してもよいですが、基本操作はキーボードとします。
+## 11. キーボード操作
 
----
+単一選択：A～Gを押して回答。複数選択：A～Gで選択しEnterで確定。Esc：一時停止。マウスは補助操作とします。
 
-# 9. 問題の時間制限
+## 12. 制限時間
 
-問題ごとに制限時間を持たせます。
+問題ごとに`Question.timeLimitSeconds`で管理します。Stage側には別の制限時間を持たせません。
 
-基本的には、**実際の試験で理想的に回答できる時間を目安**に設定します。
+## 13. 正解時
 
-データとしては、問題ごとに `timeLimitSeconds` を持たせます。
-
-```text
-Question
- ├─ 問題文
- ├─ 選択肢
- ├─ 正解
- └─ 制限時間
+``` text
+正解 → 敵HP -1 → Combo +1 → Score +100 → キャラクター攻撃 → 説明 → 次の問題
 ```
 
-MVPでは、Stage側に別の時間設定を持たせず、**Questionの時間を使う**方針とします。
+## 14. 不正解時
 
----
-
-# 10. 長い問題への対応
-
-Java Bronzeの問題文やコードが長い場合があります。
-
-そのため、ゲーム画面では「問題を無理に小さく表示する」のではなく、PC画面の中で読みやすく分けます。
-
-```text
-┌───────────────────────┬───────────────────────┐
-│ 問題・選択肢・タイマー │ キャラクター・敵・HP    │
-│                       │                       │
-│ Javaの問題文          │       GAME AREA       │
-│ A～G                  │                       │
-│                       │   Player  →  Enemy    │
-└───────────────────────┴───────────────────────┘
+``` text
+MISS → 敵HPそのまま → Combo 0 → Score +0 → 説明 → 次の問題
 ```
 
-左側を「学習」、右側を「ゲーム」として分けることで、長い問題でもゲーム部分を邪魔しにくくします。
+## 15. 時間切れ
 
----
-
-# 11. ゲームUIの基本構成
-
-ゲーム画面には最低限、次を表示します。
-
-- 問題文
-- 選択肢
-- 残り時間
-- プレイヤーキャラクター
-- 敵キャラクター
-- 敵HP
-- コンボ
-- 現在の問題数
-
-### 画面イメージ
-
-```text
-┌─────────────────────────────────────────────┐
-│ Q3 / 5                         TIME 08       │
-├──────────────────────┬──────────────────────┤
-│ Javaの問題文         │   プレイヤー  → 敵   │
-│                      │                      │
-│ A. ...               │   HP ███□□  COMBO 2 │
-│ B. ...               │                      │
-│ C. ...               │                      │
-│ D. ...               │                      │
-└──────────────────────┴──────────────────────┘
+``` text
+TIME UP → 入力停止 → 時間切れ確定 → HPそのまま → Combo 0 → 履歴保存 → 説明 → 次の問題
 ```
 
----
+1問につき回答結果は1回だけ確定します。
 
-# 12. Stageごとのキャラクター・敵・フィールド
+## 16. Score
 
-Stageが変わったとき、ゲームの見た目も変化させます。
+MVPでは、正解+100、不正解+0、時間切れ+0とします。
 
-例：
+## 17. Combo
 
-| Stage | プレイキャラ | 敵 | フィールド |
-|---|---|---|---|
-| Stage 1 | 剣士 | Java Guard | 草原 |
-| Stage 2 | サラリーマン | Java Robot | オフィス |
-| Stage 3 | 忍者 | Code Samurai | 城 |
+正解で+1、不正解・時間切れで0に戻します。
 
-重要なのは、**キャラクターや見た目が変わっても、問題判定や履歴保存の仕組みは共通にすること**です。
+## 18. Stage Clear
 
----
+5問すべて回答するとStage終了です。
 
-# 13. ミニゲーム
+## 19. Perfect
 
-MVPでは、複数のミニゲームを用意します。
+5問すべて正解すると、敵HP0・Perfect・Stage
+Clearです。派手な必殺技はMVP完成後に余裕があれば追加します。
 
-### MVP候補
+## 20. Stageごとの変化
 
-- Code Target
-- Code Whack-a-Mole
-- Typing Samurai型の選択ゲーム
-- Code Breaker
+例：Stage1＝剣士 / Java Guard / 草原、Stage2＝サラリーマン / Java Robot
+/ オフィス、Stage3＝忍者 / Code Samurai / 城。ゲーム処理は共通化します。
 
-どのミニゲームでも、問題を解くことが中心です。
+## 21. 画面遷移図
 
-```text
-Question
-   ↓
-正解 / 不正解
-   ↓
-共通の結果処理
-   ├─ HP
-   ├─ コンボ
-   ├─ スコア
-   ├─ 履歴
-   └─ 次の問題
+``` text
+タイトル → Chapter選択 → Stage選択 → Game → Stage結果 → 復習 → Chapterへ
 ```
 
----
+## 22. 画面一覧
 
-# 14. ミニゲームの拡張方針
+-   タイトル
+-   Chapter選択
+-   Stage選択
+-   Game
+-   結果
+-   復習
 
-新しいミニゲームを追加できる構造を目指します。
+## 23. デザイン方針
 
-ただし、**「新しいミニゲームを追加するときにコードが不要」という意味ではありません。**
+ポップ、分かりやすい、ゲームらしい、キー入力が気持ちいい、Java問題が読みやすい画面を目指します。Typing
+LandやOzawa-Kenは操作テンポの参考とし、キャラクター・ロゴ・画面・素材をコピーしません。
 
-### データ追加で増やしやすいもの
+## 24. データの関係
 
-- 新しいQuestion
-- 新しいChapter
-- 新しいStage
-- 新しい敵
-- 新しいプレイヤー
-- Java Silver / Goldの問題
+``` text
+Chapter
+ ├── Question ── Choice
+ └── StageDefinition ── MiniGame
+             │
+             ↓
+        StageSession
+          │     │
+          ↓     ↓
+   AnswerHistory GameSession
+          ↑
+       Question
+          │
+          ↓
+   QuestionProgress
 
-### コード追加が必要なもの
-
-- 新しいMiniGameの動きそのもの
-- 新しい特殊入力ルール
-- 新しい特殊演出
-
-既存の問題判定・履歴・学習進捗をなるべく変更せず、ミニゲーム部分だけ追加できる構造を目指します。
-
----
-
-# 15. GameSession・StageSession
-
-プレイ中の状態を管理します。
-
-### GameSession
-
-1回のプレイ全体を管理します。
-
-```text
-GameSession
- ├─ 5問  → Stage 1
- ├─ 10問 → Stage 1 + Stage 2
- └─ 20問 → Stage 1～4
+GameSession ── AnswerHistory
 ```
 
-### StageSession
+## 25. システム全体像
 
-現在プレイしている1 Stageの状態を管理します。
-
-主な情報：
-
-- 現在何問目か
-- 正解数
-- 敵HP
-- Stage状態
-- 開始時刻・終了時刻
-
----
-
-# 16. 回答履歴と学習進捗
-
-2つを分けて管理します。
-
-### AnswerHistory
-
-「過去に何が起きたか」を保存します。
-
-例：
-
-- どの問題か
-- 正解か
-- 時間切れか
-- 回答時間
-- いつ回答したか
-- どのGameSession / StageSessionか
-
-### QuestionProgress
-
-「今その問題をどのくらい学習できているか」を管理します。
-
-状態の例：
-
-```text
-UNSEEN
-   ↓
-REVIEW
-   ↓
-CLEAR
-   ↓
-MASTERED
-```
-
-`MASTERED`になる条件などの細かい値は実装前に決定します。
-
----
-
-# 17. Result / Review
-
-StageまたはGameSession終了後に結果を表示します。
-
-### Result
-
-- 正解数
-- 不正解数
-- 時間切れ数
-- スコア
-- 最大コンボ
-- Perfectの有無
-- Stage結果
-
-### Review
-
-間違えた問題や復習対象の問題を見返せるようにします。
-
----
-
-# 18. スコア・コンボ
-
-MVPでは複雑な計算を避けます。
-
-```text
-正解       → +100
-不正解     → +0
-時間切れ   → +0
-```
-
-### コンボ
-
-```text
-正解 → +1
-不正解 → 0に戻す
-時間切れ → 0に戻す
-```
-
-タイムボーナスなどの高度なスコア計算は完成後の拡張候補です。
-
----
-
-# 19. Pause / Resume
-
-ゲーム中に一時停止できるようにします。
-
-```text
-Game
+``` text
+学習者
  ↓
-Pause
- ├─ Resume
- └─ Home
+HTML / CSS / JavaScript
+ ↓ HTTP
+Spring Boot / Controller
+ ↓
+Service
+ ↓
+Repository
+ ↓
+Database
+
+Java側の結果
+ ↓
+画面へ返却
+ ↓
+キャラクター・敵・HP・Combo更新
 ```
 
-Pause中は問題への入力とタイマーを止めます。
+## 26. 基本アーキテクチャ
 
----
-
-# 20. 画面遷移
-
-```mermaid
-flowchart TD
-    A[HOME] --> B[Chapter Select]
-    B --> C[Game Setup]
-    C --> D[Game]
-    D --> E{5問終了?}
-    E -- No --> D
-    E -- Yes --> F[Stage Result]
-    F --> G{続ける?}
-    G -- Yes --> D
-    G -- No --> H[Result]
-    H --> I[Review]
-    I --> A
-    D --> J[Pause]
-    J --> D
-    J --> A
-```
-
----
-
-# 21. 画面一覧
-
-### HOME
-
-- Chapterを選ぶ
-- 5 / 10 / 20問を選ぶ
-- 学習を開始する
-
-### Chapter Select
-
-- Chapter一覧
-- 学習進捗
-- 復習対象の確認
-
-### Game Setup
-
-- 出題数
-- 難易度やStage設定があれば表示
-
-### Game
-
-- 問題
-- 選択肢
-- タイマー
-- プレイヤー / 敵
-- HP / コンボ
-
-### Result
-
-- 成績
-- スコア
-- Stage結果
-
-### Review
-
-- 間違えた問題
-- 解説
-- 再挑戦
-
----
-
-# 22. デザイン方針
-
-目指すのは、**ポップで楽しいゲーム感覚 + 読みやすい学習画面**です。
-
-参考にするのは、操作感やテンポの考え方です。
-
-- Typing Land：キー入力と即時反応の気持ちよさ
-- Ozawa-Ken：ゲームらしいテンポと演出
-- 写真を大きく使うWebデザイン：画面全体の見せ方
-
-ただし、キャラクター・ロゴ・画面・素材をそのままコピーしません。
-
-### デザイン上の優先順位
-
-1. 問題が読みやすい
-2. キーを押した結果がすぐ分かる
-3. ゲームらしく動く
-4. Stageごとの雰囲気が変わる
-5. 派手な演出は最後に追加する
-
----
-
-# 23. データモデル
-
-実装時に中心となるデータです。
-
-| データ | 役割 |
-|---|---|
-| Chapter | 学習テーマ |
-| Question | 問題本体 |
-| Choice | 選択肢 |
-| StageDefinition | Stageの設定 |
-| StageSession | 現在のStage状態 |
-| GameSession | 1回のプレイ全体 |
-| AnswerHistory | 回答履歴 |
-| QuestionProgress | 学習状態 |
-| MiniGame | ミニゲーム設定 |
-
-### StageDefinitionとStageSessionを分ける理由
-
-```text
-StageDefinition
-「このStageはどういうStageか」
-
-StageSession
-「今このStageをどこまで進めているか」
-```
-
-この2つを混ぜないことで、設定とプレイ中の状態を分けて管理できます。
-
----
-
-# 24. データの関係
-
-```mermaid
-flowchart TD
-    C[Chapter] --> Q[Question]
-    Q --> CH[Choice]
-    C --> SD[StageDefinition]
-    SD --> STS[StageSession]
-    GS[GameSession] --> STS
-    GS --> AH[AnswerHistory]
-    STS --> AH
-    Q --> AH
-    Q --> QP[QuestionProgress]
-    SD --> MG[MiniGame]
-```
-
-### 重要な関係
-
-- ChapterはQuestionを持つ
-- QuestionはChoiceを持つ
-- StageDefinitionはStageの設定を持つ
-- GameSessionはStageSessionをまとめる
-- AnswerHistoryは回答結果を保存する
-- QuestionProgressは学習状態を保存する
-- MiniGameはStageの遊び方に関係する
-
----
-
-# 25. システム全体像
-
-```mermaid
-flowchart LR
-    U[ユーザー] --> F[HTML / CSS / JavaScript]
-    F --> C[Spring Boot / Controller]
-    C --> S[Service]
-    S --> R[Repository]
-    R --> DB[(Database)]
-```
-
-### 役割
-
-**画面**
-
-ユーザーが問題を見て、キーを押します。
-
-**Java側**
-
-問題取得・回答判定・Stage進行・履歴保存などを処理します。
-
-**Database**
-
-問題、回答履歴、学習状態などを保存します。
-
----
-
-# 26. 基本アーキテクチャ
-
-基本構成は3つの役割に分けます。
-
-```text
-画面
+``` text
 HTML / CSS / JavaScript
         ↓
-処理
-Controller / Service
+Controller
         ↓
-データ
-Repository / Database
+Service
+        ↓
+Repository
+        ↓
+Database
 ```
 
-### Controller
+Controllerは受付、Serviceはゲームルール、RepositoryはDBとのやり取りを担当します。
 
-画面からのリクエストを受け取ります。
+## 27. 要求モデル
 
-### Service
+  ID       要求
+  -------- ------------------------------
+  REQ-01   Chapterを選択できる
+  REQ-02   Stageを開始できる
+  REQ-03   問題に回答できる
+  REQ-04   正誤判定できる
+  REQ-05   制限時間を管理できる
+  REQ-06   HP・Combo・Scoreを更新できる
+  REQ-07   回答履歴を保存できる
+  REQ-08   結果を確認できる
+  REQ-09   間違えた問題を復習できる
 
-「何をするか」を決めます。
+## 28. Use Case Diagram
 
-例：
-
-- 問題を取得する
-- 回答を判定する
-- Stageを進める
-- 結果を計算する
-
-### Repository
-
-Databaseとのやり取りを担当します。
-
----
-
-# 27. 要求モデル：このシステムでできること
-
-ユーザーがすることを、まず日本語で整理します。
-
-```text
-Chapterを選ぶ
-    ↓
-学習を開始する
-    ↓
-問題を解く
-    ↓
-ミニゲームを遊ぶ
-    ↓
-結果を見る
-    ↓
-間違えた問題を復習する
+``` text
+             ┌──────────────────────────┐
+             │ Java Learning System     │
+             │                          │
+学習者 ────→ │ Chapterを選択する        │
+             │ 学習を開始する           │
+             │ 問題に回答する           │
+             │ Stageを進める            │
+             │ 結果を見る               │
+             │ 復習する                 │
+             │ 進捗を見る               │
+             └──────────────────────────┘
 ```
 
-主な機能：
+## 29. ロバストネス分析
 
-- Chapter選択
-- 学習開始
-- 問題回答
-- タイムアウト処理
-- Stage進行
-- 結果表示
-- 復習
-- 学習進捗確認
-
----
-
-# 28. Use Case Diagram
-
-READMEでは、細かいUML記号の説明より「誰が何をするか」を分かりやすくします。
-
-```mermaid
-flowchart LR
-    U[学習者]
-    U --> A[Chapterを選ぶ]
-    U --> B[学習を開始する]
-    U --> C[問題に回答する]
-    U --> D[Stageを進める]
-    U --> E[結果を見る]
-    U --> F[問題を復習する]
-    U --> G[進捗を見る]
-```
-
----
-
-# 29. ロバストネス分析
-
-ロバストネス分析では、**画面・処理・データ**を分けて考えます。
-
-```text
-【画面】
-Game画面
-Result画面
-Review画面
-    ↓
-【処理】
-GameController
+``` text
+【Boundary：画面】
+Game / Result / Review
+        ↓
+【Control：処理】
+AnswerController
 AnswerService
 GameSessionService
 ReviewService
-    ↓
-【データ】
+        ↓
+【Entity：データ】
 Question
 StageSession
+GameSession
 AnswerHistory
 QuestionProgress
 ```
 
-### この図の目的
+## 30. シーケンス図：回答判定
 
-「画面の処理を全部1つの場所に書かないための整理」です。
-
----
-
-# 30. シーケンス図：回答判定
-
-1問に回答したときの処理順です。
-
-```mermaid
-sequenceDiagram
-    participant User as 学習者
-    participant Screen as Game画面
-    participant API as Controller
-    participant Service as AnswerService
-    participant DB as Database
-
-    User->>Screen: キーを押す
-    Screen->>API: 回答を送る
-    API->>Service: 正誤判定
-    Service->>DB: 回答履歴を保存
-    Service-->>API: 結果を返す
-    API-->>Screen: 正解 / 不正解
-    Screen-->>User: キャラを動かす・次の問題
+``` text
+学習者
+ ↓
+Game画面
+ ↓
+AnswerController
+ ↓
+AnswerService
+ ↓
+Question取得
+ ↓
+正誤判定
+ ↓
+StageSession更新
+ ↓
+AnswerHistory保存
+ ↓
+GameSession更新
+ ↓
+結果返却
+ ↓
+キャラクター演出
+ ↓
+次の問題
 ```
 
-### 実装上の重要点
+正解：HP-1、Combo+1、Score+100。不正解：HP維持、Combo0、Score+0。
 
-回答を受け付けたら入力を一度ロックし、**二重送信を防止**します。
+## 31. シーケンス図：時間切れ
 
-時間切れ処理とキー入力が同時に発生した場合も、1問につき1回だけ結果を確定させます。
-
----
-
-# 31. シーケンス図：時間切れ
-
-```mermaid
-sequenceDiagram
-    participant Timer as タイマー
-    participant Screen as Game画面
-    participant API as Controller
-    participant Service as AnswerService
-    participant DB as Database
-
-    Timer->>Screen: TIME UP
-    Screen->>Screen: 入力停止
-    Screen->>API: 時間切れを送る
-    API->>Service: 回答を確定
-    Service->>DB: 履歴保存
-    Service-->>API: 結果を返す
-    API-->>Screen: TIME UP結果
+``` text
+Timer → TIME UP → 入力停止 → AnswerController → AnswerService → 履歴保存 → Combo0 → 結果返却 → TIME UP表示 → 次の問題
 ```
 
----
+## 32. シーケンス図：Stage進行
 
-# 32. シーケンス図：Stage進行
+1～4問目：`回答 → 正誤判定 → HP/Combo/Score更新 → 履歴保存 → 次問題`
 
-```mermaid
-sequenceDiagram
-    participant Screen as Game画面
-    participant Service as GameSessionService
-    participant DB as Database
+5問目：`5問目回答 → 正誤判定 → 履歴保存 → 5問終了 → Perfect判定 → Stage Clear判定 → Result`
 
-    Screen->>Service: 回答結果
-    Service->>Service: HP / コンボ / 正解数更新
-    Service->>DB: 状態保存
-    alt 5問未満
-        Service-->>Screen: 次の問題
-    else 5問終了
-        Service-->>Screen: Stage Clear / Result
-    end
-```
+## 33. クラス図
 
----
-
-# 33. クラス図
-
-READMEでは「クラスの全部」ではなく、中心となるデータだけを表示します。
-
-```mermaid
+``` mermaid
 classDiagram
-    class Chapter {
-        Long id
-        String name
-    }
-
-    class Question {
-        Long id
-        String text
-        int timeLimitSeconds
-    }
-
-    class Choice {
-        Long id
-        String label
-        String text
-    }
-
-    class StageDefinition {
-        Long id
-        String name
-        int maxEnemyHp
-    }
-
-    class GameSession {
-        Long id
-        int questionCount
-    }
-
-    class StageSession {
-        Long id
-        int currentQuestionIndex
-        int correctCount
-        int enemyHp
-    }
-
-    class AnswerHistory {
-        Long id
-        boolean correct
-        boolean timeout
-        int answerTime
-    }
-
-    class QuestionProgress {
-        Long id
-        String status
-    }
-
-    Chapter --> Question
-    Question --> Choice
-    Chapter --> StageDefinition
-    GameSession --> StageSession
-    StageDefinition --> StageSession
-    StageSession --> AnswerHistory
-    Question --> AnswerHistory
-    Question --> QuestionProgress
+class Chapter {
+  Long chapterId
+  String name
+}
+class Question {
+  Long questionId
+  Long chapterId
+  String questionText
+  int timeLimitSeconds
+}
+class Choice {
+  Long choiceId
+  Long questionId
+  String choiceText
+  boolean correct
+}
+class StageDefinition {
+  Long stageId
+  Long chapterId
+  int stageNumber
+  String name
+  String playerCharacter
+  String enemy
+  String field
+  String miniGameId
+  String actionPattern
+  int maxEnemyHp
+}
+class MiniGame {
+  String miniGameId
+  String name
+}
+class GameSession {
+  Long gameSessionId
+  int questionCount
+  int score
+  int currentStage
+}
+class StageSession {
+  Long stageSessionId
+  Long gameSessionId
+  Long stageId
+  int currentQuestionIndex
+  int correctCount
+  int enemyHp
+  String status
+}
+class AnswerHistory {
+  Long answerHistoryId
+  Long gameSessionId
+  Long stageSessionId
+  Long questionId
+  boolean correct
+  boolean timeout
+  int answerTime
+}
+class QuestionProgress {
+  Long questionProgressId
+  Long questionId
+  String status
+}
+Chapter --> Question
+Question --> Choice
+Chapter --> StageDefinition
+StageDefinition --> MiniGame
+GameSession --> StageSession
+StageSession --> StageDefinition
+StageSession --> AnswerHistory
+GameSession --> AnswerHistory
+Question --> AnswerHistory
+Question --> QuestionProgress
 ```
 
-### クラス図の見方
+## 33.1 Javaクラス名
 
-```text
-Chapter
-  ↓
-Question
-  ↓
-Choice
+Controller：`ChapterController`, `GameSessionController`,
+`AnswerController`, `ResultController`, `ReviewController`
+
+Service：`ChapterService`, `GameSessionService`, `AnswerService`,
+`ResultService`, `ReviewService`
+
+Repository：`ChapterRepository`, `QuestionRepository`,
+`ChoiceRepository`, `StageDefinitionRepository`,
+`GameSessionRepository`, `StageSessionRepository`,
+`AnswerHistoryRepository`, `QuestionProgressRepository`
+
+Entity：`Chapter`, `Question`, `Choice`, `StageDefinition`,
+`GameSession`, `StageSession`, `AnswerHistory`, `QuestionProgress`
+
+## 33.2 詳細クラス図
+
+``` mermaid
+classDiagram
+class AnswerController {
+  +submitAnswer()
+}
+class AnswerService {
+  +judgeAnswer()
+  +updateStage()
+  +saveHistory()
+}
+class QuestionRepository {
+  +findById()
+}
+class StageSessionRepository {
+  +findById()
+  +save()
+}
+class AnswerHistoryRepository {
+  +save()
+}
+AnswerController --> AnswerService
+AnswerService --> QuestionRepository
+AnswerService --> StageSessionRepository
+AnswerService --> AnswerHistoryRepository
 ```
 
-は「Chapterの中に問題があり、問題に選択肢がある」という意味です。
+## 34. MiniGame / GameEffectの設計
 
----
+Questionは「何を答えるか」、MiniGameは「どう遊ぶか」を担当します。
 
-# 34. ミニゲーム設計
+MVP：Code Target、Code Whack-a-Mole、Typing Samurai、Code Breaker。
 
-ミニゲームは「問題そのもの」と分けて考えます。
+共通処理は回答判定・Score・Combo・履歴・Stage進行。MiniGameごとの処理は入力方法・キャラクター動作・攻撃演出です。
 
-```text
-Question
-「何を答えるか」
+## 35. REST APIの事前確認
 
-      ＋
+APIは画面とJavaをつなぐ窓口です。
 
-MiniGame
-「どうやって遊ぶか」
-
-      ↓
-
-Answer Result
-「正解 / 不正解」
-```
-
-### 共通にする処理
-
-- 回答判定
-- スコア計算
-- コンボ更新
-- 履歴保存
-- Stage進行
-
-### ミニゲームごとに変えてよい処理
-
-- キャラクターの動き
-- 入力方法
-- 攻撃演出
-- 成功演出
-
-この分け方により、ゲームを追加しても学習データ側の処理をできるだけ再利用できます。
-
----
-
-# 35. REST APIの位置付け
-
-APIは、**画面とJava側をつなぐ窓口**です。
-
-例えば、
-
-```text
-画面
- ↓
-「この回答を送る」
- ↓
-API
- ↓
-Java
- ↓
-正誤判定・保存
- ↓
-結果を画面へ返す
-```
-
-実装時の候補として、次のようなAPIを用意します。
-
-```text
+``` text
 GET  /api/chapters
-GET  /api/questions/{id}
+GET  /api/stages?chapterId=1
+GET  /api/questions/{questionId}
 POST /api/answers
 GET  /api/results/{gameSessionId}
 ```
 
-実際のURLやrequest / responseの詳細は、実装時に決定します。
+`POST /api/answers` Request：
 
----
-
-# 36. 設計整合性チェック
-
-要求・設計・実装で、次のルールを共通にします。
-
-| ルール | README | 実装 |
-|---|---|---|
-| 1 Stage = 5問 | ✅ | ✅ |
-| 敵HP = 5 | ✅ | ✅ |
-| 正解でHP -1 | ✅ | ✅ |
-| 正解でコンボ +1 | ✅ | ✅ |
-| 不正解でコンボ0 | ✅ | ✅ |
-| 時間切れでHP維持 | ✅ | ✅ |
-| 5問終了でStage Clear | ✅ | ✅ |
-| Perfect = 5問全正解 | ✅ | ✅ |
-| 回答履歴を保存 | ✅ | ✅ |
-
-実装時にREADMEのルールとコードの動きがずれていないか確認します。
-
----
-
-# 37. Java型とDatabase型の対応方針
-
-詳細なDB設計は実装時に確定しますが、基本的にはJavaのデータ型とDBの型を対応させます。
-
-例：
-
-| Java | Databaseの例 |
-|---|---|
-| `Long` | BIGINT |
-| `String` | VARCHAR / TEXT |
-| `int` | INT |
-| `boolean` | BOOLEAN |
-| `LocalDateTime` | DATETIME / TIMESTAMP |
-
-実際のDB製品と設定に合わせて調整します。
-
----
-
-# 38. 開発で意識すること
-
-難しい設計を増やすことより、次を優先します。
-
-### 責任を分ける
-
-問題取得、回答判定、履歴保存などを無理に1つへまとめない。
-
-### 同じ処理を重複させない
-
-問題判定や結果保存などは共通化する。
-
-### 必要以上に複雑にしない
-
-MVPで使わない機能のために複雑な仕組みを作らない。
-
----
-
-# 39. Git / GitHubの運用
-
-GitHubは、完成したコードを置くだけでなく、**どのように開発したかを残す場所**として使います。
-
-### Commit
-
-1回のコミットで、何を変えたか分かるようにします。
-
-初心者の場合は日本語でも問題ありません。
-
-例：
-
-```text
-READMEを初心者向けに更新
+``` json
+{
+  "gameSessionId": 1,
+  "stageSessionId": 1,
+  "questionId": 10,
+  "selectedChoices": [2],
+  "timeout": false
+}
 ```
 
-説明を付ける場合：
+Response：
 
-```text
-READMEを更新し、ゲーム仕様・設計図・拡張方針を整理しました。
+``` json
+{
+  "correct": true,
+  "timeout": false,
+  "enemyHp": 4,
+  "combo": 1,
+  "score": 100,
+  "stageClear": false,
+  "perfect": false,
+  "nextQuestionId": 11
+}
 ```
 
-### ブランチ
+5問目は`stageClear=true`、5/5は`perfect=true`、次がなければ`nextQuestionId=null`とします。
 
-大きな変更や試作をするときは、必要に応じて作業用ブランチを使います。
+## 36. 設計整合性チェック
 
-```text
-main
- ├─ feature/game-screen
- ├─ feature/answer-logic
- └─ feature/result-screen
+  ルール                      要求   設計   API   実装
+  --------------------------- ------ ------ ----- ------
+  1 Stage = 5問               ○      ○      ○     確認
+  敵HP = 5                    ○      ○      ○     確認
+  正解でHP -1                 ○      ○      ○     確認
+  不正解でHP維持              ○      ○      ○     確認
+  時間切れでHP維持            ○      ○      ○     確認
+  正解でCombo +1              ○      ○      ○     確認
+  不正解・時間切れでCombo 0   ○      ○      ○     確認
+  正解でScore +100            ○      ○      ○     確認
+  5問終了でStage Clear        ○      ○      ○     確認
+  5/5でPerfect                ○      ○      ○     確認
+  回答履歴保存                ○      ○      ○     確認
+
+## 37. 回答処理の共通ルール
+
+``` text
+回答受付 → 1回だけ確定 → 正誤判定 → StageSession更新 → GameSession更新 → AnswerHistory保存 → 結果返却
 ```
 
-MVPでは、複雑なGit運用より、**変更内容が分かるコミットを残すこと**を優先します。
+最終的な正誤判定はJava側で行います。
 
----
+## 38. 二重回答防止
 
-# 40. AI活用方針
+キー入力とTIME
+UPが同時に発生しても、1問につき1回だけ回答を確定します。画面側で入力をロックし、サーバー側でも重複処理を防止します。
 
-AIは「全部作ってもらう」ためではなく、**考えるための補助**として使います。
+## 39. データモデル
 
-### AIに任せやすいもの
+-   Chapter：`chapterId`, `name`, `description`
+-   Question：`questionId`, `chapterId`, `questionText`, `questionType`,
+    `timeLimitSeconds`, `explanation`
+-   Choice：`choiceId`, `questionId`, `choiceText`, `choiceOrder`,
+    `correct`
+-   StageDefinition：`stageId`, `chapterId`, `stageNumber`, `name`,
+    `playerCharacter`, `enemy`, `field`, `miniGameId`, `actionPattern`,
+    `maxEnemyHp`
+-   GameSession：`gameSessionId`, `questionCount`, `score`,
+    `currentStage`, `startedAt`, `endedAt`
+-   StageSession：`stageSessionId`, `gameSessionId`, `stageId`,
+    `currentQuestionIndex`, `correctCount`, `enemyHp`, `status`,
+    `startedAt`, `endedAt`
+-   AnswerHistory：`answerHistoryId`, `userId`, `gameSessionId`,
+    `stageSessionId`, `questionId`, `correct`, `timeout`, `answerTime`,
+    `answeredAt`
+-   QuestionProgress：`questionProgressId`, `userId`, `questionId`,
+    `status`, `lastAnsweredAt`
 
-- Java Bronze問題のアイデア出し
-- 問題文のたたき台
-- エラーの原因候補
-- 設計案の比較
-- README文章の整理
-- テストケースのアイデア
+## 40. QuestionProgressとAnswerHistory
 
-### 自分で理解して行うもの
+AnswerHistoryは「過去に何をしたか」、QuestionProgressは「現在どの程度学習できているか」を表します。
 
-- Javaコードの入力・修正
-- クラスの役割を決める
-- DB設計の最終判断
-- 画面デザイン
-- ゲームルールの最終決定
-- Gitへのコミット
+## 41. 学習状態
 
-### AI利用時のルール
-
-生成されたコードは、そのまま使用せず、**何をしているコードなのか説明できる状態にする**ことを目標にします。
-
----
-
-# 41. 問題作成・著作権・データ品質
-
-問題はJava Bronze学習用として作成・整理します。
-
-他者の教材やWebサイトの問題文をそのまま大量に転載するのではなく、必要に応じて自分で問題を作成・再構成します。
-
-確認する項目：
-
-- Javaの仕様と矛盾していないか
-- 正解が明確か
-- 複数選択の正解条件が明確か
-- 解説と正解が一致しているか
-- 問題文が長すぎないか
-- 制限時間が適切か
-
----
-
-# 42. テスト方針
-
-MVPでは、まず実際に画面を操作して動作を確認します。
-
-### 重点テスト
-
-#### 正解
-
-```text
-キー入力
-↓
-正解
-↓
-キャラクター攻撃
-↓
-HP -1
-↓
-コンボ +1
+``` text
+UNSEEN → REVIEW → CLEAR → MASTERED
 ```
 
-#### 不正解
+MASTEREDの具体的条件は実装前に決定します。
 
-```text
-MISS
-↓
-HP変化なし
-↓
-コンボ0
+## 42. 設計上の基本ルール
+
+-   役割を分ける
+-   同じ処理を重複させない
+-   必要以上に複雑にしない
+-   初心者でも読める名前にする
+
+## 43. 画面とゲーム処理の分離
+
+Java側：正誤判定、HP、Combo、Score、履歴、Stage判定。
+
+JavaScript側：キー入力、画面更新、キャラクター演出、敵アニメーション、表示更新。
+
+## 44. 設計から実装への流れ
+
+``` text
+要求 → Use Case → データモデル → ロバストネス → シーケンス → クラス → REST API → Java実装 → HTML/CSS/JavaScript → テスト
 ```
 
-#### 時間切れ
+## 45. 開発手順
 
-```text
-TIME UP
-↓
-入力停止
-↓
-HP変化なし
-↓
-コンボ0
-↓
-履歴保存
+1.  Spring Boot起動確認
+2.  DB接続
+3.  Entity
+4.  Repository
+5.  Service
+6.  Controller
+7.  API確認
+8.  HTML/CSS
+9.  JavaScript
+10. 回答処理
+11. Stage処理
+12. ゲーム演出
+13. 結果
+14. 復習
+15. テスト・修正
+
+## 46. Git / GitHub
+
+初心者でも変更内容が分かる日本語コミットを使用します。
+
+例：`READMEを初心者向けに更新`、`回答判定処理を追加`、`Stage進行処理を追加`、`ゲーム画面を作成`、`回答履歴の保存処理を追加`
+
+## 47. AI活用方針
+
+AIは補助として使用します。
+
+AIを活用：問題案、解説案、エラー原因調査、設計確認、コードの意味の説明。
+
+自分で理解して行う：Javaコード入力、クラス作成、API実装、HTML/CSS/JavaScript調整、Git操作、テスト、エラー修正。
+
+## 48. 問題データ
+
+既存教材の文章をそのまま大量転載せず、学習用として自分で問題を構成します。
+
+## 49. データ品質
+
+問題文、正解、選択肢、解説、制限時間、複数選択数を確認します。
+
+## 50. テスト
+
+正解、不正解、時間切れ、Perfect、Stage
+Clear、二重送信、履歴保存を確認します。
+
+## 51. Must / Should / Could
+
+Must：Chapter、Stage、5問、問題、キーボード回答、正誤、制限時間、HP、Combo、Score、履歴、結果、復習。
+
+Should：ミニゲーム追加、Stage演出、Perfect演出、Time Attack。
+
+Could：Blender 3D、キャラクター成長、ランキング、Java Silver / Gold。
+
+## 52. 拡張方針
+
+Chapter、Stage、Question、MiniGameを追加できる構造を目指します。Java
+Silver、Java
+Goldも将来的な拡張候補です。問題・Chapter・Stageなどのデータ追加は既存コードをできるだけ変更せずに行える構成を目指します。新しいMiniGameを追加する場合は、新しいゲーム処理のコード実装が必要です。
+
+## 53. MVP
+
+``` text
+Chapter選択 → Stage開始 → 5問回答 → 正誤判定 → HP / Combo / Score → キャラクター反応 → 履歴保存 → Stage Clear → 結果 → 復習
 ```
 
-#### Perfect
+まずJava Bronze学習ゲームを最後まで完成させることを最優先します。
 
-```text
-5問すべて正解
-↓
-HP0
-↓
-Perfect
-↓
-Stage Clear
+## 54. 開発スケジュール
+
+``` text
+10/02 企画・検討
+10/06 要求整理
+10/09 分析
+10/13 設計
+10/14～ プログラミング
+10/26 テスト・デバッグ・リファクタリング
+10/28 提出物・発表資料
+10/29 発表
 ```
 
-#### 重複送信
+## 55. 実装優先順位
 
-1問に対して結果が2回保存されないことを確認します。
+最優先：Question、Answer、Stage、GameSession、AnswerHistory、Result、Review。
 
----
+次：ゲーム演出、MiniGame追加、デザイン改善。
 
-# 43. Must / Should / Could
+最後：3D、複雑なエフェクト、ランキング。
 
-## Must：完成に必須
+## 56. コードを書く前に確認
 
-- Java Bronze問題
-- A～E / A～G
-- 単一・複数選択
-- 問題ごとの制限時間
-- 正誤判定
-- 解説
-- ミニゲーム
-- 1 Stage = 5問
-- 敵HP5
-- スコア
-- 回答履歴
-- 復習
-- Java / Spring Boot
-- HTML / CSS / JavaScript
-- Database
+-   クラス名
+-   データ項目
+-   API
+-   回答処理
+-   Stageルール
+-   HPルール
+-   Perfect条件
+-   履歴保存内容
 
-## Should：余裕があれば追加
+## 57. 画面デザイン前に確認
 
-- ミニゲーム追加
-- コンボ演出強化
-- タイムアタック
-- Stage演出強化
-- Result演出
-- 成績グラフ
-- サウンド
-- アニメーション
+-   問題文
+-   選択肢
+-   キー入力
+-   タイマー
+-   HP
+-   Combo
+-   キャラクター
+-   正解・不正解表示
+-   次問題への導線
 
-## Could：完成後の候補
+## 58. 説明するときのポイント
 
-- Blender 3D
-- 複雑なエフェクト
-- キャラクター成長
-- Java Silver / Gold
-- オンラインランキング
-- 3Dステージ
+最初は「Java
+Bronzeの問題をゲーム形式で解く学習Webアプリです。」と説明します。
 
-最優先は、**Java Bronze学習ゲームを最後まで完成させること**です。
+次に「正解するとキャラクターが攻撃し、敵のHPが減ります。1Stageは5問で、5問すべて正解するとPerfectになります。」と説明します。
 
----
+技術説明は「画面はHTML/CSS/JavaScript、サーバー側はJava/Spring
+Boot、データはデータベースで管理しています。」とします。
 
-# 44. 将来の拡張
+## 59. ポートフォリオで見せるポイント
 
-このシステムでは、問題・Chapter・Stageなどを追加できる構造を目指します。
+Java、Spring Boot、データ管理、REST
+API、ゲーム処理、画面制作、テストまで一通り経験したことを見せられる作品にします。
 
-```text
-Java Bronze
-   ↓
-Chapter追加
-   ↓
-Stage追加
-   ↓
-Question追加
-   ↓
-Silver / Gold追加
+## 60. 現在の設計状態
+
+要求、Use
+Case、データモデル、データ関係、システム全体像、アーキテクチャ、ロバストネス、シーケンス、クラス図、REST
+API、設計整合性を整理済みとします。ここからは設計を増やすより実装を進めます。
+
+## 61. 実装時のルール
+
+1.  小さく動かす
+2.  1機能ずつ実装
+3.  動いたらコミット
+4.  分からないコードは確認
+5.  AIコードを理解せず使わない
+6.  エラー原因を確認
+7.  設計とコードのズレを修正
+
+## 62. 最終コンセプト
+
+``` text
+考える → キーを押す → すぐ反応 → キャラクターが動く → 敵HPが変化 → 結果が分かる → 次へ
 ```
 
-### 追加しやすくしたいもの
+## 63. 今後追加できる要素
 
-- Question
-- Chapter
-- Stage
-- キャラクター
-- 敵
-- フィールド
-- MiniGame設定
-- Java Silver / Goldの問題
+新キャラクター、新しい敵、新Stage、新MiniGame、Java Silver、Java
+Gold、3Dモデル、エフェクト、キャラクター成長、ランキングなど。MVP完成後に追加します。
 
-### 将来的な問題管理
+## 64. README更新履歴
 
-最終的には、問題をコードに直接大量に書くのではなく、JSON / CSVなどのデータとして管理する方法も検討します。
+### 2026/10/07
 
----
+-   ゲーム基本ループ更新
+-   1Stage = 5問に統一
+-   敵HP = 5に統一
+-   Perfect条件統一
+-   正解・不正解・時間切れを統一
+-   データ関係、システム全体像、アーキテクチャを整理
+-   要求モデル、Use Case、ロバストネス分析を整理
+-   回答判定・時間切れ・Stage進行シーケンスを整理
+-   クラス図・Javaクラス名を整理
+-   REST APIのRequest / Responseを整理
+-   設計整合性チェックを追加
+-   Git / GitHub運用とAI活用方針を整理
+-   実装優先順位を整理
 
-# 45. MVP完成条件
+## 65. 用語
 
-以下を満たしたら、MVP完成とします。
+  用語               意味
+  ------------------ ------------------------
+  Chapter            学習テーマ
+  Question           問題
+  Stage              5問を遊ぶ単位
+  GameSession        1回のプレイ全体
+  StageSession       現在のStage状態
+  AnswerHistory      過去の回答記録
+  QuestionProgress   問題ごとの学習状態
+  API                画面とJavaをつなぐ窓口
+  Controller         リクエスト受付
+  Service            ゲームルール処理
+  Repository         DBとのやり取り
+  Entity             保存するデータ
+  Boundary           画面
+  Control            処理
+  UML                システムを図で表す方法
 
-```text
-① Chapterを選べる
-        ↓
-② 5問のStageを開始できる
-        ↓
-③ A～Gなどのキーで回答できる
-        ↓
-④ 正解 / 不正解 / 時間切れを判定できる
-        ↓
-⑤ 正解時にキャラクターが動く
-        ↓
-⑥ 敵HPが正しく変化する
-        ↓
-⑦ 5問でStage Clearできる
-        ↓
-⑧ Perfectを判定できる
-        ↓
-⑨ 回答履歴を保存できる
-        ↓
-⑩ Result / Reviewを表示できる
+## 66. READMEの使い方
+
+コードを書くときはクラス名・データ・API・処理順を確認します。デザインするときは画面遷移・ゲーム画面・操作方法を確認します。説明するときは「何を作るか」「なぜ作るか」「どう動くか」「どう作るか」を確認します。
+
+## 67. 開発開始チェック
+
+``` text
+□ Spring Boot起動
+□ DB接続
+□ Entity
+□ Repository
+□ Service
+□ Controller
+□ API
+□ Question取得
+□ Answer送信
+□ 正誤判定
+□ HP更新
+□ Combo更新
+□ Score更新
+□ AnswerHistory保存
+□ 5問でStage Clear
+□ 5/5でPerfect
+□ 結果画面
 ```
 
-ここまで完成したら、追加演出よりも**安定動作と説明できる状態**を優先します。
+## 68. 完成の最終目標
 
----
+Java
+Bronzeを勉強したいが、通常の問題演習だけでは続きにくい人が、ゲーム感覚で何度も問題を解けるWebアプリを完成させます。
 
-# 46. 実装フェーズの順番
-
-コードを書く順番を決めておきます。
-
-### Step 1：プロジェクト基本設定
-
-- Spring Boot
-- Database接続
-- Git管理
-
-### Step 2：Chapter / Question
-
-- Chapter取得
-- Question取得
-- Choice取得
-
-### Step 3：GameSession / StageSession
-
-- 5問開始
-- 現在問題番号
-- 敵HP
-- 正解数
-
-### Step 4：回答判定
-
-- 単一選択
-- 複数選択
-- 時間切れ
-- 二重送信防止
-
-### Step 5：履歴
-
-- AnswerHistory
-- QuestionProgress
-
-### Step 6：ゲーム画面
-
-- 問題表示
-- キー入力
-- HP表示
-- キャラクター表示
-
-### Step 7：ミニゲーム演出
-
-- 攻撃
-- MISS
-- TIME UP
-- コンボ
-
-### Step 8：Result / Review
-
-- 結果表示
-- 復習
-
-### Step 9：UI改善
-
-- デザイン
-- アニメーション
-- 効果音
-
-### Step 10：テスト・修正
-
-- 正解
-- 不正解
-- 時間切れ
-- Stage Clear
-- Perfect
-- 二重送信
-
-**演出より先に、学習機能とゲーム進行を完成させます。**
-
----
-
-# 47. 実際にコードを書くときの確認項目
-
-実装中に迷ったら、次を確認します。
-
-### 問題
-
-- このQuestionは何を学ばせる問題か
-- 正解は明確か
-- 制限時間はあるか
-
-### 回答
-
-- 単一選択か複数選択か
-- キー入力をどう受け取るか
-- 1問1回だけ確定するか
-
-### Stage
-
-- 今何問目か
-- 敵HPはいくつか
-- Stage終了条件は5問か
-
-### 結果
-
-- 正解数は正しいか
-- スコアは正しいか
-- 履歴が保存されているか
-
-### UI
-
-- 問題が読めるか
-- キー入力が分かるか
-- 正解 / 不正解がすぐ分かるか
-- キャラクターが反応するか
-
----
-
-# 48. デザインするときの確認項目
-
-画面を作るときは、まず見た目より使いやすさを確認します。
-
-```text
-読みやすい
-   ↓
-押しやすい
-   ↓
-反応が分かる
-   ↓
-ゲームとして楽しい
-```
-
-### 色・装飾
-
-- 問題文と背景を区別する
-- 正解 / 不正解を視覚的に分ける
-- タイマーを見やすくする
-- HPを一目で分かるようにする
-
-### アニメーション
-
-最初から大量に入れず、
-
-```text
-正解 → 攻撃
-不正解 → MISS
-時間切れ → TIME UP
-Perfect → 特別演出
-```
-
-のように意味があるところから追加します。
-
----
-
-# 49. 人に説明するときのポイント
-
-先生や企業に説明するときは、難しい言葉を先に並べません。
-
-### まず一言
-
-> Java Bronzeの問題演習にゲーム性を加え、楽しく繰り返し学習できるWebアプリです。
-
-### 次にゲームの流れ
-
-> 1 Stageは5問で、正解するとキャラクターが攻撃し、敵のHPが1減ります。5問すべて正解するとPerfectになります。
-
-### 次に技術
-
-> Java / Spring Bootを中心に、HTML・CSS・JavaScriptとDatabaseを組み合わせています。
-
-### 最後に工夫
-
-> 問題データとゲーム演出を分け、新しい問題やStageを追加しやすくしています。
-
-この4つを説明できれば、READMEの細かい設計用語をすべて暗記する必要はありません。
-
----
-
-# 50. 学校提出物との対応
-
-学校提出で必要になる資料は、READMEの内容から整理できます。
-
-| 学校で必要な内容 | READMEで対応する場所 |
-|---|---|
-| 何を作るか | 1～2 |
-| どんな問題を解決するか | 2 |
-| システム全体像 | 25～26 |
-| 要求モデル | 27～28 |
-| 分析・整理 | 23～29 |
-| 設計モデル | 30～36 |
-| 実装方針 | 46～48 |
-| テスト | 42 |
-| 拡張性 | 14・44 |
-| AI活用 | 40 |
-| Git / GitHub | 39 |
-
-READMEは学校提出資料そのものではなく、**プロジェクト全体を確認するための中心資料**として使います。
-
----
-
-# 51. 開発スケジュール
-
-現在の学校スケジュールを目安に、設計を長引かせず実装へ移ります。
-
-| 時期 | 主な内容 |
-|---|---|
-| 10/2 | 検討項目1～5 |
-| 10/6 | 要求整理 |
-| 10/9 | 分析 |
-| 10/13 | 設計 |
-| 10/14～ | プログラミング |
-| 10/26 | テスト・デバッグ・リファクタリング |
-| 10/28 | 提出物・発表資料 |
-| 10/29 | 発表 |
-
-進捗に遅れが出た場合は、Should / Couldを削ってMVP完成を優先します。
-
----
-
-# 52. 現在の開発方針
-
-現在は、設計を無限に増やす段階ではありません。
-
-```text
-仕様を確認
-   ↓
-必要な画面・データを決める
-   ↓
-Java / DBの実装
-   ↓
-画面実装
-   ↓
-ゲーム反応
-   ↓
-テスト
-```
-
-特に、**Blenderや派手な演出より、Java Bronze学習機能の完成を優先**します。
-
----
-
-# 53. 実装前に決める項目
-
-大枠は決定していますが、実装時に具体値を決めます。
-
-- 実際のQuestion件数
-- Chapterごとの問題配分
-- 各Questionの制限時間
-- `MASTERED`の判定条件
-- Stageの具体的な敵・キャラクター素材
-- ミニゲームごとの具体的な入力方法
-- 音声・BGMの有無
-- 認証をMVPに入れるか
-- レスポンシブ対応の範囲
-- DBのINDEXや制約
-- APIのrequest / response形式
-
-ここで決める内容は、基本仕様を変更するものではなく、**実装に必要な具体値を決める作業**です。
-
----
-
-# 54. 開発上の基本ルール
-
-1. **Java Bronze学習ゲームを最後まで完成させる。**
-2. 仕様を勝手に増やさず、READMEを基準にする。
-3. 難しい設計を追加する前に、MVPが完成するか考える。
-4. AIが出したコードは内容を理解してから使用する。
-5. 動かないときは、まず小さく切り分ける。
-6. Gitにこまめにコミットする。
-7. READMEと実装の仕様がずれたら更新する。
-
----
-
-# 55. 最終コンセプト
-
-## Java Learning System
-
-**Javaを、遊びながら身につけよう。**
-
-```text
-Java Bronze問題
-      ↓
-キーボードで回答
-      ↓
-キャラクターが動く
-      ↓
-敵にダメージ
-      ↓
-正解 / 不正解を体感
-      ↓
-結果を保存
-      ↓
-復習
-```
-
-学習問題だけでも、ゲームだけでもありません。
-
-**「問題を解くこと」と「ゲームで反応すること」を1つの体験にすること**が、この作品の中心です。
-
----
-
-# 56. README更新履歴
-
-| 日付 | 内容 |
-|---|---|
-| 2026/10/06 | READMEを再構成。実装・デザイン・説明に必要な内容を中心に整理 |
-| 2026/10/06 | 1 Stage = 5問、敵HP5、Perfect、Stageごとのキャラクター変更を反映 |
-| 2026/10/06 | 画面遷移、システム全体像、データモデル、クラス図、シーケンス図を簡略化 |
-| 2026/10/06 | Python / FastAPI、詳細なSOLID説明、Axiomatic Design、ICONIX詳細説明などをREADMEから整理 |
-
----
-
-## READMEの方針
-
-このREADMEは「専門用語をたくさん並べた資料」ではなく、
-
-> **自分がコードを書き、画面を作り、動作を説明するための設計メモ兼プロジェクト紹介**
-
-として使います。
+まずJava
+Bronze学習ゲームを最後まで完成させることを最優先とし、3Dモデルや高度なエフェクトなどは完成後の追加機能とします。
