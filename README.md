@@ -1,4 +1,4 @@
-
+[README(7).md](https://github.com/user-attachments/files/33165140/README.7.md)
 # Java Learning System
 
 Java
@@ -640,20 +640,29 @@ sequenceDiagram
     participant AC as AnswerController
     participant AS as AnswerService
     participant QR as QuestionRepository
+    participant SQR as StageQuestionRepository
     participant SR as StageSessionRepository
+    participant GR as GameSessionRepository
     participant HR as AnswerHistoryRepository
+    participant HCR as AnswerHistoryChoiceRepository
     participant JS as JavaScript演出
 
     User->>UI: A～Gを押す / Enter
     UI->>AC: 回答送信
     AC->>AS: 回答処理を依頼
+    AS->>SQR: StageQuestionを取得
+    SQR-->>AS: StageQuestion
     AS->>QR: Questionを取得
     QR-->>AS: Question
     AS->>AS: 正誤判定・時間判定
     AS->>SR: StageSession更新
+    AS->>GR: GameSession更新
     AS->>HR: AnswerHistory保存
+    AS->>HCR: 選択肢履歴保存
     SR-->>AS: 更新結果
+    GR-->>AS: 更新結果
     HR-->>AS: 保存完了
+    HCR-->>AS: 保存完了
     AS-->>AC: 結果を返す
     AC-->>UI: JSON Response
     UI->>JS: 結果に応じた演出
@@ -664,7 +673,7 @@ sequenceDiagram
 正解・不正解のルールはJava側で確定し、JavaScriptは画面演出を担当します。
 
 
-``` text
+```text
 学習者
  ↓
 Game画面
@@ -673,15 +682,19 @@ AnswerController
  ↓
 AnswerService
  ↓
+StageQuestion取得
+ ↓
 Question取得
  ↓
-正誤判定
+正誤・時間判定
  ↓
 StageSession更新
  ↓
+GameSession更新
+ ↓
 AnswerHistory保存
  ↓
-GameSession更新
+AnswerHistoryChoice保存
  ↓
 結果返却
  ↓
@@ -701,6 +714,8 @@ sequenceDiagram
     participant UI as Game画面
     participant AC as AnswerController
     participant AS as AnswerService
+    participant SR as StageSessionRepository
+    participant GR as GameSessionRepository
     participant HR as AnswerHistoryRepository
 
     T->>UI: TIME UP
@@ -708,7 +723,11 @@ sequenceDiagram
     UI->>AC: 回答確定要求
     AC->>AS: 時間判定
     AS->>AS: startedAt / 現在時刻を確認
+    AS->>SR: StageSession更新
+    AS->>GR: GameSession更新（Combo 0）
     AS->>HR: AnswerHistory保存
+    SR-->>AS: 更新結果
+    GR-->>AS: 更新結果
     HR-->>AS: 保存完了
     AS-->>AC: TIME UP結果
     AC-->>UI: JSON Response
@@ -719,8 +738,8 @@ sequenceDiagram
 クライアントが「時間切れ」と自己申告するだけではなく、Java側でも時間を確認します。
 
 
-``` text
-Timer → TIME UP → 入力停止 → AnswerController → AnswerService → 履歴保存 → Combo0 → 結果返却 → TIME UP表示 → 次の問題
+```text
+Timer → TIME UP → 入力停止 → AnswerController → AnswerService → StageSession更新 → GameSession更新（Combo0） → AnswerHistory保存 → 結果返却 → TIME UP表示 → 次の問題
 ```
 
 ## 32. シーケンス図：Stage進行
@@ -758,13 +777,14 @@ sequenceDiagram
 
 ### Mermaid図
 
-クラス図では、実装する主要なEntityと回答処理の関係を確認します。
+クラス図では、MVPで実装するEntityと、回答処理に必要なController・Service・Repositoryの関係を確認します。
 
 ```mermaid
 classDiagram
     class Chapter {
         +Long chapterId
         +String name
+        +String description
     }
     class Question {
         +Long questionId
@@ -800,6 +820,9 @@ classDiagram
         +int questionCount
         +int score
         +int currentCombo
+        +int currentStage
+        +LocalDateTime startedAt
+        +LocalDateTime endedAt
     }
     class StageSession {
         +Long stageSessionId
@@ -809,6 +832,8 @@ classDiagram
         +int correctCount
         +int enemyHp
         +String status
+        +LocalDateTime startedAt
+        +LocalDateTime endedAt
     }
     class StageQuestion {
         +Long stageQuestionId
@@ -838,6 +863,9 @@ classDiagram
         +updateStage()
         +saveHistory()
     }
+    class StageQuestionRepository {
+        +findById()
+    }
     class QuestionRepository {
         +findById()
     }
@@ -845,7 +873,14 @@ classDiagram
         +findById()
         +save()
     }
+    class GameSessionRepository {
+        +findById()
+        +save()
+    }
     class AnswerHistoryRepository {
+        +save()
+    }
+    class AnswerHistoryChoiceRepository {
         +save()
     }
 
@@ -862,89 +897,80 @@ classDiagram
     AnswerHistory --> AnswerHistoryChoice
     AnswerHistoryChoice --> Choice
     AnswerController --> AnswerService
+    AnswerService --> StageQuestionRepository
     AnswerService --> QuestionRepository
     AnswerService --> StageSessionRepository
+    AnswerService --> GameSessionRepository
     AnswerService --> AnswerHistoryRepository
+    AnswerService --> AnswerHistoryChoiceRepository
 ```
 
-### クラスを役割で分けると
-
-```mermaid
-flowchart LR
-    subgraph ENTITY[Entity：データ]
-        E1[Chapter]
-        E2[Question]
-        E3[Choice]
-        E4[StageDefinition]
-        E5[GameSession]
-        E6[StageSession]
-        E7[StageQuestion]
-        E8[AnswerHistory]
-        E9[AnswerHistoryChoice]
-    end
-
-    subgraph CONTROL[Control：処理]
-        C1[AnswerController]
-        C2[AnswerService]
-    end
-
-    subgraph REPO[Repository：DBアクセス]
-        R1[QuestionRepository]
-        R2[StageSessionRepository]
-        R3[AnswerHistoryRepository]
-    end
-
-    C1 --> C2
-    C2 --> R1 & R2 & R3
-    R1 --> E2
-    R2 --> E6
-    R3 --> E8
-```
-
-MVPでは`QuestionProgress`はコアゲーム実装から外し、学習進捗機能として後から追加できる構成にします。
+`QuestionProgress`はMVPのクラス図・実装対象には含めません。学習進捗機能を追加するときに将来拡張します。
 
 ## 33.1 Javaクラス名
 
-Controller：`ChapterController`, `GameSessionController`,
-`AnswerController`, `ResultController`, `ReviewController`
+### Controller
 
-Service：`ChapterService`, `GameSessionService`, `AnswerService`,
-`ResultService`, `ReviewService`
+`ChapterController`, `GameSessionController`, `AnswerController`, `ResultController`, `ReviewController`
 
-Repository：`ChapterRepository`, `QuestionRepository`,
-`ChoiceRepository`, `StageDefinitionRepository`,
-`GameSessionRepository`, `StageSessionRepository`,
-`AnswerHistoryRepository`, `QuestionProgressRepository`
+### Service
 
-Entity：`Chapter`, `Question`, `Choice`, `StageDefinition`,
-`GameSession`, `StageSession`, `AnswerHistory`, `QuestionProgress`
+`ChapterService`, `GameSessionService`, `AnswerService`, `ResultService`, `ReviewService`
 
-## 33.2 詳細クラス図
+### Repository（MVP）
+
+`ChapterRepository`, `QuestionRepository`, `ChoiceRepository`, `StageDefinitionRepository`, `GameSessionRepository`, `StageSessionRepository`, `StageQuestionRepository`, `AnswerHistoryRepository`, `AnswerHistoryChoiceRepository`
+
+### Entity（MVP）
+
+`Chapter`, `Question`, `Choice`, `StageDefinition`, `GameSession`, `StageSession`, `StageQuestion`, `AnswerHistory`, `AnswerHistoryChoice`
+
+### 将来拡張
+
+`QuestionProgress`はMVPでは実装せず、学習進捗機能を追加するときにEntity・Repository・Serviceを追加します。
+
+## 33.2 回答処理の詳細クラス図
+
+回答を送信したときに実際に呼び出すJavaクラスだけを抜き出した図です。
 
 ```mermaid
 classDiagram
-class AnswerController {
-  +submitAnswer()
-}
-class AnswerService {
-  +judgeAnswer()
-  +updateStage()
-  +saveHistory()
-}
-class QuestionRepository {
-  +findById()
-}
-class StageSessionRepository {
-  +findById()
-  +save()
-}
-class AnswerHistoryRepository {
-  +save()
-}
-AnswerController --> AnswerService
-AnswerService --> QuestionRepository
-AnswerService --> StageSessionRepository
-AnswerService --> AnswerHistoryRepository
+    class AnswerController {
+        +submitAnswer()
+    }
+    class AnswerService {
+        +judgeAnswer()
+        +updateStage()
+        +saveHistory()
+    }
+    class StageQuestionRepository {
+        +findById()
+    }
+    class QuestionRepository {
+        +findById()
+    }
+    class StageSessionRepository {
+        +findById()
+        +save()
+    }
+    class GameSessionRepository {
+        +findById()
+        +save()
+    }
+    class AnswerHistoryRepository {
+        +save()
+    }
+    class AnswerHistoryChoiceRepository {
+        +save()
+    }
+
+    AnswerController --> AnswerService
+    AnswerService --> StageQuestionRepository
+    AnswerService --> QuestionRepository
+    AnswerService --> StageSessionRepository
+    AnswerService --> GameSessionRepository
+    AnswerService --> AnswerHistoryRepository
+    AnswerService --> AnswerHistoryChoiceRepository
 ```
 
 ## 34. MiniGame / GameEffectの設計
@@ -1008,7 +1034,7 @@ APIは「画面とJavaをつなぐ窓口」です。
 ```text
 GET  /api/chapters
 GET  /api/stages?chapterId={chapterId}
-GET  /api/questions/{questionId}
+GET  /api/stage-questions/{stageQuestionId}
 POST /api/game-sessions
 POST /api/answers
 GET  /api/game-sessions/{gameSessionId}/result
@@ -1017,6 +1043,11 @@ GET  /api/game-sessions/{gameSessionId}/review
 
 ### 回答API
 
+実際のプレイでは、Question IDではなく現在のStage上の問題を表す`stageQuestionId`を基準にします。
+`GET /api/stage-questions/{stageQuestionId}`で今回のStageの問題を取得し、`POST /api/answers`で同じ`stageQuestionId`を使って回答します。
+
+`POST /api/answers` はJava側で正誤と時間を確定した結果を返します。
+
 ```json
 {
   "stageQuestionId": 101,
@@ -1024,7 +1055,96 @@ GET  /api/game-sessions/{gameSessionId}/review
 }
 ```
 
-回答の正誤・時間切れ・HP・Combo・Score・Stage Clear・Perfectの最終判定はJava側で行います。クライアント側から`timeout=true`のような結果を信用しない方針です。
+### Response
+
+通常の問題で正解した場合：
+
+```json
+{
+  "correct": true,
+  "timeout": false,
+  "enemyHp": 4,
+  "combo": 1,
+  "score": 100,
+  "stageClear": false,
+  "perfect": false,
+  "nextStageQuestionId": 102
+}
+```
+
+不正解の場合：
+
+```json
+{
+  "correct": false,
+  "timeout": false,
+  "enemyHp": 5,
+  "combo": 0,
+  "score": 100,
+  "stageClear": false,
+  "perfect": false,
+  "nextStageQuestionId": 103
+}
+```
+
+時間切れの場合：
+
+```json
+{
+  "correct": false,
+  "timeout": true,
+  "enemyHp": 5,
+  "combo": 0,
+  "score": 100,
+  "stageClear": false,
+  "perfect": false,
+  "nextStageQuestionId": 104
+}
+```
+
+5問目でStage Clearになった場合：
+
+```json
+{
+  "correct": true,
+  "timeout": false,
+  "enemyHp": 0,
+  "combo": 5,
+  "score": 500,
+  "stageClear": true,
+  "perfect": true,
+  "nextStageQuestionId": null
+}
+```
+
+`nextStageQuestionId` は **Question IDではなくStageQuestion ID** です。
+`StageSession → StageQuestion → Question` の構造に統一しているため、次に表示する問題もStage上の問題を指します。
+
+`stageClear=true` は5問すべて回答し終えたことを表し、`perfect=true` は5問すべて正解したことを表します。次の問題がない場合は`nextStageQuestionId=null`とします。
+
+### 時間切れ時のRequest
+
+タイマー表示が0になった場合も同じ`POST /api/answers`を使用します。選択肢がないため`selectedChoiceIds`は空にします。`timeout`はRequestに持たせません。
+
+```json
+{
+  "stageQuestionId": 101,
+  "selectedChoiceIds": []
+}
+```
+
+時間切れかどうか、正誤、HP、Combo、Score、Stage Clear、Perfectの最終判定はすべてJava側で行います。クライアント側から結果を自己申告する設計にはしません。
+
+### HTTPステータス
+
+| Status | 意味 | 例 |
+|---|---|---|
+| `200 OK` | 回答処理成功 | 正解・不正解・時間切れを正常に確定 |
+| `400 Bad Request` | リクエスト内容が不正 | 必須項目不足、選択肢IDの形式不正 |
+| `404 Not Found` | 対象データが存在しない | 指定したStageQuestionが存在しない |
+| `409 Conflict` | 現在の状態では処理できない | すでに回答済みのStageQuestionを再送信 |
+
+エラー時もサーバー側で処理を止め、同じ回答を二重保存しません。
 
 ## 36. 設計整合性チェック
 
@@ -1039,8 +1159,14 @@ GET  /api/game-sessions/{gameSessionId}/review
   不正解・時間切れでCombo 0   ○      ○      ○     確認
   正解でScore +100            ○      ○      ○     確認
   5問終了でStage Clear        ○      ○      ○     確認
-  5/5でPerfect                ○      ○      ○     確認
+  5/5でPerfect・敵HP 0        ○      ○      ○     確認
   回答履歴保存                ○      ○      ○     確認
+  StageQuestionで5問を固定    ○      ○      ○     確認
+  AnswerHistoryChoice保存     ○      ○      ○     確認
+  miniGameTypeで統一          ○      ○      ○     確認
+  nextStageQuestionIdはStageQuestionId ○ ○ ○     確認
+  POST /api/answersのResponse固定 ○      ○      ○     確認
+  HTTPステータスを固定         ○      ○      ○     確認
 
 ## 37. 回答処理の共通ルール
 
@@ -1052,41 +1178,86 @@ GET  /api/game-sessions/{gameSessionId}/review
 
 ## 38. 二重回答防止
 
-キー入力とTIME
-UPが同時に発生しても、1問につき1回だけ回答を確定します。画面側で入力をロックし、サーバー側でも重複処理を防止します。
+キー入力とTIME UPが同時に発生しても、1問につき1回だけ回答を確定します。画面側で入力をロックし、サーバー側でも重複処理を防止します。
 
 ## 39. データモデル
 
--   Chapter：`chapterId`, `name`, `description`
--   Question：`questionId`, `chapterId`, `questionText`, `questionType`,
-    `timeLimitSeconds`, `explanation`
--   Choice：`choiceId`, `questionId`, `choiceText`, `choiceOrder`,
-    `correct`
--   StageDefinition：`stageId`, `chapterId`, `stageNumber`, `name`,
-    `playerCharacter`, `enemy`, `field`, `miniGameId`, `actionPattern`,
-    `maxEnemyHp`
--   GameSession：`gameSessionId`, `questionCount`, `score`,
-    `currentStage`, `startedAt`, `endedAt`
--   StageSession：`stageSessionId`, `gameSessionId`, `stageId`,
-    `currentQuestionIndex`, `correctCount`, `enemyHp`, `status`,
-    `startedAt`, `endedAt`
--   AnswerHistory：`answerHistoryId`, `userId`, `gameSessionId`,
-    `stageSessionId`, `questionId`, `correct`, `timeout`, `answerTime`,
-    `answeredAt`
--   QuestionProgress：`questionProgressId`, `userId`, `questionId`,
-    `status`, `lastAnsweredAt`
+READMEのクラス図と実装するEntityの項目をここで完全に一致させます。以下をMVPのデータ設計の基準とし、README・設計書・Java Entityで同じ名前と項目を使用します。
+
+### Chapter
+
+`chapterId`, `name`, `description`
+
+### Question
+
+`questionId`, `chapterId`, `questionText`, `questionType`, `timeLimitSeconds`, `explanation`, `codeBlock`
+
+### Choice
+
+`choiceId`, `questionId`, `choiceText`, `choiceOrder`, `correct`
+
+### StageDefinition
+
+`stageId`, `chapterId`, `stageNumber`, `name`, `playerCharacter`, `enemy`, `field`, `miniGameType`, `actionPattern`, `maxEnemyHp`
+
+### GameSession
+
+`gameSessionId`, `chapterId`, `questionCount`, `score`, `currentCombo`, `currentStage`, `startedAt`, `endedAt`
+
+### StageSession
+
+`stageSessionId`, `gameSessionId`, `stageId`, `currentQuestionIndex`, `correctCount`, `enemyHp`, `status`, `startedAt`, `endedAt`
+
+### StageQuestion
+
+`stageQuestionId`, `stageSessionId`, `questionId`, `questionOrder`
+
+Stage開始時に選ばれた5問を固定して管理します。
+
+### AnswerHistory
+
+```text
+AnswerHistory
+├─ answerHistoryId
+├─ gameSessionId
+├─ stageSessionId
+├─ stageQuestionId
+├─ correct
+├─ timeout
+└─ answerTime
+```
+
+`StageQuestion → Question` で対象問題を特定できるため、MVPでは`questionId`をAnswerHistoryに重複保存しません。
+
+### AnswerHistoryChoice
+
+`id`, `answerHistoryId`, `choiceId`
+
+複数選択問題を含め、ユーザーが実際に選択したChoiceを保存します。
+
+### QuestionProgress（将来拡張・MVP対象外）
+
+`QuestionProgress`はMVPでは実装しません。クラス図・MVP Entity一覧・MVP Repository一覧にも含めず、問題ごとの学習進捗機能を追加するときに導入します。
 
 ## 40. QuestionProgressとAnswerHistory
 
-AnswerHistoryは「過去に何をしたか」、QuestionProgressは「現在どの程度学習できているか」を表します。
+`AnswerHistory`はMVPで実装し、「過去に何を回答したか」を保存します。
+
+`QuestionProgress`はMVPでは実装せず、将来「この問題をどの程度習得したか」を管理するときに追加します。
+
+この2つを分けることで、MVPのデータ構造を必要以上に複雑にしません。
 
 ## 41. 学習状態
 
-``` text
+`QuestionProgress`は将来拡張のための設計です。MVPでは使用しません。
+
+将来追加する場合は、例えば以下の状態を利用できます。
+
+```text
 UNSEEN → REVIEW → CLEAR → MASTERED
 ```
 
-MASTEREDの具体的条件は実装前に決定します。
+`MASTERED`の具体的条件は、学習進捗機能を実装する段階で決定します。
 
 ## 42. 設計上の基本ルール
 
@@ -1300,7 +1471,8 @@ Gold、3Dモデル、エフェクト、キャラクター成長、ランキン�
 -   要求モデル、Use Case、ロバストネス分析を整理
 -   回答判定・時間切れ・Stage進行シーケンスを整理
 -   クラス図・Javaクラス名を整理
--   REST APIのRequest / Responseを整理
+-   REST APIのRequest / Response / HTTPステータスを整理
+-   nextStageQuestionIdをStageQuestion IDとして統一
 -   設計整合性チェックを追加
 -   Git / GitHub運用とAI活用方針を整理
 -   実装優先順位を整理
