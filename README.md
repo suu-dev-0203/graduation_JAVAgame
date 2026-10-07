@@ -1,10 +1,35 @@
-[README(3).md](https://github.com/user-attachments/files/33160216/README.3.md)
 # Java Learning System
 
 Java
 Bronzeを学習している初学者を対象とした、ゲーム感覚でJavaの問題を学習できるWebアプリケーションです。
 
 ## 1. プロジェクト概要
+
+## 開発に必須の設計図一覧
+
+このREADMEでは、実際にJava / Spring Boot / JavaScript / DBを実装するときに参照する図を、設計の流れに沿って整理しています。
+
+| 図 | 目的 |
+|---|---|
+| 学習体験の基本ループ | 正解・不正解・時間切れ・攻撃・HP・5問終了のルールを確認する |
+| 画面遷移図 | HOMEからGame、Result、Reviewまでの画面の移動を確認する |
+| データの関係図 | Entity同士の関係と外部キーの流れを確認する |
+| システム全体像 | ユーザー・画面・Spring Boot・DBのつながりを確認する |
+| 回答判定シーケンス | 1問を回答したときの処理順を確認する |
+| 時間切れシーケンス | TIME UP発生時の処理順を確認する |
+| Stage進行シーケンス | 1～4問目と5問目の違いを確認する |
+| クラス図 | Entity・Controller・Service・Repositoryの役割と関係を確認する |
+| 画面レイアウト | Game画面の配置を確認する |
+| 現状課題 vs 本アプリ | 何を解決するアプリなのかを確認する |
+| Chapter / Pool / Stage | 学習テーマ・問題群・ゲーム単位の関係を確認する |
+| Use Case Diagram | 学習者が何をできるかを確認する |
+| ロバストネス分析 | 画面・処理・データを分けて確認する |
+| MiniGame分離 | QuestionとMiniGameを分離する理由を確認する |
+| REST APIの位置付け | 画面とJavaの通信方法を確認する |
+| 一時停止 | Pause / Resume / Homeの状態を確認する |
+| 将来の拡張 | BronzeからSilver / Goldへ広げる方法を確認する |
+| デザイン優先度 | 読みやすさ・操作性・反応・楽しさの優先順位を確認する |
+
 
 Java Bronzeの問題をゲーム形式で解くWebアプリです。
 
@@ -37,10 +62,72 @@ Stage Clear / Perfect
 ```
 
 ## 2. 作成する理由
+### 現状の課題と本アプリ
+
+```text
+一般的な問題演習
+問題を解く
+  ↓
+間違える
+  ↓
+解説を読む
+  ↓
+もう一度解く
+  ↓
+「勉強している感じ」が強く、繰り返しが単調になりやすい
+
+            ↓ 改善
+
+Java Learning System
+問題を見る
+  ↓
+考える
+  ↓
+キーを押す
+  ↓
+すぐ反応
+  ↓
+キャラクターが攻撃
+  ↓
+HP / Combo / Scoreが変化
+  ↓
+短い説明
+  ↓
+次の問題
+```
+
 
 通常の資格学習では「問題を解く→間違える→解説を読む」の繰り返しになりやすいため、ゲームの反応を加えて繰り返し学習しやすくすることを目的とします。
 
 ## 3. 学習体験の基本ループ
+### Mermaid図
+
+```mermaid
+flowchart LR
+    A[問題を見る] --> B[考える]
+    B --> C[キーを押す]
+    C --> D{正誤判定}
+    D -->|正解| E[キャラクター攻撃]
+    E --> F[敵HP - 1]
+    F --> G[Combo + 1 / Score + 100]
+    D -->|不正解| H[MISS]
+    H --> I[HPそのまま / Combo 0]
+    D -->|時間切れ| J[TIME UP]
+    J --> K[HPそのまま / Combo 0]
+    G --> L[履歴保存・説明]
+    I --> L
+    K --> L
+    L --> M{5問終了?}
+    M -->|いいえ| N[次の問題]
+    N --> A
+    M -->|はい| O[Stage Clear判定]
+    O --> P{5問すべて正解?}
+    P -->|はい| Q[Perfect]
+    P -->|いいえ| R[Stage Clear]
+```
+
+この図をゲーム処理の最重要ルールとして扱います。
+
 
 ``` text
 問題を見る → 考える → キーを押す → すぐに正誤判定
@@ -55,6 +142,27 @@ Stage Clear / Perfect
 ```
 
 ## 4. Chapter / Question / Stage
+### Chapter / Pool / Stageの関係
+
+```text
+Chapter（学習テーマ）
+│
+├─ Question Pool（そのChapterの問題群）
+│   ├─ Question 1
+│   ├─ Question 2
+│   ├─ Question 3
+│   └─ ...
+│
+└─ Stage（ゲームとしてプレイする単位）
+    ├─ 1問目
+    ├─ 2問目
+    ├─ 3問目
+    ├─ 4問目
+    └─ 5問目
+```
+
+Question PoolはChapterに属する「出題候補の集まり」です。Stage開始時に、その中から今回プレイする5問を決定します。
+
 
 -   Chapter：学習テーマ
 -   Question：実際に解く問題
@@ -99,6 +207,28 @@ Chapterは自由に選択できる方式を基本とします。苦手な分野�
 複数選択は正解の組み合わせと完全一致した場合を正解とします。
 
 ## 10. 長い問題への対応
+### 画面レイアウトイメージ
+
+```text
+┌────────────────────────────────────────────────────────────┐
+│ Chapter 1        Stage 1 / 5       TIME 08s               │
+├──────────────────────────────┬─────────────────────────────┤
+│                              │                             │
+│  Javaの問題                  │         Player              │
+│                              │            ↓                │
+│  次のコードの結果は？        │          ⚔                  │
+│                              │                             │
+│  A. 10                       │        Enemy                │
+│  B. 20                       │        HP █████              │
+│  C. 30                       │        Combo ×3             │
+│  D. 40                       │        Score 300            │
+│                              │                             │
+│  [ A ][ B ][ C ][ D ]        │                             │
+└──────────────────────────────┴─────────────────────────────┘
+```
+
+左側は「考えるための情報」、右側は「ゲームの反応」を担当します。
+
 
 PC画面を問題部分とゲーム部分に分けます。
 
@@ -162,12 +292,48 @@ Clearです。派手な必殺技はMVP完成後に余裕があれば追加しま
 / オフィス、Stage3＝忍者 / Code Samurai / 城。ゲーム処理は共通化します。
 
 ## 21. 画面遷移図
+### Mermaid図
+
+```mermaid
+flowchart TD
+    A[HOME / タイトル] --> B[Chapter選択]
+    B --> C[Stage選択]
+    C --> D[Game]
+    D --> E{5問終了?}
+    E -->|いいえ| D
+    E -->|はい| F[Stage Result]
+    F --> G[Review]
+    G --> B
+    F --> B
+    D --> H[Pause]
+    H -->|Resume| D
+    H -->|Home| A
+```
+
 
 ``` text
 タイトル → Chapter選択 → Stage選択 → Game → Stage結果 → 復習 → Chapterへ
 ```
 
 ## 22. 画面一覧
+### 画面設計で確認すること
+
+```text
+HOME
+ ↓
+Chapter Select
+ ↓
+Stage Select
+ ↓
+Game
+ ├─ Pause → Resume → Game
+ └─ Pause → Home → HOME
+ ↓
+Stage Result
+ ↓
+Review
+```
+
 
 -   タイトル
 -   Chapter選択
@@ -176,12 +342,75 @@ Clearです。派手な必殺技はMVP完成後に余裕があれば追加しま
 -   結果
 -   復習
 
+
+
+## 一時停止の設計
+
+```text
+Game
+│
+└─ Pause
+   ├─ Resume → Gameへ戻る
+   └─ Home → タイトルへ戻る
+```
+
+一時停止中は回答入力とタイマー進行を停止します。Resumeすると、停止前のGame状態に戻ります。
+
 ## 23. デザイン方針
+### デザイン優先度
+
+```text
+読みやすい
+   ↓
+押しやすい
+   ↓
+押した結果がすぐ分かる
+   ↓
+キャラクターが反応する
+   ↓
+気持ちいい
+   ↓
+楽しい
+```
+
+見た目だけを派手にするのではなく、まず「問題が読みやすい」「答えやすい」「反応が分かる」を優先します。
+
 
 ポップ、分かりやすい、ゲームらしい、キー入力が気持ちいい、Java問題が読みやすい画面を目指します。Typing
 LandやOzawa-Kenは操作テンポの参考とし、キャラクター・ロゴ・画面・素材をコピーしません。
 
 ## 24. データの関係
+### Mermaid図
+
+```mermaid
+flowchart TD
+    C[Chapter] --> Q[Question]
+    Q --> CH[Choice]
+    C --> SD[StageDefinition]
+    SD --> SS[StageSession]
+    SD --> MG[MiniGameType]
+    GS[GameSession] --> SS
+    SS --> SQ[StageQuestion]
+    SQ --> Q
+    SQ --> AH[AnswerHistory]
+    AH --> AHC[AnswerHistoryChoice]
+    AHC --> CH
+    Q --> AHP[QuestionProgress]
+    GS --> AH
+```
+
+### 重要な関係
+
+```text
+StageSession
+  ↓
+StageQuestion × 5
+  ↓
+Question
+```
+
+これにより「今回のStageで出す5問」を固定できます。
+
 
 ``` text
 Chapter
@@ -203,6 +432,21 @@ GameSession ── AnswerHistory
 ```
 
 ## 25. システム全体像
+### Mermaid図
+
+```mermaid
+flowchart LR
+    U[学習者] --> F[HTML / CSS / JavaScript]
+    F -->|HTTP / REST| C[Spring Boot Controller]
+    C --> S[Service]
+    S --> R[Repository]
+    R --> DB[(Database)]
+    S -->|結果| F
+    F --> G[キャラクター / 敵 / HP / Combo表示]
+```
+
+「画面 → API → Java → DB → 結果 → 画面演出」の流れを一つにつなげています。
+
 
 ``` text
 学習者
@@ -255,6 +499,21 @@ Controllerは受付、Serviceはゲームルール、RepositoryはDBとのやり
   REQ-09   間違えた問題を復習できる
 
 ## 28. Use Case Diagram
+### Mermaid図
+
+```mermaid
+flowchart LR
+    U[学習者]
+    U --> A[Chapterを選択する]
+    U --> B[Stageを開始する]
+    U --> C[問題に回答する]
+    U --> D[結果を確認する]
+    U --> E[問題を復習する]
+    U --> F[進捗を確認する]
+```
+
+Use Caseは「学習者がシステムを使って何をするか」を表します。
+
 
 ``` text
              ┌──────────────────────────┐
@@ -271,6 +530,32 @@ Controllerは受付、Serviceはゲームルール、RepositoryはDBとのやり
 ```
 
 ## 29. ロバストネス分析
+### ロバストネス図
+
+```text
+┌──────────────────────────────┐
+│ Boundary：画面                │
+│ Game / Result / Review       │
+└──────────────┬───────────────┘
+               ↓
+┌──────────────────────────────┐
+│ Control：処理                 │
+│ AnswerController              │
+│ AnswerService                 │
+│ GameSessionService            │
+│ ResultService / ReviewService │
+└──────────────┬───────────────┘
+               ↓
+┌──────────────────────────────┐
+│ Entity：データ                │
+│ Question / Choice             │
+│ StageSession / GameSession    │
+│ AnswerHistory / StageQuestion│
+└──────────────────────────────┘
+```
+
+Boundary = 画面、Control = 処理、Entity = 保存するデータ、という3分割です。
+
 
 ``` text
 【Boundary：画面】
@@ -291,6 +576,38 @@ QuestionProgress
 ```
 
 ## 30. シーケンス図：回答判定
+### Mermaid図
+
+```mermaid
+sequenceDiagram
+    actor User as 学習者
+    participant UI as Game画面
+    participant AC as AnswerController
+    participant AS as AnswerService
+    participant QR as QuestionRepository
+    participant SR as StageSessionRepository
+    participant HR as AnswerHistoryRepository
+    participant JS as JavaScript演出
+
+    User->>UI: A～Gを押す / Enter
+    UI->>AC: 回答送信
+    AC->>AS: 回答処理を依頼
+    AS->>QR: Questionを取得
+    QR-->>AS: Question
+    AS->>AS: 正誤判定・時間判定
+    AS->>SR: StageSession更新
+    AS->>HR: AnswerHistory保存
+    SR-->>AS: 更新結果
+    HR-->>AS: 保存完了
+    AS-->>AC: 結果を返す
+    AC-->>UI: JSON Response
+    UI->>JS: 結果に応じた演出
+    JS-->>UI: HP / Combo / Score更新
+    UI->>UI: 次の問題を表示
+```
+
+正解・不正解のルールはJava側で確定し、JavaScriptは画面演出を担当します。
+
 
 ``` text
 学習者
@@ -321,18 +638,185 @@ GameSession更新
 正解：HP-1、Combo+1、Score+100。不正解：HP維持、Combo0、Score+0。
 
 ## 31. シーケンス図：時間切れ
+### Mermaid図
+
+```mermaid
+sequenceDiagram
+    participant T as Timer
+    participant UI as Game画面
+    participant AC as AnswerController
+    participant AS as AnswerService
+    participant HR as AnswerHistoryRepository
+
+    T->>UI: TIME UP
+    UI->>UI: 入力をロック
+    UI->>AC: 回答確定要求
+    AC->>AS: 時間判定
+    AS->>AS: startedAt / 現在時刻を確認
+    AS->>HR: AnswerHistory保存
+    HR-->>AS: 保存完了
+    AS-->>AC: TIME UP結果
+    AC-->>UI: JSON Response
+    UI->>UI: TIME UP表示
+    UI->>UI: 次の問題へ
+```
+
+クライアントが「時間切れ」と自己申告するだけではなく、Java側でも時間を確認します。
+
 
 ``` text
 Timer → TIME UP → 入力停止 → AnswerController → AnswerService → 履歴保存 → Combo0 → 結果返却 → TIME UP表示 → 次の問題
 ```
 
 ## 32. シーケンス図：Stage進行
+### Mermaid図
+
+```mermaid
+sequenceDiagram
+    participant UI as Game画面
+    participant AS as AnswerService
+    participant SS as StageSession
+    participant GS as GameSession
+
+    UI->>AS: 1問分の回答
+    AS->>SS: HP / 正解数 / 問題位置を更新
+    AS->>GS: Score / Comboを更新
+
+    alt 1～4問目
+        AS-->>UI: 次の問題を返す
+    else 5問目
+        AS->>AS: 5問終了を確認
+        AS->>AS: Perfect判定
+        AS->>SS: Stage Clear
+        AS-->>UI: Resultへ進む
+    end
+```
+
+1～4問目は「次の問題」、5問目は「Perfect / Stage Clear判定」という役割分担です。
+
 
 1～4問目：`回答 → 正誤判定 → HP/Combo/Score更新 → 履歴保存 → 次問題`
 
 5問目：`5問目回答 → 正誤判定 → 履歴保存 → 5問終了 → Perfect判定 → Stage Clear判定 → Result`
 
 ## 33. クラス図
+### Mermaid図
+
+```mermaid
+classDiagram
+    class Chapter {
+        +Long chapterId
+        +String name
+    }
+    class Question {
+        +Long questionId
+        +Long chapterId
+        +String questionText
+        +String questionType
+        +int timeLimitSeconds
+        +String explanation
+        +String codeBlock
+    }
+    class Choice {
+        +Long choiceId
+        +Long questionId
+        +String choiceText
+        +int choiceOrder
+        +boolean correct
+    }
+    class StageDefinition {
+        +Long stageId
+        +Long chapterId
+        +int stageNumber
+        +String name
+        +String playerCharacter
+        +String enemy
+        +String field
+        +String miniGameType
+        +String actionPattern
+        +int maxEnemyHp
+    }
+    class GameSession {
+        +Long gameSessionId
+        +Long chapterId
+        +int questionCount
+        +int score
+        +int currentCombo
+    }
+    class StageSession {
+        +Long stageSessionId
+        +Long gameSessionId
+        +Long stageId
+        +int currentQuestionIndex
+        +int correctCount
+        +int enemyHp
+        +String status
+    }
+    class StageQuestion {
+        +Long stageQuestionId
+        +Long stageSessionId
+        +Long questionId
+        +int questionOrder
+    }
+    class AnswerHistory {
+        +Long answerHistoryId
+        +Long gameSessionId
+        +Long stageSessionId
+        +Long stageQuestionId
+        +boolean correct
+        +boolean timeout
+        +int answerTime
+    }
+    class AnswerHistoryChoice {
+        +Long id
+        +Long answerHistoryId
+        +Long choiceId
+    }
+    class QuestionProgress {
+        +Long questionProgressId
+        +Long questionId
+        +String status
+    }
+    class AnswerController {
+        +submitAnswer()
+    }
+    class AnswerService {
+        +judgeAnswer()
+        +updateStage()
+        +saveHistory()
+    }
+    class AnswerHistoryRepository {
+        +save()
+    }
+    class QuestionRepository {
+        +findById()
+    }
+    class StageSessionRepository {
+        +findById()
+        +save()
+    }
+
+    Chapter --> Question
+    Question --> Choice
+    Chapter --> StageDefinition
+    GameSession --> StageSession
+    StageSession --> StageDefinition
+    StageSession --> StageQuestion
+    StageQuestion --> Question
+    GameSession --> AnswerHistory
+    StageSession --> AnswerHistory
+    StageQuestion --> AnswerHistory
+    AnswerHistory --> AnswerHistoryChoice
+    AnswerHistoryChoice --> Choice
+    Question --> QuestionProgress
+    AnswerController --> AnswerService
+    AnswerService --> QuestionRepository
+    AnswerService --> StageSessionRepository
+    AnswerService --> AnswerHistoryRepository
+```
+
+この図は「データを表すクラス」と「回答処理を担当するクラス」を一つの全体像として確認するための図です。
+
 
 ``` mermaid
 classDiagram
@@ -454,6 +938,28 @@ AnswerService --> AnswerHistoryRepository
 ```
 
 ## 34. MiniGame / GameEffectの設計
+### QuestionとMiniGameの分離
+
+```text
+┌─────────────────────┐
+│ Question            │
+│ 「何を答えるか」    │
+└──────────┬──────────┘
+           +
+┌──────────▼──────────┐
+│ MiniGame            │
+│ 「どう遊ぶか」      │
+└──────────┬──────────┘
+           ↓
+┌─────────────────────┐
+│ 共通の回答結果      │
+│ correct / HP /      │
+│ Combo / Score       │
+└─────────────────────┘
+```
+
+Questionの内容とゲーム演出を分けることで、同じ問題を別のMiniGameでも利用できます。
+
 
 Questionは「何を答えるか」、MiniGameは「どう遊ぶか」を担当します。
 
@@ -462,6 +968,30 @@ MVP：Code Target、Code Whack-a-Mole、Typing Samurai、Code Breaker。
 共通処理は回答判定・Score・Combo・履歴・Stage進行。MiniGameごとの処理は入力方法・キャラクター動作・攻撃演出です。
 
 ## 35. REST APIの事前確認
+### REST APIの位置付け
+
+```text
+┌───────────────┐
+│ Browser       │
+│ HTML / JS     │
+└───────┬───────┘
+        │ HTTP / JSON
+        ↓
+┌───────────────┐
+│ Controller    │
+└───────┬───────┘
+        ↓
+┌───────────────┐
+│ Service       │
+└───────┬───────┘
+        ↓
+┌───────────────┐
+│ Repository / DB│
+└───────────────┘
+```
+
+APIは「画面とJavaをつなぐ窓口」です。URL、Request、Response、エラー時の扱いを同じ仕様で実装します。
+
 
 APIは画面とJavaをつなぐ窓口です。
 
@@ -578,6 +1108,26 @@ Java側：正誤判定、HP、Combo、Score、履歴、Stage判定。
 JavaScript側：キー入力、画面更新、キャラクター演出、敵アニメーション、表示更新。
 
 ## 44. 設計から実装への流れ
+### 将来の拡張イメージ
+
+```text
+Java Bronze
+   ↓
+Chapter追加
+   ↓
+Stage追加
+   ↓
+Question追加
+   ↓
+MiniGame追加
+   ↓
+Java Silver
+   ↓
+Java Gold
+```
+
+問題やChapterなどのデータ追加は既存処理をできるだけ変更せずに行える構造を目指します。新しいMiniGameは新しい処理コードの追加が必要です。
+
 
 ``` text
 要求 → Use Case → データモデル → ロバストネス → シーケンス → クラス → REST API → Java実装 → HTML/CSS/JavaScript → テスト
