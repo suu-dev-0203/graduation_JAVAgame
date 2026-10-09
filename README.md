@@ -1890,31 +1890,39 @@ GameSessionとStageSessionの状態遷移は次のとおりです。
 
 Pause／Resume処理はサーバー側で管理します。画面側の状態表示だけを切り替えてPauseが完了したことにはせず、API成功後に状態を更新します。
 
-
 ### 35.1.8 回答APIの正規処理順
 
 `POST /api/answers`は`@Transactional`で処理します。
 
 ```text
 1. StageQuestionを取得
-2. AnswerHistoryが既に存在するか確認
-3. 存在する場合は409 ALREADY_ANSWERED
-4. selectedChoiceIdsが空配列なら、Choice検索をせずTIME UPとして処理
-5. 空配列でない場合、Java側でremainingTimeMsを再計算
-6. 0以下ならTIME UPとして処理
-7. TIME UPでなければQuestionTypeに応じて選択数を検証
-8. Choiceを取得して正解集合と完全一致で判定
-9. StageSessionを更新
-10. GameSessionを更新
-11. AnswerHistoryを保存
-12. AnswerHistoryChoiceを保存
-13. 5問目ならStage Clear / Perfectを確定
-14. AnswerResponseを返す
+2. 対象のGameSession / StageSession / StageQuestionの状態を確認
+3. AnswerHistoryが既に存在するか確認
+4. 存在する場合は409 ALREADY_ANSWERED
+5. 開始済み・未回答であることを確認
+6. Java側で残り時間を再計算
+7. 残り時間が0以下ならTIME UPとして処理
+8. 時間が残っていてselectedChoiceIdsが空配列なら400 INVALID_ANSWER_COUNT
+9. QuestionTypeに応じて選択数とChoiceの所属を検証
+10. 正解集合と選択集合を完全一致で比較
+11. StageSessionを更新
+12. GameSessionを更新
+13. AnswerHistoryを保存
+14. AnswerHistoryChoiceを保存
+15. 5問目ならStage Clear / Perfectを確定
+16. AnswerResponseを返す
 ```
 
 TIME UPは`correct=false`、HP変更なし、Combo=0、Score加算なしです。
 
-複数選択は**集合の完全一致**です。順番は無視し、部分点はありません。必要数より少ない／多い回答は400です。ただし`selectedChoiceIds=[]`は上記の4番で先にTIME UPとして処理します。
+回答APIでは、GameSessionとStageSessionが`PLAYING`であること、対象のStageQuestionが開始済みで未回答であることを確認します。Pause中の問題や、現在の進行状態と一致しない問題への回答は受け付けません。
+
+複数選択は集合の完全一致で判定します。順番は無視し、部分点はありません。時間が残っている状態で必要数より少ない、または多い選択をした場合は`400 INVALID_ANSWER_COUNT`とします。
+
+`selectedChoiceIds=[]`の場合でも、時間切れ判定を行う前に無条件にTIME UPとして扱ってはいけません。
+
+同時送信によって二重回答が発生しないよう、UIロック・Serviceの回答済み確認・DB UNIQUE制約を併用します。DB制約違反が二重回答によるものと確認できた場合は、`409 ALREADY_ANSWERED`として返します。
+
 
 ### 35.1.9 二重回答防止の3層構造
 
