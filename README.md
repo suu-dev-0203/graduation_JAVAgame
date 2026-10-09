@@ -1710,42 +1710,36 @@ AnswerHistoryChoice
 
 ### 35.1.5 時間管理の正規ルール
 
-Timerは**問題表示時ではなくStart API成功後**に開始します。
+Timerは問題表示時ではなく、Start API成功後に開始します。
 
 ```text
 1. 問題を表示
 2. WAITING_TO_START
 3. Enter
-4. POST /api/stage-questions/{id}/start
+4. POST /api/stage-questions/{stageQuestionId}/start
 5. JavaがstartedAtを記録
 6. 200 OKを返す
 7. JavaScriptがTimer表示を開始
 ```
 
-サーバーの残り時間は次の式で計算します。
+残り時間の正式な計算式とPause中の計算方法は、第12節「制限時間」を正とします。
 
-```text
-remainingTimeMs
-= timeLimitSeconds * 1000
-  - (currentTime - startedAt - totalPausedMs)
-```
+実装上の固定ルールは次のとおりです。
 
-`remainingTimeMs`の最終値は0未満にせず0として扱います。
+* `startedAt`が`null`の場合はTimer未開始です。
+* `remainingTimeMs == null`の場合、JavaScriptは初期表示だけを行い、カウントダウンを開始しません。
+* Start APIが`200 OK`を返した後にだけTimer表示を開始します。
+* Refresh時は`GET /api/game-sessions/{gameSessionId}/current`の返却値を基準に表示を復元します。
+* Pause中は`StageQuestion.pausedAt`を基準に残り時間を固定します。
+* 回答API受信時にはJava側で残り時間を再計算します。
+* 残り時間が0以下なら、選択肢の正誤判定よりもTIME UP判定を優先します。
+* 時間が残っている場合の空配列送信は`400 INVALID_ANSWER_COUNT`とします。
+* JavaScriptのローカルTimerだけで時間切れや正解を確定しません。
 
-JavaScriptのTimerは表示用です。JavaScriptのローカル経過時間を正解判定に使用しません。
+`answerTimeMs`は第12節で定義した計算式に従い、ミリ秒の`long`として管理します。
 
-回答API受信時にはJava側で必ず再計算します。通信遅延によって画面上は残り時間があっても、サーバー計算で0以下ならTIME UPです。
+経過時間が何らかの理由で負数になった場合は`0L`として扱います。
 
-`WAITING_TO_START`ではTimerが未開始のため`remainingTimeMs`は`null`で返却します。`remainingTimeMs == null`の場合、JavaScriptは`timeLimitSeconds × 1000`を初期表示するだけでカウントダウンを開始しません。`POST /api/stage-questions/{stageQuestionId}/start`が`200 OK`を返した後に、返却された`remainingTimeMs`を基準として表示Timerを開始します。`null`を数値計算に直接使用して`NaN`を発生させません。
-
-`answerTimeMs`は次式で固定します。
-
-```text
-answerTimeMs
-= answeredAt - startedAt - totalPausedMs
-```
-
-経過時間が何らかの理由で負数になった場合は`0L`として扱い、時間切れの確定はJava側だけで行います。
 
 ### 35.1.6 Start APIの二重実行防止
 
