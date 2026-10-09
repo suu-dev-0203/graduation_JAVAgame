@@ -262,42 +262,88 @@ flowchart TB
 
 ## 12. 制限時間
 
-制限時間は問題ごとの`Question.timeLimitSeconds`で管理します。問題が表示されただけではタイマーを開始せず、**Enterを押して問題開始を確定した時点からカウントを開始**します。
+制限時間は問題ごとの `Question.timeLimitSeconds` で管理します。問題が表示されただけではタイマーを開始せず、**Enterを押して問題開始を確定し、Start APIが成功した時点からカウントを開始**します。
 
 Stage側に別の制限時間は持たせません。
 
-### Pause中の時間
-
-Pause中はタイマーを停止します。サーバー側では`StageQuestion.pausedAt` / `StageQuestion.totalPausedMs`を問題の時間計算に使用し、`StageSession.pausedAt` / `StageSession.totalPausedMs`はStage全体のPause記録として保持します。
+### Timer開始の流れ
 
 ```text
-開始
- ↓
-プレイ時間を計測
- ↓
-Pause → pausedAtを記録しタイマー停止
- ↓
-Resume → Pause時間をtotalPausedMsへ加算
- ↓
-プレイ再開
+1. 問題を表示
+2. WAITING_TO_START
+3. Enter
+4. POST /api/stage-questions/{stageQuestionId}/start
+5. JavaがstartedAtを記録
+6. 200 OKを返す
+7. JavaScriptが返却されたremainingTimeMsを基準にTimer表示を開始
 ```
 
-時間切れ判定はJava側で行い、実時間からPause時間を除外して判定します。**JavaScriptが表示している残り時間は判定の正解ではありません。**
+`WAITING_TO_START`ではTimerが未開始のため、`remainingTimeMs`は`null`で返却します。
 
-正式な計算式：
+`remainingTimeMs == null`の場合、JavaScriptは`timeLimitSeconds × 1000`を初期表示するだけで、カウントダウンを開始しません。`null`を数値計算に直接使用して`NaN`を発生させないようにします。
+
+### 残り時間の計算
+
+サーバーは`StageQuestion.startedAt`、`StageQuestion.pausedAt`、`StageQuestion.totalPausedMs`、現在時刻を使用して残り時間を計算します。
 
 ```text
-remainingTimeMs
-= timeLimitSeconds * 1000
-  - (currentTime - StageQuestion.startedAt - StageQuestion.totalPausedMs)
+effectiveNow =
+    StageQuestion.pausedAt != null
+        ? StageQuestion.pausedAt
+        : 現在時刻
+
+elapsedMs =
+    max(
+        0,
+        effectiveNow - StageQuestion.startedAt
+        - StageQuestion.totalPausedMs
+    )
+
+remainingTimeMs =
+    max(
+        0,
+        Question.timeLimitSeconds * 1000
+        - elapsedMs
+    )
 ```
 
+上記の日時の差はミリ秒で計算します。Javaでは`Instant`と`Duration.between(...).toMillis()`を使用し、経過時間は`long`で扱います。
+
+Pause中は`StageQuestion.pausedAt`を`effectiveNow`として使用するため、Pause中にRefreshや現在状態の取得を行っても残り時間は減少しません。
+
+`StageSession.pausedAt`もStage全体のPause記録として保持し、Pause開始時には`StageQuestion.pausedAt`と同じ時刻を設定します。ただし、問題ごとの残り時間の計算には`StageQuestion.pausedAt`を使用します。
+
+残り時間の最終値は0未満にしません。
+
+JavaScriptのTimerは表示専用です。JavaScriptのローカル経過時間を正解判定には使用しません。
+
+`GET /api/game-sessions/{gameSessionId}/current`では、Java側がその時点の残り時間を再計算して返します。Refresh後のTimer表示も、この返却値を基準に復元します。
+
+### 時間切れの判定
+
+`POST /api/answers`を受信したとき、Java側で必ず残り時間を再計算します。
+
+サーバー計算で`remainingTimeMs <= 0`の場合はTIME UPとして処理します。画面上では残り時間があっても、通信遅延などによってサーバー側ですでに時間切れになっていれば、TIME UPを優先します。
+
+`selectedChoiceIds`が空配列であることだけを理由にTIME UPにはしません。空配列の回答は、Java側で時間切れが確認された場合に限ってTIME UPとして処理します。時間が残っている場合は`400 INVALID_ANSWER_COUNT`とします。
+
+### 回答時間の計算
+
+`answerTimeMs`は次式で固定します。
+
 ```text
-answerTimeMs
-= StageQuestion.answeredAt
-  - StageQuestion.startedAt
-  - StageQuestion.totalPausedMs
+answerTimeMs =
+    max(
+        0,
+        answeredAt - startedAt - totalPausedMs
+    )
 ```
+
+`startedAt`、`answeredAt`、`pausedAt`は`Instant`で管理し、`answerTimeMs`の単位はミリ秒です。
+
+回答はPause中には受け付けません。Resume後の回答では、完了したPause時間が`totalPausedMs`に加算されているため、Pause時間を回答時間に含めません。
+
+時間切れの最終判定はJava側だけで行います。
 
 ## 13. 正解時
 
