@@ -1771,17 +1771,17 @@ StageQuestion
 
 AnswerHistory
 - answerHistoryId
-- gameSessionId
-- stageSessionId
-- stageQuestionId
+- gameSessionId（JPAではGameSessionへの@ManyToOne）
+- stageSessionId（JPAではStageSessionへの@ManyToOne）
+- stageQuestionId（JPAではStageQuestionへの@ManyToOne）
 - correct
 - timeout
 - answerTimeMs
 
 AnswerHistoryChoice
 - id
-- answerHistoryId
-- choiceId
+- answerHistoryId（JPAではAnswerHistoryへの@ManyToOne）
+- choiceId（JPAではChoiceへの@ManyToOne）
 ```
 
 `QuestionProgress`はMVPでは作成しません。`actionPattern`もMVP仕様から削除し、実装しません。
@@ -2173,7 +2173,7 @@ Repositoryの検索メソッドは、EntityのJavaプロパティとJPAリレー
 
 Repositoryのメソッド名は、次の関連フィールドを前提とします。
 
-| Entity          | Javaプロパティ         | 関連先             |
+| Entity          | Javaプロパティ     |　関連先　　　　　 |
 | --------------- | ----------------- | --------------- |
 | Question        | `chapter`         | Chapter         |
 | Choice          | `question`        | Question        |
@@ -2182,7 +2182,11 @@ Repositoryのメソッド名は、次の関連フィールドを前提としま�
 | StageSession    | `stageDefinition` | StageDefinition |
 | StageQuestion   | `stageSession`    | StageSession    |
 | StageQuestion   | `question`        | Question        |
+| AnswerHistory   | `gameSession`     | GameSession     |
+| AnswerHistory   | `stageSession`    | StageSession    |
 | AnswerHistory   | `stageQuestion`   | StageQuestion   |
+| AnswerHistoryChoice | `answerHistory` | AnswerHistory |
+| AnswerHistoryChoice | `choice`        | Choice        |
 
 これらの関連フィールド名を、Repositoryのメソッド名と一致させます。必要なフィールドは既存のEntity仕様に従って実装し、別の関連フィールドを勝手に追加しません。
 
