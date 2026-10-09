@@ -2514,7 +2514,7 @@ flowchart LR
 7. **Question選択**：UNANSWERED → REVIEW → CLEARED、同一GameSession内重複なし。
 8. **Stage Clear**：5問回答完了でClear。敵HP0はClear条件ではない。
 9. **Perfect**：Stage 5/5のみ。追加点なし。
-10. **TIME UP**：空配列はChoice検索前にTIME UP処理。
+10. **TIME UP**：回答API受信時にJava側で残り時間を再計算する。残り時間が0以下の場合はTIME UPとして処理し、時間が残っている状態で空配列が送信された場合は400 INVALID_ANSWER_COUNTとする。
 11. **Entity固定**：MVP 9 Entity。`QuestionProgress` / `actionPattern`は実装しない。
 12. **状態**：`WAITING_TO_START → ANSWERING → SUBMITTING → RESULT`を固定。
 
