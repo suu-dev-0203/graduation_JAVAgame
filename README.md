@@ -487,48 +487,126 @@ flowchart TD
 
 Stageは自由選択ではありません。1つのGameSession内ではStage 1から始まり、2～4 Stageが必要な場合は`stageNumber + 1`で自動進行します。
 
-## 22. 画面一覧・一時停止
+## 22. 画面一覧・一時停止・Refresh復元
 
-### 画面一覧
+### 22.1 画面一覧
 
-- HOME
-- Chapter Select
-- Chapter / Question Count Select
-- Game
-- Pause
-- Stage Result
-- Game Result
-- Review
+* HOME
+* Chapter Select
+* Chapter / Question Count Select
+* Game
+* Pause
+* Stage Result
+* Game Result
+* Review
 
-### 一時停止のルール
+### 22.2 一時停止のルール
+
+Pause／Resumeによる状態変更はJava側で管理します。JavaScriptはAPI成功後に画面を更新し、画面側だけでゲーム状態を変更してはいけません。
+
+Pauseは回答中の問題に対してのみ可能です。`WAITING_TO_START`、`SUBMITTING`、`RESULT`ではPauseできません。
+
+#### Pause時
+
+Pause APIが成功した場合、Java側で次の状態を更新します。
+
+* `GameSession.status = PAUSED`
+* `StageSession.status = PAUSED`
+* `StageSession.pausedAt`にPause開始時刻を記録する
+* 回答中の`StageQuestion.pausedAt`にも同じ時刻を記録する
+
+`StageSession.pausedAt`と`StageQuestion.pausedAt`には同じ`Instant`の値を設定します。
+
+Pause中は回答入力を受け付けず、Timerを停止します。Pause中の残り時間は`StageQuestion.pausedAt`を基準に計算し、時間が経過しても減少しないようにします。
+
+#### Resume時
+
+Resume APIが成功した場合、Java側で次の処理を行います。
+
+1. Resume時刻とPause開始時刻からPause時間をミリ秒で計算する。
+2. `StageSession.totalPausedMs`と`StageQuestion.totalPausedMs`にPause時間を加算する。
+3. `StageSession.pausedAt`と`StageQuestion.pausedAt`を`null`にする。
+4. `GameSession.status`と`StageSession.status`を両方とも`PLAYING`に戻す。
+5. 最新の`remainingTimeMs`を返す。
+
+JavaScriptはAPI成功後、返却された`remainingTimeMs`を基準にTimer表示を再開します。同じStage・同じStageQuestionから再開し、問題の開始時刻や経過時間をリセットしません。
+
+Pause時間は問題ごとの残り時間と回答時間の計算から除外します。時間切れの最終判定はJava側が行います。
+
+#### Homeを選択した場合
+
+Pause画面でHomeを選択した場合は、次の確認メッセージを表示します。
+
+「セーブされませんがゲームを終了しますか？」
+
+* キャンセル：Pause画面に戻り、ゲーム状態を変更しない。
+* 終了：終了APIを呼び出し、現在の`GameSession.status`と`StageSession.status`を`ABANDONED`にしてHOMEへ戻る。
+
+`ABANDONED`のGameSessionは再開対象にしません。終了時点のゲーム進行から再開することはできません。ただし、すでに保存された`AnswerHistory`などの履歴データを削除するという意味ではありません。
+
+### 22.3 Refresh / ブラウザ再読み込み
+
+ブラウザの再読み込み・再アクセス後は、サーバー側の状態を正としてゲーム画面を復元します。JavaScriptのローカル状態やローカルTimerだけで、ゲームの進行状況を復元してはいけません。
+
+進行中のGameSessionがある場合は、次の確認メッセージを表示します。
+
+「続きから再開しますか？」
+
+* はい：`GET /api/game-sessions/{gameSessionId}/current`を呼び出し、最新のゲーム状態を取得して画面を復元する。
+* いいえ：ゲームを終了するか確認する。終了を確定した場合は終了APIを呼び出して`ABANDONED`にし、HOMEへ戻る。終了をキャンセルした場合は、ゲーム状態を変更しない。
+
+再開を選んだ場合、現在のStage・StageQuestion・Score・Combo・HP・時間状態などをサーバーから取得します。
+
+#### Refresh時の状態別処理
 
 ```mermaid
 flowchart TD
-    GAME[Game] --> PAUSE[Pause]
-    PAUSE -->|Resume| GAME
-    PAUSE -->|Home| ABANDON[GameSession = ABANDONED]
-    ABANDON --> HOME[HOME]
+    R[Refresh / 再アクセス] --> S{GameSessionの状態}
+    S -->|PLAYING| P[再開確認]
+    S -->|PAUSED| P
+    S -->|COMPLETED| H[HOMEへ]
+    S -->|ABANDONED| H
+    P -->|再開する| C[現在のゲーム状態を取得]
+    P -->|終了する| A[終了確認]
+    A -->|終了確定| AB[ABANDONEDとして終了]
+    A -->|キャンセル| P
+    AB --> H
+    C --> V{GameSessionとStageSessionの状態}
+    V -->|両方PLAYING| G[現在のゲーム画面を復元]
+    V -->|両方PAUSED| PA[Pause画面を復元]
+    V -->|状態不一致| E[状態を検証しエラー処理]
 ```
 
-- Pause中は回答入力を受け付けない
-- Pause中はタイマーを進めない
-- Resumeすると同じStage・同じStageQuestionから再開する
-- Homeを選ぶと「セーブされませんがゲームを終了しますか？」と確認し、終了を選んだ場合は現在のGameSessionを`ABANDONED`として終了する
-- ABANDONEDのGameSessionは自動復帰しない。終了時点のゲーム内容はセーブしない
+#### Refresh後のTimer復元
 
-### Refresh / ブラウザ再読み込み
+* `questionState = WAITING_TO_START`の場合：Timerは未開始のまま復元し、Start APIが成功するまでカウントダウンを開始しない。
+* `questionState = ANSWERING`かつGameSession・StageSessionが`PLAYING`の場合：サーバーが返した`remainingTimeMs`を基準にTimer表示を再開する。
+* GameSession・StageSessionが`PAUSED`の場合：Pause画面を復元し、Timerを停止したままにする。
+* `questionState = SUBMITTING`または`RESULT`の場合：サーバー側の確定済み状態を確認し、回答を重複送信せずに適切な画面を復元する。
 
-```mermaid
-flowchart LR
-    R[Refresh] --> S{GameSessionの状態}
-    S -->|PLAYING| C[現在のStageSessionを取得]
-    S -->|PAUSED| P[Pause状態を復元]
-    S -->|COMPLETED / ABANDONED| H[HOMEへ]
-    C --> G[Gameを再表示]
-    P --> G
-```
+Pause中は`StageQuestion.pausedAt`を基準に残り時間を計算するため、Refreshによって残り時間が減少することはありません。
 
-再読み込み・再アクセス時に進行中のGameSessionがある場合は「続きから再開しますか？」と確認します。再開を選んだ場合は現在のStage・問題・Score・Combo・時間状態などを復元します。終了済みとしてABANDONEDにしたゲームは再開しません。
+Refresh後に同じ問題を最初から開始したり、回答履歴・Score・Combo・HP・Pause時間を初期化したりしてはいけません。
+
+### 22.4 状態管理の正規ルール
+
+| 操作          | GameSession.status | StageSession.status         |
+| ----------- | ------------------ | --------------------------- |
+| 通常プレイ中      | `PLAYING`          | `PLAYING`                   |
+| Pause       | `PAUSED`           | `PAUSED`                    |
+| Resume      | `PLAYING`          | `PLAYING`                   |
+| Stage Clear | `PLAYING`          | `CLEARED`                   |
+| ゲーム完了       | `COMPLETED`        | 最終Stageの終了状態を維持             |
+| ゲーム中断       | `ABANDONED`        | 現在のStageSessionを`ABANDONED` |
+
+* GameSessionとStageSessionの状態変更はJava側で確定する。
+* Pause／Resumeでは、両方の状態を整合させる。
+* Refresh時はサーバー側の状態を取得して画面を復元する。
+* Timerはサーバーの`remainingTimeMs`を基準に表示する。
+* `COMPLETED`と`ABANDONED`のGameSessionはプレイ中として復元しない。
+* 同じ回答をRefresh後に重複送信しない。
+* 状態が不一致の場合は、画面側だけで状態を決めつけず、サーバー側で整合性を検証する。
+
 
 ## 23. デザイン方針
 
