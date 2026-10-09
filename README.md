@@ -2217,6 +2217,7 @@ StageSessionRepository
     Long stageId
   )
 - save()
+- findByGameSession_GameSessionId(Long gameSessionId)
 
 StageQuestionRepository
 - findById()
@@ -2228,6 +2229,7 @@ StageQuestionRepository
     Long stageSessionId
   )
 - saveAll()
+- findByStageSession_GameSession_GameSessionId(Long gameSessionId)
 
 AnswerHistoryRepository
 - existsByStageQuestion_StageQuestionId(
@@ -2237,9 +2239,11 @@ AnswerHistoryRepository
     Long questionId
   )
 - save()
+- findByGameSession_GameSessionId(Long gameSessionId)
 
 AnswerHistoryChoiceRepository
 - saveAll()
+- findByAnswerHistory_AnswerHistoryId(Long answerHistoryId)
 ```
 
 `findAll()`、`findById()`、`save()`、`saveAll()`は、基本的に`JpaRepository`から継承して利用します。独自の検索メソッドを必要以上に追加しません。
