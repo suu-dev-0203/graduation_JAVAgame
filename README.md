@@ -2165,7 +2165,28 @@ UNIQUE(gameSessionId, stageId)                 // StageSession
 
 ### 35.1.16 Repositoryの最小責務
 
-AIがRepositoryに不要な処理を追加しないよう、MVPで必要なDB操作を次で固定します。
+AIがRepositoryに不要な処理を追加しないよう、MVPで必要なDB操作を次に固定します。
+
+Repositoryの検索メソッドは、EntityのJavaプロパティとJPAリレーションに一致させます。外部キーを数値として直接保持するのではなく、関連Entityをたどって検索します。
+
+#### Javaプロパティ名の固定
+
+Repositoryのメソッド名は、次の関連フィールドを前提とします。
+
+| Entity          | Javaプロパティ         | 関連先             |
+| --------------- | ----------------- | --------------- |
+| Question        | `chapter`         | Chapter         |
+| Choice          | `question`        | Question        |
+| StageDefinition | `chapter`         | Chapter         |
+| StageSession    | `gameSession`     | GameSession     |
+| StageSession    | `stageDefinition` | StageDefinition |
+| StageQuestion   | `stageSession`    | StageSession    |
+| StageQuestion   | `question`        | Question        |
+| AnswerHistory   | `stageQuestion`   | StageQuestion   |
+
+これらの関連フィールド名を、Repositoryのメソッド名と一致させます。必要なフィールドは既存のEntity仕様に従って実装し、別の関連フィールドを勝手に追加しません。
+
+#### Repositoryごとの最小責務
 
 ```text
 ChapterRepository
@@ -2173,14 +2194,17 @@ ChapterRepository
 - findById()
 
 QuestionRepository
-- findByChapterId()
+- findByChapter_ChapterId(Long chapterId)
 - findById()
 
 ChoiceRepository
-- findByQuestionIdOrderByChoiceOrder()
+- findByQuestion_QuestionIdOrderByChoiceOrder(Long questionId)
 
 StageDefinitionRepository
-- findByChapterIdAndStageNumber()
+- findByChapter_ChapterIdAndStageNumber(
+    Long chapterId,
+    int stageNumber
+  )
 
 GameSessionRepository
 - findById()
@@ -2188,36 +2212,70 @@ GameSessionRepository
 
 StageSessionRepository
 - findById()
-- existsByGameSessionIdAndStageId()
+- existsByGameSession_GameSessionIdAndStageDefinition_StageId(
+    Long gameSessionId,
+    Long stageId
+  )
 - save()
 
 StageQuestionRepository
 - findById()
-- findByStageSessionIdAndQuestionOrder()
-- findByStageSessionIdOrderByQuestionOrder()
+- findByStageSession_StageSessionIdAndQuestionOrder(
+    Long stageSessionId,
+    int questionOrder
+  )
+- findByStageSession_StageSessionIdOrderByQuestionOrder(
+    Long stageSessionId
+  )
 - saveAll()
 
 AnswerHistoryRepository
-- existsByStageQuestionId()
-- findByStageQuestionQuestionIdOrderByAnsweredAtDescAnswerHistoryIdDesc()
+- existsByStageQuestion_StageQuestionId(
+    Long stageQuestionId
+  )
+- findFirstByStageQuestion_Question_QuestionIdOrderByAnsweredAtDescAnswerHistoryIdDesc(
+    Long questionId
+  )
 - save()
 
 AnswerHistoryChoiceRepository
 - saveAll()
-### 35.1.17 実装時の絶対ルール
-
-```text
-READMEの正規仕様と異なるフィールド・Enum・APIをAIが勝手に追加しない
-EntityをControllerから直接返さない
-QuestionProgressをMVPで作らない
-actionPatternを作らない
-LocalDateTimeに戻さない
-answerTimeとanswerTimeMsを混在させない
-QuestionIdとStageQuestionIdを混同しない
-JavaScriptだけで正解・時間・Scoreを確定しない
-Stageを自由選択できる処理を作らない
-GameSession開始時に全StageQuestionを一括生成しない
 ```
+
+`findAll()`、`findById()`、`save()`、`saveAll()`は、基本的に`JpaRepository`から継承して利用します。独自の検索メソッドを必要以上に追加しません。
+
+#### 関連Entityをたどる検索
+
+例えば、次のメソッドは、指定したChapterに属するQuestionを取得します。
+
+```java
+findByChapter_ChapterId(Long chapterId)
+```
+
+これは、`Question.chapter.chapterId`というプロパティの経路を表します。
+
+また、次のメソッドは、指定したQuestionに対する最新のAnswerHistoryを1件取得します。
+
+```java
+findFirstByStageQuestion_Question_QuestionIdOrderByAnsweredAtDescAnswerHistoryIdDesc(
+    Long questionId
+)
+```
+
+これは、`AnswerHistory.stageQuestion.question.questionId`という経路で検索し、`answeredAt DESC`、同値の場合は`answerHistoryId DESC`の順で最新の1件を取得するためのメソッドです。
+
+最新判定は`answeredAt DESC`、同値の場合は`answerHistoryId DESC`で決定します。`answerHistoryId`の大小だけを最新判定の根拠にはしません。
+
+回答済み確認では、次のメソッドを使用します。
+
+```java
+existsByStageQuestion_StageQuestionId(Long stageQuestionId)
+```
+
+指定したStageQuestionに対するAnswerHistoryが存在するかを確認します。
+
+実装時には、Entityの関連フィールド名とRepositoryメソッド名が一致していることを確認し、アプリケーションの起動テストおよびRepositoryのテストで検証します。
+
 
 ## 36. 設計整合性チェック
 
