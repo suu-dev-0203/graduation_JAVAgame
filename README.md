@@ -1755,28 +1755,63 @@ StageSession.status == PLAYING
 
 ### 35.1.7 Pause / Resumeの正規ルール
 
-Pauseは`ANSWERING`中だけ可能です。WAITING_TO_START、SUBMITTING、RESULTではPauseできません。
+Pauseは回答中の問題に対してのみ可能です。`WAITING_TO_START`、`SUBMITTING`、`RESULT`ではPauseできません。
 
-Pause時：
+APIの成功条件は、GameSessionとStageSessionがともに`PLAYING`であり、対象のStageQuestionが開始済み・未回答で、まだPauseされていないことです。
+
+### Pause時
 
 ```text
-StageSession.pausedAt = 現在時刻
-StageQuestion.pausedAt = 現在時刻
+pauseStartedAt = 現在時刻
+
+GameSession.status = PAUSED
 StageSession.status = PAUSED
+
+StageSession.pausedAt = pauseStartedAt
+StageQuestion.pausedAt = pauseStartedAt
 ```
 
-Resume時：
+`StageSession.pausedAt`と`StageQuestion.pausedAt`には、同じ`Instant`の値を設定します。
+
+### Resume時
 
 ```text
-pauseDuration = currentTime - pausedAt
-StageSession.totalPausedMs += pauseDuration
-StageQuestion.totalPausedMs += pauseDuration
+resumedAt = 現在時刻
+
+pauseDurationMs =
+    max(0, resumedAt - StageQuestion.pausedAt)
+
+StageSession.totalPausedMs += pauseDurationMs
+StageQuestion.totalPausedMs += pauseDurationMs
+
 StageSession.pausedAt = null
 StageQuestion.pausedAt = null
+
+GameSession.status = PLAYING
 StageSession.status = PLAYING
 ```
 
-問題の`remainingTimeMs`と`answerTimeMs`には**StageQuestion.totalPausedMs**を使用します。StageSession.totalPausedMsはStage全体の一時停止時間の記録として保持します。
+日時の差はミリ秒で計算します。Resume APIはGameSessionとStageSessionがともに`PAUSED`で、必要なPause時刻が設定されている場合にのみ成功します。
+
+### Pause時間の管理
+
+* `StageQuestion.totalPausedMs`は、その問題の残り時間と回答時間の計算に使用します。
+* `StageSession.totalPausedMs`は、Stage全体のPause時間の記録として保持します。
+* Pause中は`StageQuestion.pausedAt`を使って残り時間を固定します。
+* Resume時にはPause時間を両方の累積値に加算します。
+* Pause中は回答を受け付けず、Timer表示も停止します。
+
+GameSessionとStageSessionの状態遷移は次のとおりです。
+
+| 操作     | GameSession.status        | StageSession.status |
+| ------ | ------------------------- | ------------------- |
+| 通常プレイ中 | `PLAYING`                 | `PLAYING`           |
+| Pause  | `PAUSED`                  | `PAUSED`            |
+| Resume | `PLAYING`                 | `PLAYING`           |
+| ゲーム終了  | `COMPLETED`または`ABANDONED` | 終了条件に応じた状態          |
+
+Pause／Resume処理はサーバー側で管理します。画面側の状態表示だけを切り替えてPauseが完了したことにはせず、API成功後に状態を更新します。
+
 
 ### 35.1.8 回答APIの正規処理順
 
