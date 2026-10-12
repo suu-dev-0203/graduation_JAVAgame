@@ -1,2111 +1,3075 @@
-[Java_Learning_System_README_完成版.md](https://github.com/user-attachments/files/33040744/Java_Learning_System_README_.md)
+
 # Java Learning System
-## ゲーム要素を取り入れたJava学習管理Webシステム
 
-> **Javaを1問解くたび、ゲームが進む。**
+> 本READMEは、設計説明だけでなく、Java / Spring Boot / JPA / JavaScriptへそのまま落とし込めるよう、時間管理・JPAリレーション・DTO/API名・Stage進行・Pause/Resume・二重実行・Question選択・Stage Clear条件を実装固定仕様として追加しています。以降のコードはこのREADMEをSource of Truthとして作成します。
 
-Java Bronzeを学習している初学者を対象に、**問題演習・ミニゲーム・回答履歴・復習・成績分析**を組み合わせたJava学習管理Webシステムを開発する。
+Java
+Bronzeを学習している初学者を対象とした、ゲーム感覚でJavaの問題を学習できるWebアプリケーションです。
 
-単なる「Java問題集」ではなく、Javaの知識を使って短いゲームを次々クリアしながら学ぶ体験を目指す。
+## 1. プロジェクト概要
 
----
+## 開発に必須の設計図一覧
 
-## 0. このREADMEの読み方
+このREADMEでは、実際にJava / Spring Boot / JavaScript / DBを実装するときに参照する図を、設計の流れに沿って整理しています。
 
-初心者・先生には前半、SE/SES・エンジニアには後半が読みやすい構成にしている。
+| 図 | 目的 |
+|---|---|
+| 学習体験の基本ループ | 正解・不正解・時間切れ・攻撃・HP・5問終了のルールを確認する |
+| 画面遷移図 | HOMEからGame、Result、Reviewまでの画面の移動を確認する |
+| データの関係図 | Entity同士の関係と外部キーの流れを確認する |
+| システム全体像 | ユーザー・画面・Spring Boot・DBのつながりを確認する |
+| 回答判定シーケンス | 1問を回答したときの処理順を確認する |
+| 時間切れシーケンス | TIME UP発生時の処理順を確認する |
+| Stage進行シーケンス | 1～4問目と5問目の違いを確認する |
+| クラス図 | Entity・Controller・Service・Repositoryの役割と関係を確認する |
+| 画面レイアウト | Game画面の配置を確認する |
+| 現状課題 vs 本アプリ | 何を解決するアプリなのかを確認する |
+| Chapter / Pool / Stage | 学習テーマ・問題群・ゲーム単位の関係を確認する |
+| Use Case Diagram | 学習者が何をできるかを確認する |
+| ロバストネス分析 | 画面・処理・データを分けて確認する |
+| MiniGame分離 | QuestionとMiniGameを分離する理由を確認する |
+| REST APIの位置付け | 画面とJavaの通信方法を確認する |
+| 一時停止 | Pause / Resume / Homeの状態を確認する |
+| 将来の拡張 | BronzeからSilver / Goldへ広げる方法を確認する |
+| デザイン優先度 | 読みやすさ・操作性・反応・楽しさの優先順位を確認する |
 
-```text
-概要
- ↓
-課題・目的
- ↓
-機能・画面・ゲーム体験
- ↓
-使用技術
- ↓
-システム構成
- ↓
-要求・分析・設計
- ↓
-UML / ロバストネス / クラス / シーケンス
- ↓
-開発方法・AI活用・テスト
- ↓
-スケジュール・進捗・拡張
-```
 
----
+Java Bronzeの問題をゲーム形式で解くWebアプリです。
 
-# 1. プロジェクト概要
+基本ループ：
 
-## 1.1 何を作るのか
-
-Java Bronzeを学習する初学者向けの学習支援Webアプリケーションを開発する。
-
-ユーザーはJavaの問題に回答し、正解するとキャラクターが攻撃したり、シュートしたり、魚を釣ったり、レースで相手を追い抜いたりするなど、回答結果がゲーム内の出来事として表現される。
-
-## 1.2 コンセプト
-
-> **「Java Bronzeの問題を解いている」ではなく、「Javaの知識を使ってゲームをクリアしている」と感じる学習体験を作る。**
-
-中心となる考え方は、
-
-**「問題が変わる → 操作・演出が変わる → 学習体験が変わる」**
-
-である。
-
-## 1.3 ターゲットユーザー
-
-- Java Bronzeを学習している初学者
-- Javaの基本文法を繰り返し練習したい人
-- 問題集だけでは学習が続きにくい人
-- 自分の苦手分野や過去の回答を確認したい人
-
----
-
-# 2. 開発背景と解決したい課題
-
-## 2.1 課題
-
-一般的な資格学習は、
-
-```text
-問題を解く
-  ↓
-間違える
-  ↓
-解説を読む
-  ↓
-もう一度解く
-```
-
-という反復になりやすい。
-
-そのため、
-
-- 問題演習が単調になりやすい
-- 同じ問題を繰り返すと答えを覚えてしまう
-- 間違えた問題をもう一度解くモチベーションが下がる
-- 自分の苦手分野が分かりにくい
-- 長いコード・問題文をゲーム画面にそのまま表示すると読みにくい
-
-という課題がある。
-
-## 2.2 解決策
-
-本システムでは、
-
-```text
-問題を解く
-  ↓
-正誤判定
-  ↓
-短い解説
-  ↓
-正解ならゲーム演出
-  ↓
-スコア・コンボ・ステージ進行
-  ↓
-全問終了
-  ↓
-グラフ・データ・問題・解説で振り返る
-  ↓
-間違えた問題を復習・再挑戦
-```
-
-という流れを作る。
-
-学習機能を中心に置きながら、ゲームによる視覚的なフィードバックで反復学習を続けやすくする。
-
----
-
-# 3. 学習フロー
-
-## 3.1 全体フロー
-
-```text
-HOME
-  ↓
-CHAPTER / STAGE選択
-  ↓
-StageSession開始
-  ↓
-問題をランダム出題
-  ↓
-制限時間内に回答
-  ↓
-正誤判定
-  ↓
-短い解説
-  ↓
-正解ならゲーム演出
-  ↓
-スコア・コンボ・敵HPなど更新
-  ↓
-次の問題
-  ↓
-全問終了
-  ↓
-STAGE CLEAR または RESULT
-  ↓
-間違えた問題を振り返る
-  ↓
-復習・リベンジ
-```
-
-## 3.2 ステージ例
-
-4問構成の1-1を例にすると、正解1回につき敵HPを1減らす。
-
-```text
-1-1 START
-   ↓
-問題① → 正解 → Enemy HP -1
-   ↓
-問題② → 正解 → Enemy HP -1
-   ↓
-問題③ → 正解 → Enemy HP -1
-   ↓
-問題④ → 正解 → Enemy HP -1
-   ↓
-Enemy HP = 0
-   ↓
-✨ STAGE CLEAR ✨
-   ↓
-1-2 OPEN
-```
-
-### ステージ状態の考え方
-
-`Stage` は「ステージの定義」、`StageSession` は「ユーザーがそのステージをプレイしている状態」と分ける。
-
-```text
-Stage
- └─ マスターデータ
-    ・4問構成
-    ・忍者
-    ・Java Robot A
-
-StageSession
- └─ プレイ中の状態
-    ・現在何問目か
-    ・正解数
-    ・現在コンボ
-    ・最大コンボ
-    ・スコア
-    ・残りHP
-```
-
-これにより、ステージの固定情報と、プレイ中に変化する値を混ぜない。
-
-## 3.3 ステージクリア条件
-
-MVPでは、
-
-```text
-ステージ内の全問題を回答
-AND
-全問題を正解
+``` text
+Chapterを選ぶ
 ↓
-STAGE CLEAR
-```
-
-を基本仕様とする。
-
-1問でも不正解または時間切れがあった場合、そのプレイはクリアにならず、RESULT → REVIEW / REVENGEへ進む。
-
-## 3.4 不正解時
-
-```text
-不正解
- ↓
-Enemy HPは減らさない
- ↓
-コンボを0
- ↓
-スコア加算なし
- ↓
-短い解説
- ↓
+Stage開始
+↓
+Java問題を表示
+↓
+キーボードで回答
+↓
+正解・不正解・時間切れを判定
+↓
+キャラクターが反応
+↓
+敵HP・コンボ・スコアを更新
+↓
+説明
+↓
 次の問題
+↓
+5問終了
+↓
+Stage Clear / Perfect
+↓
+結果・復習
 ```
 
-ステージ終了後、間違えた問題を確認して再挑戦できる。
+## 2. 作成する理由
 
-## 3.5 時間切れ時
-
-```text
-タイマー = 0
- ↓
-入力をロック
- ↓
-不正解として確定
- ↓
-回答履歴を保存
- ↓
-コンボを0
- ↓
-解説を表示
- ↓
-次の問題
-```
-
-部分点は与えない。
-# 4. 問題仕様
-
-## 4.1 問題形式
-
-以下の選択形式を対象とする。
-
-- A～E / 1つ選択
-- A～G / 1つ選択
-- A～E / 2つ選択
-- A～G / 2つ選択
-- A～G / 3つ選択
-- コード選択 A～E / 1つ選択
-- コード選択 A～G / 2つ選択
-
-問題形式は必要に応じて拡張する。
-
-## 4.2 短い問題
-
-例：
-
-```java
-int score = 80;
-```
-
-**scoreの型は？**
-
-```text
-A int
-B double
-C String
-D boolean
-```
-
-## 4.3 長文問題
-
-短い問題だけに限定せず、Java Bronzeで想定されるような長い問題文・長いコードにも対応する。
-
-例：
-
-```text
-次のプログラムを実行した場合、
-コンソールに表示される結果として
-正しいものを選択してください。
-```
-
-画面は、
-
-```text
-┌──────────────────────────────────┐
-│          問題エリア              │
-│                                  │
-│  問題文・Javaコード・選択肢       │
-│                                  │
-├──────────────────────────────────┤
-│          ゲーム演出エリア          │
-│                                  │
-│       プレイヤー VS 敵            │
-│                                  │
-└──────────────────────────────────┘
-```
-
-のように、**問題を読むための領域とゲーム演出の領域を分離**する。
-
-これにより、長文問題でもゲーム性を維持する。
-
----
-
-# 5. 制限時間・スコア・コンボ
-
-## 5.1 問題ごとの制限時間
-
-回答時間は1つの固定値ではなく、**問題ごとに設定する**。
-
-考慮する要素：
-
-- 問題文の長さ
-- コード量
-- 問題の難易度
-- 学習分野
-- 想定回答時間
-- Java Bronze試験で必要になる時間感覚
-
-基本的な実装上の責務は `Question.timeLimitSeconds` に持たせる。
-
-## 5.2 Stageの標準時間との関係
-
-章・ステージごとに時間感覚を変えたい場合に対応できるよう、`Stage.defaultTimeLimitSeconds` を持たせる。
-
-ただし、実際にその問題へ適用する時間は次の優先順位とする。
-
-```text
-Question.timeLimitSeconds が設定されている
-        ↓
-その問題の個別制限時間を使用
-
-Question側に個別設定がない
-        ↓
-Stage.defaultTimeLimitSeconds を使用
-```
-
-これにより、「1問ごとに違う制限時間」と「章・ステージによる時間設定」の両方に対応する。
-
-実際の試験仕様を参考にした数値は、実装時点の公式情報を確認して設定する。
-
-## 5.3 コンボ
-
-基本ルール：
-
-```text
-正解       → currentCombo + 1
-不正解     → currentCombo = 0
-時間切れ   → currentCombo = 0
-```
-
-ステージ終了時には `maxCombo` を保存する。
-
-## 5.4 スコア
-
-MVPでは複雑な計算式を避け、次のシンプルな方式を基本案とする。
-
-```text
-正解       → +100
-不正解     → +0
-時間切れ   → +0
-```
-
-残り時間ボーナスなどは、MVP完成後の拡張候補とする。
-# 6. ステージ内ランダム出題
-
-同じ1-1を繰り返しても同じ問題順にならないように、ステージごとに問題プールを持たせる。
-
-```text
-1-1 Question Pool
-├ Q001
-├ Q002
-├ Q003
-├ Q004
-├ Q005
-├ Q006
-└ ...
-```
-
-1回目：
-
-```text
-Q002 → Q005 → Q001 → Q004
-```
-
-2回目：
-
-```text
-Q006 → Q003 → Q002 → Q005
-```
-
-のようにランダム化する。
-
-将来的には、直前に出題した問題の連続出題を避けるなどのルールも追加候補とする。
-
----
-
-# 7. 回答後のフィードバック
-
-## 7.1 解説
-
-回答後は、まずシンプルな解説を表示する。
-
-例：
-
-```text
-✅ 正解！
-
-intは整数を扱うためのデータ型です。
-```
-
-長い解説はゲーム画面に詰め込まず、詳細な復習画面で確認できる構成を目指す。
-
-## 7.2 正解演出
-
-正解すると、毎回気持ちよいフィードバックを出す。
-
-```text
-✨ GREAT! ✨
-
-🥷 クナイ発射！
-
-💥 HIT!!
-
-Enemy HP -1
-```
-
-候補：
-
-- 正解エフェクト
-- キャラクターアニメーション
-- 効果音
-- スコア加算
-- コンボ増加
-- 敵HP減少
-- 画面フラッシュ
-- 演出テキスト
-
-## 7.3 ステージクリア演出
-
-全問終了時は、1問正解時とは別にステージクリア演出を表示する。
-
-```text
-🎉🎉🎉
-
-      STAGE CLEAR!
-
-         1 - 1
-
-  SCORE       920
-  COMBO         4
-  正答率      100%
-
-   ★ ★ ★ ★ ★
-
-      NEXT → 1-2
-```
-
----
-
-# 8. ミニゲーム・演出コンセプト
-
-本プロジェクトでは、すべてを別々の巨大なゲームとして作らない。
-
-**問題出題・回答判定は共通化し、「正解イベント」に応じて演出パターンを切り替える。**
-
-```text
-Question
-   ↓
-AnswerService
-   ↓
-正解イベント
-   ↓
-┌──────────┬──────────┬──────────┐
-│ Attack   │ Shoot    │ Race     │
-│ 戦闘     │ スポーツ │ 乗り物   │
-└──────────┴──────────┴──────────┘
-```
-
-これにより、新しい演出を追加しても問題判定や履歴管理を作り直さなくてよい構造を目指す。
-
----
-
-## 8.1 戦闘系演出
-
-### 忍者
-
-正解 → クナイを投げる → 敵に命中 → HP -1
-
-### 侍
-
-正解 → 日本刀で斬る → 命中 → HP -1
-
-### サラリーマン
-
-正解 → ビジネスバッグで攻撃 → 命中
-
-### 医者
-
-正解 → 特大注射器で攻撃 → 命中
-
-### 学生
-
-正解 → ノート・教科書などを使って攻撃
-
-### 小学1年生
-
-ランドセルを背負ったキャラクターが、ものさし・教科書・百科事典などを使うコミカルな演出を候補とする。
-
----
-
-## 8.2 スポーツ系演出
-
-### バスケットボール
-
-正解するたびにシュートし、ゴールする。
-
-```text
-問題① → シュート → GOAL!
-問題② → シュート → GOAL!
-問題③ → シュート → GOAL!
-問題④ → シュート → GOAL!
-```
-
-### ボウリング
-
-正解するたびにピンを倒し、最後の問題でストライクを狙う。
-
----
-
-## 8.3 動物系演出
-
-### ペンギン
-
-正解するたびに魚を捕まえる。
-
-全問正解 → FISH GET!
-
-### 釣り人
-
-正解 → HIT! → 魚を引き上げる。
-
----
-
-## 8.4 乗り物系演出
-
-### 自動車レース
-
-正解するごとに前の車を追い抜き、最後にゴールする。
-
-### 電車レース
-
-正解するごとに他の電車を追い抜き、最後にゴールする。
-
----
-
-# 9. キャラクター・敵のバリエーション
-
-同じキャラクターや敵だけでは単調になりやすいため、可能な範囲でラウンドごとに見た目を変える。
-
-例：
-
-```text
-1-1
-プレイヤー：忍者
-敵：Java Robot A
-
-1-2
-プレイヤー：侍
-敵：Java Robot B
-
-1-3
-プレイヤー：医者
-敵：Java Robot C
-```
-
-敵は同じ「Javaロボット」というテーマでも、
-
-- Type A
-- Type B
-- Type C
-- 重装型
-- 高速型
-- 巨大型
-- 宇宙型
-
-などの差分を持たせる候補とする。
-
-**ただし、キャラクター数を増やすこと自体は目的ではない。完成度と期限を優先する。**
-
----
-
-# 10. 復習・学習管理
-
-## 10.1 全問終了後の振り返り
-
-全問を解き終えたら、正答率だけではなく、間違えた問題を中心に振り返る。
-
-```text
-RESULT
-
-10 / 12
-
-正答率 83.3%
-
-得意：変数・演算子
-苦手：条件分岐・配列
-```
-
-## 10.2 間違えた問題
-
-```text
-REVIEW
-
-Q003 条件分岐     ×
-Q007 配列         ×
-Q010 文字列       ×
-
-[問題を見る]
-[解説を見る]
-[もう一度解く]
-```
-
-## 10.3 グラフ・データ
-
-カテゴリ別に、
-
-- 正答率
-- 正解数 / 不正解数
-- 回答時間
-- 問題数
-- 苦手カテゴリ
-
-などを可視化する。
-
-例：
-
-```text
-カテゴリ別正答率
-
-変数        ██████████ 100%
-演算子      ████████    80%
-条件分岐    ██████      60%
-配列        █████       50%
-```
-
-これにより、「ゲームを遊んだだけ」で終わらず、**次に何を学習すべきかが分かる学習管理システム**にする。
-
----
-
-# 11. 画面構成
-
-## HOME
-
-写真・3Dビジュアルを大胆に使用する。
-
-```text
-JAVA QUEST
-
-Javaを、遊びながら身につけよう。
-
-[ START ]
-[ REVIEW ]
-[ RECORD ]
-[ HELP ]
-```
-
-## CHAPTER / STAGE
-
-```text
-JAVA WORLD
-
-[ 変数 ]       ★★★
-[ 条件分岐 ]   ★★☆
-[ 配列 ]       🔒
-```
-
-## GAME
-
-```text
-SCORE 1250     COMBO ×4     TIME 04
-
-┌────────────────────────────┐
-│ int score = 80;            │
-│                            │
-│ scoreの型は？              │
-│                            │
-│ [A int]   [B double]       │
-│ [C String][D boolean]      │
-├────────────────────────────┤
-│       🥷         🤖        │
-│                         HP │
-└────────────────────────────┘
-```
-
-## RESULT
-
-```text
-RESULT
-
-8 / 10
-
-正答率 80%
-得意：変数
-苦手：条件分岐
-
-[ REVIEW ]
-[ NEXT STAGE ]
-```
-
-## REVIEW
-
-```text
-REVIEW
-
-間違えた問題
-・条件分岐 ×
-・演算子   ×
-・配列     ×
-
-[問題を見る]
-[解説を見る]
-[REVENGE]
-```
-
----
-
-# 12. デザイン方針
-
-## 12.1 HOME：おしゃれ・ビジュアル重視
-
-写真を全面的に使ったポートフォリオ系Webサイトのように、
-
-- 大きなビジュアル
-- 余白
-- 統一されたテーマ
-- 少ない要素でも成立する構成
-
-を意識する。
-
-必要に応じてBlenderでオリジナル3D素材を制作する。
-
-## 12.2 GAME：ポップ・ゲーム重視
-
-Typing LandやOzawa-Kenなどから、「楽しく操作できる」「すぐ結果が分かる」というUI/UXの考え方を参考にする。
-
-- 大きなボタン
-- ポップなフィードバック
-- タイマー
-- スコア
-- コンボ
-- 正解アニメーション
-- キーボード操作
-- キャラクターアクション
-
-を組み合わせる。
-
-既存作品のキャラクター、画面、ロゴ、名称、素材、具体的なデザインをコピーしない。
-
-## 12.3 REVIEW / RECORD：情報確認を優先
-
-ゲーム画面より落ち着いたUIにして、学習データを読み取りやすくする。
-
----
-
-# 13. ビジュアル制作
-
-## 第一候補：Blender
-
-候補：
-
-- キャラクター
-- Javaロボット
-- ステージ
-- 背景
-- 3Dオブジェクト
-- エフェクト素材
-
-ただし、優先順位は、
-
-```text
-Java学習システム完成
-      ↓
-UI完成度を上げる
-      ↓
-余裕があればBlender
-```
-
-とする。
-
-## 第二候補：フリー素材
-
-制作時間が足りない場合はフリー素材も検討する。
-
-候補：
-
-- ソコスト
-- ちょうどいいイラスト
-- 鉛筆素材
-- イラストナビ
-- 水彩画イラストフリー素材 sui-sai
-- おいしそうなフリーイラスト oisiso
-- Pixnote
-- ドットイラスト
-- dotpict
-
-使用前に、商用利用・改変・クレジット・再配布・GitHub公開などの利用規約を確認する。
-
----
-
-# 14. データモデル
-
-## 14.1 User
-
-```text
-User
-├ user_id
-├ username
-└ ...
-```
-
-## 14.2 Question
-
-```text
-Question
-├ question_id
-├ question_text
-├ code_block
-├ choice_count
-├ required_answer_count
-├ time_limit_seconds
-├ difficulty
-├ category
-└ explanation
-```
-
-`required_answer_count` は、何個の選択肢を選ぶ必要があるかを表す。
-
-```text
-1 → 単一選択
-2 → 2つ選択
-3 → 3つ選択
-```
-
-## 14.3 Choice
-
-```text
-Choice
-├ choice_id
-├ question_id
-├ choice_label
-├ choice_text
-└ is_correct
-```
-
-正解となる選択肢は `is_correct = true` で管理する。
-
-## 14.4 Stage
-
-`Stage` はマスターデータとして、ステージそのものの固定情報を持つ。
-
-```text
-Stage
-├ stage_id
-├ chapter
-├ round
-├ question_count
-├ default_time_limit_seconds
-├ player_type
-├ enemy_type
-├ action_pattern
-└ background
-```
-
-## 14.5 StageSession
-
-`StageSession` は、ユーザーが現在プレイしているステージの状態を管理する。
-
-```text
-StageSession
-├ stage_session_id
-├ user_id
-├ stage_id
-├ current_question_index
-├ correct_count
-├ current_combo
-├ max_combo
-├ score
-├ remaining_enemy_hp
-├ started_at
-└ completed_at
-```
-
-### HPの扱い
-
-MVPでは、最大HPをステージ問題数から求める。
-
-```text
-maximumEnemyHp = Stage.questionCount
-remainingEnemyHp = maximumEnemyHp - StageSession.correctCount
-```
-
-これにより、`Stage`に「現在HP」を持たせず、プレイ中の可変値は `StageSession` で管理する。
-
-## 14.6 AnswerHistory
-
-```text
-AnswerHistory
-├ history_id
-├ user_id
-├ question_id
-├ correct
-├ answer_time_seconds
-└ answered_at
-```
-
-複数選択の回答は、文字列1列に押し込めず、選択したChoiceとの関連を別に保持する。
-
-```text
-AnswerHistorySelectedChoice
-├ history_id
-└ choice_id
-```
-
-例えばAとCを選択した場合、
-
-```text
-history_id = 101
-choice_id  = A
-
-history_id = 101
-choice_id  = C
-```
-
-のように保存する。
-
-## 14.7 GameResult
-
-```text
-GameResult
-├ result_id
-├ user_id
-├ stage_id
-├ score
-├ max_combo
-├ correct_count
-├ total_count
-├ cleared
-└ completed_at
-```
-
-## 14.8 ReviewItem
-
-```text
-ReviewItem
-├ review_id
-├ user_id
-├ question_id
-├ latest_correct
-├ retry_count
-└ last_reviewed_at
-```
-
----
-
-# 15. データ整合性の基本ルール
-
-設計モデルと要求仕様がずれないよう、以下を共通ルールとする。
-
-| 仕様 | 設計上の対応 |
-|---|---|
-| 単一・複数選択 | `required_answer_count` + `Choice.is_correct` |
-| 複数選択判定 | 選択されたChoice集合と正解Choice集合を完全一致比較 |
-| 部分点なし | 一部一致では正解にしない |
-| 問題ごとの時間 | `Question.time_limit_seconds` |
-| Stageの標準時間 | `Stage.default_time_limit_seconds` |
-| プレイ中のHP | `StageSession.remaining_enemy_hp` |
-| スコア | `StageSession.score` → `GameResult.score` |
-| コンボ | `StageSession.current_combo` / `max_combo` |
-| 回答履歴 | `AnswerHistory` + `AnswerHistorySelectedChoice` |
-| ステージクリア | 全問回答 AND 全問正解 |
-| 時間切れ | 不正解扱い、入力ロック、コンボ0 |
-
-この表を、要求モデル・UML・DB実装をつなぐ基準とする。
-
----
-# 15. システム全体像
-
-## 15.1 基本アーキテクチャ
-
-```text
-┌────────────────────────────────────┐
-│ Web Browser                        │
-│ HTML / CSS / JavaScript            │
-│ HOME / GAME / RESULT / REVIEW      │
-└────────────────┬───────────────────┘
-                 │ HTTP / REST
-                 ▼
-┌────────────────────────────────────┐
-│ Java / Spring Boot                 │
-│ Controller                         │
-│ Service                            │
-│ Repository                         │
-└────────────────┬───────────────────┘
-                 │
-                 ▼
-┌────────────────────────────────────┐
-│ Database                           │
-│ Question / Choice / Stage          │
-│ History / Result / Review          │
-└────────────────────────────────────┘
-```
-
-## 15.2 技術スタック
-
-| 技術 | 主な役割 |
-|---|---|
-| Java | アプリケーションの中心ロジック |
-| Spring Boot | Web / API / 業務処理 |
-| HTML | 画面構造 |
-| CSS | UI・アニメーション |
-| JavaScript | タイマー・操作・ゲーム演出・画面制御 |
-| SQL / Database | 問題・履歴・成績などの保存 |
-| Git / GitHub | ソース管理・変更履歴 |
-| Python | 問題データ処理など、必要性がある場合に使用 |
-| FastAPI | Python側を採用する場合のAPI候補 |
-| Mermaid | UML / 構造図の可視化 |
-
----
-
-# 16. Python / FastAPIの位置付け
-
-Pythonは「使った実績を増やすため」ではなく、Java本体と役割を分けられる用途がある場合に使う。
-
-候補：
-
-- 問題データの検証
-- コード内数値のランダム置換
-- 類似問題の生成補助
-- 問題データの加工
-- 出題データの分析
-
-## 採用する場合の構成
+### 現状の課題と本アプリ
 
 ```mermaid
 flowchart LR
-    Browser[Web Browser]
-    Java[Java / Spring Boot]
-    Python[Python / FastAPI]
-    DB[(Database)]
-
-    Browser --> Java
-    Java --> DB
-    Java -. REST / JSON .-> Python
-    Python -. 問題データ .-> Java
-```
-
-Python連携はMVPの必須条件にせず、**Java / Spring Bootだけでも学習システムが成立する設計**を優先する。
-
----
-
-# 17. 要求モデル
-
-学校で学習したICONIXの考え方を意識し、ビジネス上の目的からユースケースへ落とし込む。
-
-## 主なユースケース
-
-```text
-利用者
- ├ 学習を開始する
- ├ ステージを選択する
- ├ 問題を解く
- ├ 回答する
- ├ 解説を見る
- ├ ゲーム演出を体験する
- ├ ステージをクリアする
- ├ 結果を見る
- ├ 回答履歴を見る
- ├ 苦手分野を確認する
- ├ 間違えた問題を復習する
- └ 再挑戦する
-```
-
-### 主要ユースケース：問題に回答する
-
-**事前条件**：学習者がステージを開始している。
-
-**基本フロー**：
-
-1. システムがステージの問題プールから問題を選ぶ。
-2. 制限時間とともに問題を表示する。
-3. 学習者が選択肢を回答する。
-4. システムが正誤判定する。
-5. 回答履歴を保存する。
-6. 短い解説を表示する。
-7. 正解の場合はゲーム演出を実行する。
-8. 次の問題へ進む。
-9. 全問終了時は結果を集計する。
-
-**事後条件**：回答結果が履歴として保存され、必要に応じて復習対象になる。
-
----
-
-# 18. ロバストネス分析
-
-Boundary（画面）、Control（処理）、Entity（データ）を分離する。
-
-```mermaid
-flowchart LR
-    U[ユーザー]
-
-    B1[GameScreen<br/>問題・ゲーム画面]
-    B2[ResultScreen<br/>結果・解説]
-    B3[ReviewScreen<br/>復習・グラフ]
-
-    C1((GameController))
-    C2((AnswerController))
-    C3((ReviewController))
-
-    E1[(Question)]
-    E2[(AnswerHistory)]
-    E3[(GameResult)]
-    E4[(ReviewItem)]
-
-    U --> B1
-    B1 --> C1
-    C1 --> C2
-    C2 --> E1
-    C2 --> E2
-    C2 --> E3
-    C2 --> B2
-    B2 --> B3
-    B3 --> C3
-    C3 --> E4
-    C3 --> E2
-```
-
-### Boundary
-
-- GameScreen
-- QuestionDisplay
-- ChoiceDisplay
-- TimerDisplay
-- ScoreDisplay
-- ComboDisplay
-- ResultScreen
-- ReviewScreen
-
-### Control
-
-- GameController
-- QuestionController
-- AnswerController
-- ScoreController
-- StageController
-- ReviewController
-- MiniGameController
-
-### Entity
-
-- User
-- Question
-- Choice
-- Stage
-- AnswerHistory
-- GameResult
-- ReviewItem
-
----
-
-# 19. 設計モデル：3層アーキテクチャ
-
-```text
-Controller
-   ↓
-Service
-   ↓
-Repository
-   ↓
-Entity / Database
-```
-
-### Controller
-
-画面やHTTPリクエストを受け取り、適切なServiceへ処理を渡す。
-
-### Service
-
-問題取得、正誤判定、スコア計算、ステージ進行、復習データ作成などの業務ロジックを担当する。
-
-### Repository
-
-Databaseとのデータアクセスを担当する。
-
-### Entity
-
-問題・選択肢・履歴・ステージなどのデータを表す。
-
----
-
-# 20. クラス図（Javaコア領域）
-
-Spring BootのController - Service - Repositoryを基本構造とする。
-
-```mermaid
-classDiagram
-
-class QuestionController {
-  -QuestionService questionService
-  +showQuestion(stageId, model) String
-  +submitAnswer(questionId, selectedAnswers, model) String
-}
-
-class AnswerController {
-  -AnswerService answerService
-  +submitAnswer(questionId, selectedAnswers) AnswerResult
-}
-
-class QuestionService {
-  -QuestionRepository questionRepository
-  +getRandomQuestion(stageId, excludedIds) Question
-}
-
-class AnswerService {
-  -QuestionRepository questionRepository
-  -AnswerHistoryRepository historyRepository
-  -StageSessionService stageSessionService
-  +checkAnswer(questionId, selectedAnswers) boolean
-  +saveAnswerHistory(...)
-  +processAnswer(...)
-  +processTimeout(...)
-}
-
-class StageService {
-  -StageRepository stageRepository
-  +getStage(stageId) Stage
-}
-
-class StageSessionService {
-  -StageSessionRepository stageSessionRepository
-  +startStage(userId, stageId) StageSession
-  +updateCorrect(sessionId)
-  +updateIncorrect(sessionId)
-  +updateTimeout(sessionId)
-  +finishStage(sessionId) GameResult
-}
-
-class ReviewService {
-  -AnswerHistoryRepository historyRepository
-  +getWrongQuestions(userId)
-  +getStatistics(userId)
-}
-
-class GameEffectSelector {
-  +selectEffect(actionPattern) GameEffect
-}
-
-class QuestionRepository {
-  <<interface>>
-  +findByStageId(stageId) List~Question~
-  +findById(questionId) Question
-}
-
-class AnswerHistoryRepository {
-  <<interface>>
-  +save(history)
-  +findByUserId(userId)
-}
-
-class StageRepository {
-  <<interface>>
-  +findById(stageId) Stage
-}
-
-class StageSessionRepository {
-  <<interface>>
-  +save(session)
-  +findById(sessionId) StageSession
-}
-
-class Question {
-  Long id
-  String questionText
-  String codeBlock
-  int choiceCount
-  int requiredAnswerCount
-  int timeLimitSeconds
-  String difficulty
-  String category
-  String explanation
-}
-
-class Choice {
-  Long id
-  Long questionId
-  String choiceLabel
-  String choiceText
-  boolean correct
-}
-
-class Stage {
-  Long id
-  int chapter
-  int round
-  int questionCount
-  int defaultTimeLimitSeconds
-  String playerType
-  String enemyType
-  String actionPattern
-  String background
-}
-
-class StageSession {
-  Long id
-  Long userId
-  Long stageId
-  int currentQuestionIndex
-  int correctCount
-  int currentCombo
-  int maxCombo
-  int score
-  int remainingEnemyHp
-}
-
-class AnswerHistory {
-  Long id
-  Long userId
-  Long questionId
-  boolean correct
-  int answerTimeSeconds
-}
-
-class GameResult {
-  Long id
-  Long userId
-  Long stageId
-  int score
-  int maxCombo
-  int correctCount
-  int totalCount
-  boolean cleared
-}
-
-class GameEffect {
-  <<interface>>
-  +playCorrectEffect()
-  +playStageClearEffect()
-}
-
-QuestionController --> QuestionService
-QuestionController --> AnswerController
-
-QuestionService --> QuestionRepository
-AnswerService --> QuestionRepository
-AnswerService --> AnswerHistoryRepository
-AnswerService --> StageSessionService
-
-StageService --> StageRepository
-StageSessionService --> StageSessionRepository
-StageSessionService --> Stage
-
-Question --> Choice
-ReviewService --> AnswerHistoryRepository
-
-Stage --> GameEffectSelector
-GameEffectSelector --> GameEffect
-```
-
-### 設計上のポイント
-
-- `Question` は問題そのものを表す。
-- `Stage` はステージの固定設定を表す。
-- `StageSession` はプレイ中の可変状態を表す。
-- `AnswerHistory` は個々の回答履歴を表す。
-- `GameEffect` は問題判定とは別のゲーム演出を表す。
-- 複数選択の正誤判定は `AnswerService` が担当する。
-- DBアクセスはRepositoryに集約する。
-
----
-# 21. シーケンス図：回答判定
-
-```mermaid
-sequenceDiagram
-    autonumber
-
-    actor User as ユーザー
-    participant Game as GameScreen
-    participant Controller as AnswerController
-    participant Service as AnswerService
-    participant QuestionRepo as QuestionRepository
-    participant HistoryRepo as AnswerHistoryRepository
-    participant Session as StageSessionService
-    participant Effect as GameEffect
-
-    User->>Game: 選択肢を回答
-    Game->>Controller: submitAnswer(questionId, selectedAnswers)
-    Controller->>Service: processAnswer(...)
-
-    Service->>QuestionRepo: findById(questionId)
-    QuestionRepo-->>Service: Question + Choices
-    Service->>Service: selectedAnswersと正解集合を完全一致比較
-
-    alt 正解
-        Service->>HistoryRepo: 正解履歴を保存
-        Service->>Session: updateCorrect()
-        Session-->>Service: HP・コンボ・スコア更新
-        Service->>Effect: playCorrectEffect()
-        Effect-->>Game: 攻撃・シュート等
-        Game-->>User: 正解・短い解説・演出
-    else 不正解
-        Service->>HistoryRepo: 不正解履歴を保存
-        Service->>Session: updateIncorrect()
-        Session-->>Service: コンボ0
-        Game-->>User: 不正解・短い解説
+    subgraph OLD[一般的な問題演習]
+        A[問題を解く] --> B[間違える]
+        B --> C[解説を読む]
+        C --> D[もう一度解く]
+        D --> E[単調な繰り返しになりやすい]
+    end
+
+    E -->|ゲームの反応を加える| F
+
+    subgraph NEW[Java Learning System]
+        F[問題を見る] --> G[考える]
+        G --> H[キーを押す]
+        H --> I[すぐに反応]
+        I --> J[キャラクターが攻撃]
+        J --> K[HP / Combo / Scoreが変化]
+        K --> L[短い説明]
+        L --> M[次の問題]
     end
 ```
 
----
-# 22. シーケンス図：ステージ進行
+通常の資格学習では「問題を解く→間違える→解説を読む」の繰り返しになりやすいため、問題演習にゲームの反応を加えて、繰り返し学習しやすくすることを目的とします。
+
+## 3. 学習体験の基本ループ
 
 ```mermaid
-sequenceDiagram
-    autonumber
+flowchart LR
+    A[問題を見る] --> B[考える]
+    B --> C[キーを押す]
+    C --> D{正誤・時間判定}
 
-    participant User as ユーザー
-    participant Stage as StageController
-    participant Question as QuestionService
-    participant Session as StageSessionService
-    participant Effect as GameEffect
-    participant DB as Database
+    D -->|正解| E[キャラクター攻撃]
+    E --> F[敵HP - 1]
+    F --> G[Combo + 1<br/>Score + 100]
 
-    User->>Stage: 1-1開始
-    Stage->>Session: StageSession開始
-    Session->>DB: StageSession保存
+    D -->|不正解| H[MISS]
+    H --> I[HPそのまま<br/>Combo 0]
 
-    loop ステージ問題数分
-        Stage->>Question: 問題プール取得
-        Question->>DB: ステージ問題検索
-        DB-->>Question: 複数問題
-        Question-->>Stage: ランダム問題
+    D -->|時間切れ| J[TIME UP]
+    J --> K[HPそのまま<br/>Combo 0]
 
-        User->>Stage: 回答
+    G --> L[履歴保存・短い説明]
+    I --> L
+    K --> L
 
-        alt 正解
-            Stage->>Session: updateCorrect()
-            Session->>Session: correctCount + 1
-            Session->>Session: remainingEnemyHp - 1
-            Session->>Session: currentCombo + 1
-            Session->>Session: score + 100
-            Session->>Effect: 正解演出
-        else 不正解
-            Stage->>Session: updateIncorrect()
-            Session->>Session: currentCombo = 0
-        else 時間切れ
-            Stage->>Session: updateTimeout()
-            Session->>Session: currentCombo = 0
+    L --> M{5問終了?}
+    M -->|いいえ| N[次の問題]
+    N --> A
+    M -->|はい| O{5問すべて正解?}
+    O -->|はい| P[Perfect + Stage Clear]
+    O -->|いいえ| Q[Stage Clear]
+```
+
+この図をゲーム処理の最重要ルールとして扱います。回答からゲーム上の反応までをできるだけ短くすることを重視します。
+
+## 4. Chapter / Question / Stage
+
+### Chapter / Question / Stageの関係
+
+```mermaid
+flowchart TD
+    C[Chapter<br/>学習テーマ] --> P[Question Pool<br/>出題候補]
+    P --> Q[Question<br/>問題データ]
+    C --> ST[StageDefinition<br/>Stage設定]
+    ST --> SQ[StageQuestion × 5<br/>今回プレイする5問]
+    SQ --> Q
+    P -. Stage開始時に5問を選択 .-> SQ
+```
+
+- **Chapter**：学習テーマ
+- **Question Pool**：そのChapterで出題できる問題の集まり
+- **Question**：実際に解く問題
+- **StageDefinition**：キャラクター・敵・フィールド・MiniGameなどのStage設定
+- **StageQuestion**：今回のStageで実際に使う5問を固定したデータ
+
+Stageはゲーム中に自動進行します。Stageを個別に選択したり、Stageを自由選択したりする方式はMVPでは採用しません。
+
+Stageを開始すると、Question Poolから5問を選び、`StageQuestion`として1～5問目の順番を固定します。
+
+### 実装上の固定ルール
+
+```text
+1 Stage = 5問
+敵HP = 5
+StageQuestion = 必ず5件
+StageNumber / Stageの選択 = 自由選択不可・Stage 1から自動進行
+```
+
+## 5. Chapterの進め方
+
+Chapterは自由に選択できます。学習者は自分が学びたい分野を選んで開始します。
+
+Stageはプレイ中に自動で進みます。Chapter選択後に「5問・10問・20問」を選択する画面を設け、その選択内容でGameSessionを開始します。Stageを個別選択する画面は設けません。
+
+5問ならStage 1だけ、10問ならStage 1→Stage 2、20問ならStage 1→Stage 2→Stage 3→Stage 4と自動進行します。
+
+## 6. 1 Stage = 5問
+
+MVPでは1 Stageを必ず5問に固定します。
+
+```text
+1問目 → 2問目 → 3問目 → 4問目 → 5問目
+```
+
+`StageQuestion`は必ず5件作成し、`questionOrder`は1～5で管理します。
+
+## 7. 敵HP
+
+MVPでは1 Stageの敵HPを必ず5に固定します。
+
+```text
+開始：HP 5
+正解1回：HP 4
+正解2回：HP 3
+正解3回：HP 2
+正解4回：HP 1
+正解5回：HP 0
+```
+
+`StageDefinition.maxEnemyHp`は将来の拡張余地として保持しますが、MVPでは必ず5とします。
+
+## 8. プレイ問題数
+
+MVPでは5問・10問・20問から選択します。
+
+```text
+5問  = 1 Stage
+10問 = 2 Stage
+20問 = 4 Stage
+```
+
+GameSessionはChapterと5/10/20問の問題数を選択して開始します。開始StageはChapter内のStage 1です。10問・20問の場合は、同じChapter内で`stageNumber`が次のStageへ自動的に進みます。必要なStage数が存在しない場合、そのGameSessionは開始できません。
+
+Stageの解放条件は設けません。
+
+同じGameSession内では、同じQuestionを重複して選出しません。したがって開始時に、必要な問題数以上のQuestionがQuestion Poolに存在することを確認します。
+
+## 9. 問題形式
+
+-   A～Eから1つ
+-   A～Gから1つ
+-   A～Eから2つ
+-   A～Gから2つ
+-   A～Gから3つ
+-   コード選択 A～Eから1つ
+-   コード選択 A～Gから2つ
+
+複数選択は正解の組み合わせと完全一致した場合を正解とします。
+
+## 10. 長い問題への対応
+
+### 画面レイアウトイメージ
+
+```mermaid
+flowchart TB
+    H[Game Header<br/>Chapter / Stage / Timer / Pause]
+
+    subgraph SCREEN[Game画面]
+        direction LR
+        subgraph LEFT[問題エリア]
+            Q1[問題文]
+            Q2[コードブロック]
+            Q3[A〜Gの選択肢]
+            Q4[キーボード操作案内]
+        end
+
+        subgraph RIGHT[ゲームエリア]
+            P[Player]
+            E[Enemy]
+            HP[Enemy HP]
+            CMB[Combo]
+            SC[Score]
+            FX[攻撃 / MISS / TIME UP演出]
         end
     end
 
-    alt 全問正解
-        Session->>DB: GameResult(cleared=true)
-        Stage-->>User: STAGE CLEAR
-        Stage-->>User: 1-2 OPEN
-    else 不正解または時間切れあり
-        Session->>DB: GameResult(cleared=false)
-        Stage-->>User: RESULT / REVIEW
-    end
+    F[回答結果 + 短い説明]
+    N[次の問題]
+
+    H --> SCREEN
+    Q3 --> F
+    FX --> F
+    F --> N
 ```
 
----
-# 23. Python / FastAPI連携シーケンス（採用時）
+左側は「考えるための情報」、右側は「ゲームの反応」を担当します。問題の読みやすさを優先しながら、回答直後のゲーム反応も見える構成にします。
 
-Pythonを採用する場合の参考構成。
+## 11. キーボード操作
+
+単一選択：A～Gを押して回答。複数選択：A～Gで選択しEnterで確定。Esc：一時停止。マウスは補助操作とします。
+
+## 12. 制限時間
+
+制限時間は問題ごとの `Question.timeLimitSeconds` で管理します。問題が表示されただけではタイマーを開始せず、**Enterを押して問題開始を確定し、Start APIが成功した時点からカウントを開始**します。
+
+Stage側に別の制限時間は持たせません。
+
+### Timer開始の流れ
+
+```text
+1. 問題を表示
+2. WAITING_TO_START
+3. Enter
+4. POST /api/stage-questions/{stageQuestionId}/start
+5. JavaがstartedAtを記録
+6. 200 OKを返す
+7. JavaScriptが返却されたremainingTimeMsを基準にTimer表示を開始
+```
+
+`WAITING_TO_START`ではTimerが未開始のため、`remainingTimeMs`は`null`で返却します。
+
+`remainingTimeMs == null`の場合、JavaScriptは`timeLimitSeconds × 1000`を初期表示するだけで、カウントダウンを開始しません。`null`を数値計算に直接使用して`NaN`を発生させないようにします。
+
+### 残り時間の計算
+
+サーバーは`StageQuestion.startedAt`、`StageQuestion.pausedAt`、`StageQuestion.totalPausedMs`、現在時刻を使用して残り時間を計算します。
+
+```text
+effectiveNow =
+    StageQuestion.pausedAt != null
+        ? StageQuestion.pausedAt
+        : 現在時刻
+
+elapsedMs =
+    max(
+        0,
+        effectiveNow - StageQuestion.startedAt
+        - StageQuestion.totalPausedMs
+    )
+
+remainingTimeMs =
+    max(
+        0,
+        Question.timeLimitSeconds * 1000
+        - elapsedMs
+    )
+```
+
+上記の日時の差はミリ秒で計算します。Javaでは`Instant`と`Duration.between(...).toMillis()`を使用し、経過時間は`long`で扱います。
+
+Pause中は`StageQuestion.pausedAt`を`effectiveNow`として使用するため、Pause中にRefreshや現在状態の取得を行っても残り時間は減少しません。
+
+`StageSession.pausedAt`もStage全体のPause記録として保持し、Pause開始時には`StageQuestion.pausedAt`と同じ時刻を設定します。ただし、問題ごとの残り時間の計算には`StageQuestion.pausedAt`を使用します。
+
+残り時間の最終値は0未満にしません。
+
+JavaScriptのTimerは表示専用です。JavaScriptのローカル経過時間を正解判定には使用しません。
+
+`GET /api/game-sessions/{gameSessionId}/current`では、Java側がその時点の残り時間を再計算して返します。Refresh後のTimer表示も、この返却値を基準に復元します。
+
+### 時間切れの判定
+
+`POST /api/answers`を受信したとき、Java側で必ず残り時間を再計算します。
+
+サーバー計算で`remainingTimeMs <= 0`の場合はTIME UPとして処理します。画面上では残り時間があっても、通信遅延などによってサーバー側ですでに時間切れになっていれば、TIME UPを優先します。
+
+`selectedChoiceIds`が空配列であることだけを理由にTIME UPにはしません。空配列の回答は、Java側で時間切れが確認された場合に限ってTIME UPとして処理します。時間が残っている場合は`400 INVALID_ANSWER_COUNT`とします。
+
+### 回答時間の計算
+
+`answerTimeMs`は次式で固定します。
+
+```text
+answerTimeMs =
+    max(
+        0,
+        answeredAt - startedAt - totalPausedMs
+    )
+```
+
+`startedAt`、`answeredAt`、`pausedAt`は`Instant`で管理し、`answerTimeMs`の単位はミリ秒です。
+
+回答はPause中には受け付けません。Resume後の回答では、完了したPause時間が`totalPausedMs`に加算されているため、Pause時間を回答時間に含めません。
+
+時間切れの最終判定はJava側だけで行います。
+
+## 13. 正解時
+
+```mermaid
+flowchart LR
+    A[正解] --> B[敵HP - 1]
+    B --> C[Combo + 1]
+    C --> D[Score + 100]
+    D --> E[GameEffect<br/>キャラクター攻撃]
+    E --> F[履歴保存・短い説明]
+    F --> G[次の問題]
+```
+
+`GameEffect`はJavaScript側の演出処理です。Java側は正誤・時間・HP・Combo・Score・Stage Clear・Perfectを確定し、JavaScriptは受け取った結果だけを演出します。
+
+## 14. 不正解時
+
+```mermaid
+flowchart LR
+    A[MISS] --> B[敵HPそのまま]
+    B --> C[Combo 0]
+    C --> D[Score + 0]
+    D --> E[GameEffect<br/>MISS演出]
+    E --> F[履歴保存・説明]
+    F --> G[次の問題]
+```
+
+MVPではMISS時にも、敵・背景・UIのいずれかが短く反応する演出を入れます。
+
+## 15. 時間切れ
+
+```mermaid
+flowchart LR
+    A[TIME UP] --> B[入力停止]
+    B --> C[Java側で経過時間を再確認]
+    C --> D[HPそのまま]
+    D --> E[Combo 0]
+    E --> F[GameEffect<br/>TIME UP演出]
+    F --> G[履歴保存・説明]
+    G --> H[次の問題]
+```
+
+タイマーが0になったら、画面側は入力をロックして回答確定要求を送信します。最終的な時間切れ判定はJava側が行います。
+
+## 16. Score
+
+MVPでは、正解+100、不正解+0、時間切れ+0とします。
+
+ScoreはGameSession単位で累積します。
+
+## 17. Combo
+
+正解で+1、不正解・時間切れで0に戻します。
+
+Comboは**Stage単位**で扱い、Stage開始時に0へリセットします。Stageをまたいで引き継ぎません。
+
+## 18. Stage Clear
+
+5問すべて回答するとStage Clearです。
+
+```text
+Stage Clear = 5問を最後までプレイした
+Perfect     = 5問すべて正解した
+```
+
+0～4問正解でもStage自体はClearします。学習を最後までやり切ることを重視したルールです。
+
+## 19. Perfect
+
+Perfectは**Stage単位**で判定します。
+
+```text
+5問すべて正解
+↓
+敵HP 0
+↓
+Perfect
+↓
+Stage Clear
+```
+
+10問・20問プレイの場合は、PerfectになったStageの数をGame Resultに表示します。
+
+派手な必殺技演出はMVP完成後の追加機能とし、MVPではPerfect専用エフェクトまでを基本とします。
+
+## 20. Stageごとの変化
+
+Stageごとに、プレイヤー・敵・フィールドを変更します。コードでは名前そのものではなくKeyで管理します。
+
+```text
+playerCharacterKey
+enemyKey
+fieldKey
+```
+
+例：
+
+```text
+Stage 1
+playerCharacterKey = SWORDSMAN
+enemyKey            = JAVA_GUARD
+fieldKey            = GRASSLAND
+
+Stage 2
+playerCharacterKey = SALARYMAN
+enemyKey            = JAVA_ROBOT
+fieldKey            = OFFICE
+
+Stage 3
+playerCharacterKey = NINJA
+enemyKey            = CODE_SAMURAI
+fieldKey            = CASTLE
+```
+
+表示名・画像・アニメーションはKeyからJavaScript側で解決します。
+
+## 21. 画面遷移図
+
+```mermaid
+flowchart TD
+    HOME[HOME / タイトル] --> CH[Chapter選択]
+    CH --> COUNT[5 / 10 / 20問選択]
+    COUNT --> START[GameSession開始]
+    START --> GAME[Game]
+
+    GAME --> PAUSE[Pause]
+    PAUSE -->|Resume| GAME
+    PAUSE -->|Home| ABANDON[GameSession ABANDONED]
+    ABANDON --> HOME
+
+    GAME -->|5問終了| SR[Stage Result]
+    SR -->|残りStageあり| NEXT[次のStage開始]
+    NEXT --> GAME
+    SR -->|最終Stage| GR[Game Result]
+    GR --> REVIEW[Review]
+    GR --> CH
+    REVIEW --> CH
+```
+
+10問・20問ではStage Resultを挟みながら次のStageへ進み、すべてのStageが終了したらGame Resultへ進みます。
+
+Stageは自由選択ではありません。1つのGameSession内ではStage 1から始まり、2～4 Stageが必要な場合は`stageNumber + 1`で自動進行します。
+
+## 22. 画面一覧・一時停止・Refresh復元
+
+### 22.1 画面一覧
+
+* HOME
+* Chapter Select
+* Chapter / Question Count Select
+* Game
+* Pause
+* Stage Result
+* Game Result
+* Review
+
+### 22.2 一時停止のルール
+
+Pause／Resumeによる状態変更はJava側で管理します。JavaScriptはAPI成功後に画面を更新し、画面側だけでゲーム状態を変更してはいけません。
+
+Pauseは回答中の問題に対してのみ可能です。`WAITING_TO_START`、`SUBMITTING`、`RESULT`ではPauseできません。
+
+#### Pause時
+
+Pause APIが成功した場合、Java側で次の状態を更新します。
+
+* `GameSession.status = PAUSED`
+* `StageSession.status = PAUSED`
+* `StageSession.pausedAt`にPause開始時刻を記録する
+* 回答中の`StageQuestion.pausedAt`にも同じ時刻を記録する
+
+`StageSession.pausedAt`と`StageQuestion.pausedAt`には同じ`Instant`の値を設定します。
+
+Pause中は回答入力を受け付けず、Timerを停止します。Pause中の残り時間は`StageQuestion.pausedAt`を基準に計算し、時間が経過しても減少しないようにします。
+
+#### Resume時
+
+Resume APIが成功した場合、Java側で次の処理を行います。
+
+1. Resume時刻とPause開始時刻からPause時間をミリ秒で計算する。
+2. `StageSession.totalPausedMs`と`StageQuestion.totalPausedMs`にPause時間を加算する。
+3. `StageSession.pausedAt`と`StageQuestion.pausedAt`を`null`にする。
+4. `GameSession.status`と`StageSession.status`を両方とも`PLAYING`に戻す。
+5. 最新の`remainingTimeMs`を返す。
+
+JavaScriptはAPI成功後、返却された`remainingTimeMs`を基準にTimer表示を再開します。同じStage・同じStageQuestionから再開し、問題の開始時刻や経過時間をリセットしません。
+
+Pause時間は問題ごとの残り時間と回答時間の計算から除外します。時間切れの最終判定はJava側が行います。
+
+#### Homeを選択した場合
+
+Pause画面でHomeを選択した場合は、次の確認メッセージを表示します。
+
+「セーブされませんがゲームを終了しますか？」
+
+* キャンセル：Pause画面に戻り、ゲーム状態を変更しない。
+* 終了：終了APIを呼び出し、現在の`GameSession.status`と`StageSession.status`を`ABANDONED`にしてHOMEへ戻る。
+
+`ABANDONED`のGameSessionは再開対象にしません。終了時点のゲーム進行から再開することはできません。ただし、すでに保存された`AnswerHistory`などの履歴データを削除するという意味ではありません。
+
+### 22.3 Refresh / ブラウザ再読み込み
+
+ブラウザの再読み込み・再アクセス後は、サーバー側の状態を正としてゲーム画面を復元します。JavaScriptのローカル状態やローカルTimerだけで、ゲームの進行状況を復元してはいけません。
+
+進行中のGameSessionがある場合は、次の確認メッセージを表示します。
+
+「続きから再開しますか？」
+
+* はい：`GET /api/game-sessions/{gameSessionId}/current`を呼び出し、最新のゲーム状態を取得して画面を復元する。
+* いいえ：ゲームを終了するか確認する。終了を確定した場合は終了APIを呼び出して`ABANDONED`にし、HOMEへ戻る。終了をキャンセルした場合は、ゲーム状態を変更しない。
+
+再開を選んだ場合、現在のStage・StageQuestion・Score・Combo・HP・時間状態などをサーバーから取得します。
+
+#### Refresh時の状態別処理
+
+```mermaid
+flowchart TD
+    R[Refresh / 再アクセス] --> S{GameSessionの状態}
+    S -->|PLAYING| P[再開確認]
+    S -->|PAUSED| P
+    S -->|COMPLETED| H[HOMEへ]
+    S -->|ABANDONED| H
+    P -->|再開する| C[現在のゲーム状態を取得]
+    P -->|終了する| A[終了確認]
+    A -->|終了確定| AB[ABANDONEDとして終了]
+    A -->|キャンセル| P
+    AB --> H
+    C --> V{GameSessionとStageSessionの状態}
+    V -->|両方PLAYING| G[現在のゲーム画面を復元]
+    V -->|両方PAUSED| PA[Pause画面を復元]
+    V -->|状態不一致| E[状態を検証しエラー処理]
+```
+
+#### Refresh後のTimer復元
+
+* `questionState = WAITING_TO_START`の場合：Timerは未開始のまま復元し、Start APIが成功するまでカウントダウンを開始しない。
+* `questionState = ANSWERING`かつGameSession・StageSessionが`PLAYING`の場合：サーバーが返した`remainingTimeMs`を基準にTimer表示を再開する。
+* GameSession・StageSessionが`PAUSED`の場合：Pause画面を復元し、Timerを停止したままにする。
+* `questionState = SUBMITTING`または`RESULT`の場合：サーバー側の確定済み状態を確認し、回答を重複送信せずに適切な画面を復元する。
+
+Pause中は`StageQuestion.pausedAt`を基準に残り時間を計算するため、Refreshによって残り時間が減少することはありません。
+
+Refresh後に同じ問題を最初から開始したり、回答履歴・Score・Combo・HP・Pause時間を初期化したりしてはいけません。
+
+### 22.4 状態管理の正規ルール
+
+| 操作          | GameSession.status | StageSession.status         |
+| ----------- | ------------------ | --------------------------- |
+| 通常プレイ中      | `PLAYING`          | `PLAYING`                   |
+| Pause       | `PAUSED`           | `PAUSED`                    |
+| Resume      | `PLAYING`          | `PLAYING`                   |
+| Stage Clear | `PLAYING`          | `CLEARED`                   |
+| ゲーム完了       | `COMPLETED`        | 最終Stageの終了状態を維持             |
+| ゲーム中断       | `ABANDONED`        | 現在のStageSessionを`ABANDONED` |
+
+* GameSessionとStageSessionの状態変更はJava側で確定する。
+* Pause／Resumeでは、両方の状態を整合させる。
+* Refresh時はサーバー側の状態を取得して画面を復元する。
+* Timerはサーバーの`remainingTimeMs`を基準に表示する。
+* `COMPLETED`と`ABANDONED`のGameSessionはプレイ中として復元しない。
+* 同じ回答をRefresh後に重複送信しない。
+* 状態が不一致の場合は、画面側だけで状態を決めつけず、サーバー側で整合性を検証する。
+
+
+## 23. デザイン方針
+
+### デザイン優先度
+
+```mermaid
+flowchart LR
+    A[読みやすい] --> B[押しやすい]
+    B --> C[押した結果がすぐ分かる]
+    C --> D[キャラクターが反応する]
+    D --> E[気持ちいい]
+    E --> F[楽しい]
+```
+
+見た目だけを派手にするのではなく、まず「問題が読みやすい」「答えやすい」「反応が分かる」を優先します。
+
+### 回答UIの状態
+
+```mermaid
+stateDiagram-v2
+    [*] --> WAITING_TO_START
+    WAITING_TO_START --> ANSWERING: Start API成功
+    ANSWERING --> SUBMITTING: 回答確定 / TIME UP
+    SUBMITTING --> RESULT: API成功
+    RESULT --> WAITING_TO_START: 次の問題
+```
+
+`SUBMITTING`中は、選択肢・Enter・A～Gキーなどの入力をすべてロックします。これにより、連打や二重送信を防ぎます。
+
+`GameEffect`はJavaScript側の演出処理として実装し、Java側から受け取った結果に応じて攻撃・MISS・TIME UP・Perfectなどを表示します。
+
+Stageのプレイヤー・敵・フィールドは`playerCharacterKey`、`enemyKey`、`fieldKey`で管理します。
+
+Typing LandやOzawa-Kenは操作テンポやゲームとしての気持ちよさの参考とし、キャラクター・ロゴ・画面・素材はコピーしません。
+
+## 24. データの関係
+
+```mermaid
+flowchart TD
+    C[Chapter] --> Q[Question]
+    Q --> CH[Choice]
+    C --> SD[StageDefinition]
+
+    GS[GameSession] --> SS[StageSession]
+    SD --> SS
+    SS --> SQ[StageQuestion]
+    SQ --> Q
+
+    GS --> AH[AnswerHistory]
+    SS --> AH
+    SQ --> AH
+    AH --> AHC[AnswerHistoryChoice]
+    AHC --> CH
+
+    Q -. 将来拡張 .-> QP[QuestionProgress]
+```
+
+### 実装上の重要な関係
+
+```mermaid
+flowchart LR
+    SS[StageSession] --> SQ1[StageQuestion 1]
+    SS --> SQ2[StageQuestion 2]
+    SS --> SQ3[StageQuestion 3]
+    SS --> SQ4[StageQuestion 4]
+    SS --> SQ5[StageQuestion 5]
+
+    SQ1 --> Q1[Question]
+    SQ2 --> Q2[Question]
+    SQ3 --> Q3[Question]
+    SQ4 --> Q4[Question]
+    SQ5 --> Q5[Question]
+```
+
+`StageSession → StageQuestion → Question`を、今回のプレイ中の問題を管理する基本構造とします。
+
+`AnswerHistory`には`questionId`を重複保存せず、`stageQuestionId`から対象Questionを特定します。
+
+`AnswerHistoryChoice`は実際に選択したChoiceを記録します。
+
+`QuestionProgress`はMVP外の将来拡張です。
+
+## 25. システム全体像
+
+```mermaid
+flowchart LR
+    U[学習者]
+    F[Browser<br/>HTML / CSS / JavaScript]
+    API[REST API]
+    C[Controller]
+    S[Service]
+    R[Repository]
+    DB[(Database)]
+    FX[GameEffect<br/>JavaScript演出]
+
+    U --> F
+    F -->|HTTP / JSON| API
+    API --> C
+    C --> S
+    S --> R
+    R --> DB
+    S -->|結果| C
+    C -->|JSON| F
+    F --> FX
+```
+
+Java側がゲームルールを確定し、JavaScript側は受け取った結果をゲーム演出へ反映します。
+
+## 26. 基本アーキテクチャ
+
+```mermaid
+flowchart TB
+    subgraph FRONT[画面側]
+        HTML[HTML]
+        CSS[CSS]
+        JS[JavaScript]
+        FX[GameEffect]
+    end
+
+    subgraph BACK[Spring Boot]
+        CTRL[Controller]
+        SERVICE[Service]
+        REPO[Repository]
+    end
+
+    DB[(H2 Database)]
+
+    HTML --> JS
+    CSS --> HTML
+    JS -->|HTTP / JSON| CTRL
+    CTRL --> SERVICE
+    SERVICE --> REPO
+    REPO --> DB
+    SERVICE --> CTRL
+    CTRL --> JS
+    JS --> FX
+```
+
+- **Controller**：リクエストを受け取る
+- **Service**：正誤・時間・HP・Combo・Score・Stage・Session状態を処理する
+- **Repository**：DBとのやり取りを担当する
+- **JavaScript**：入力・表示・GameEffectを担当する
+- **GameEffect**：JavaScript側の演出処理
+
+画面から直接DBを操作しません。
+
+## 27. 要求モデル
+
+```mermaid
+flowchart LR
+    U([学習者])
+
+    subgraph REQ[主要要求]
+        R1[Chapterを選択する]
+        R2[Chapterを選択し、5・10・20問を選択する]
+        R3[5 / 10 / 20問で開始する]
+        R4[問題に回答する]
+        R5[正誤・時間結果を知る]
+        R6[HP / Combo / Scoreを見る]
+        R7[回答履歴を残す]
+        R8[Stage Resultを見る]
+        R9[Game Resultを見る]
+        R10[間違えた問題をReviewする]
+        R11[Pause / Resumeできる]
+    end
+
+    subgraph IMPL[主な実装]
+        I1[Chapter API / 画面]
+        I2[Chapter / Question Count Select / GameSession]
+        I3[GameSession作成]
+        I4[Answer API / AnswerService]
+        I5[Java側時間判定]
+        I6[GameSession / StageSession]
+        I7[AnswerHistory / AnswerHistoryChoice]
+        I8[Stage Result]
+        I9[Game Result]
+        I10[Review API / Review画面]
+        I11[Pause / Resume API]
+    end
+
+    U --> R1 & R2 & R3 & R4 & R8 & R9 & R10 & R11
+    R1 --> I1
+    R2 --> I2
+    R3 --> I3
+    R4 --> I4
+    R5 --> I5
+    R6 --> I6
+    R7 --> I7
+    R8 --> I8
+    R9 --> I9
+    R10 --> I10
+    R11 --> I11
+
+```
+## 28. Use Case Diagram
+
+```mermaid
+flowchart LR
+    USER([学習者])
+
+    subgraph SYSTEM[Java Learning System]
+        UC1([Chapterを選択する])
+        UC2([Chapterを選択し、5・10・20問を選択する])
+        UC3([5 / 10 / 20問を開始する])
+        UC4([問題に回答する])
+        UC5([Pause / Resumeする])
+        UC6([Stage Resultを見る])
+        UC7([Game Resultを見る])
+        UC8([Reviewする])
+    end
+
+    USER --> UC1
+    USER --> UC2
+    USER --> UC3
+    USER --> UC4
+    USER --> UC5
+    USER --> UC6
+    USER --> UC7
+    USER --> UC8
+
+    UC4 --> UC6
+    UC6 -->|最終Stage| UC7
+    UC7 --> UC8
+
+```
+## 29. ロバストネス分析
+
+### ロバストネス図
+
+ロバストネス分析では、**画面・処理・データの責任を分ける**ことで、どこに何のコードを書くのかを整理します。
+
+```mermaid
+flowchart LR
+    subgraph B[Boundary：画面]
+        direction TB
+        GAME[Game画面]
+        PAUSE[Pause]
+        SR[Stage Result]
+        GR[Game Result]
+        REVIEW[Review]
+    end
+
+    subgraph C[Control：処理]
+        direction TB
+        AC[AnswerController]
+        AS[AnswerService]
+        GS[GameSessionService]
+        PS[Pause / Resume処理]
+        RS[ResultService]
+        RV[ReviewService]
+    end
+
+    subgraph E[Entity：データ]
+        direction TB
+        Q[Question]
+        CH[Choice]
+        SS[StageSession]
+        SQ[StageQuestion]
+        GSN[GameSession]
+        AH[AnswerHistory]
+        AHC[AnswerHistoryChoice]
+    end
+
+    GAME --> AC
+    PAUSE --> PS
+    SR --> RS
+    GR --> RS
+    REVIEW --> RV
+
+    AC --> AS
+    PS --> GS
+    RS --> GS
+    RV --> AH
+
+    AS --> Q
+    AS --> CH
+    AS --> SS
+    AS --> SQ
+    AS --> GSN
+    AS --> AH
+    AS --> AHC
+    GS --> GSN
+    GS --> SS
+
+```
+## 30. シーケンス図：回答判定
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    participant Java as Java / Spring Boot
-    participant Python as Python / FastAPI
-    participant DB as Database
+    actor User as 学習者
+    participant UI as Game画面
+    participant AC as AnswerController
+    participant AS as AnswerService
+    participant SQR as StageQuestionRepository
+    participant QR as QuestionRepository
+    participant SR as StageSessionRepository
+    participant GR as GameSessionRepository
+    participant HR as AnswerHistoryRepository
+    participant HCR as AnswerHistoryChoiceRepository
+    participant JS as GameEffect(JavaScript)
 
-    Java->>Python: 問題データ取得要求
-    Python->>Python: テンプレート・データ処理
-    Python-->>Java: HTTP 200 / JSON
-    Java->>DB: 問題データ保存
-    Java-->>Java: 出題可能状態へ更新
+    User->>UI: A～G / Enter
+    UI->>UI: SUBMITTINGへ変更・入力ロック
+    UI->>AC: POST /api/answers
+    AC->>AS: 回答処理
+    AS->>SQR: StageQuestion取得
+    SQR-->>AS: StageQuestion
+    AS->>QR: Question取得
+    QR-->>AS: Question
+    AS->>AS: 正誤・時間・選択肢数を判定
+    AS->>SR: StageSession更新
+    AS->>GR: GameSession更新
+    AS->>HR: AnswerHistory保存
+    AS->>HCR: AnswerHistoryChoice保存
+    AS-->>AC: AnswerResponse
+    AC-->>UI: JSON Response
+    UI->>JS: correct / timeout / HP / Combo / Score
+    JS-->>UI: 攻撃 / MISS / TIME UP
+    UI->>UI: RESULT表示
+    UI->>UI: 次のStageQuestionを表示
 ```
 
-Pythonサーバー停止時でもJavaシステム全体が落ちないようにする場合は、Java側で例外処理・フォールバックを設ける。
+正誤・時間・HP・Combo・Score・Stage Clear・Perfectの最終判定はJava側が担当します。
 
-ただし、これはMVP完成後の拡張候補であり、期限を圧迫する場合は削る。
+### 正解・不正解のルール
 
----
+- 正解：HP-1、Combo+1、Score+100
+- 不正解：HP維持、Combo=0、Score+0
+- 複数選択：選択されたChoice IDの集合を正解集合と完全一致で比較
 
-# 24. 設計整合性チェック
+## 31. シーケンス図：時間切れ
 
-実装開始前に、要求・データモデル・クラス図・シーケンス図の間で、同じ仕様が同じルールで表現されているか確認する。
+```mermaid
+sequenceDiagram
+    participant T as Timer
+    participant UI as Game画面
+    participant AC as AnswerController
+    participant AS as AnswerService
+    participant SR as StageSessionRepository
+    participant GR as GameSessionRepository
+    participant HR as AnswerHistoryRepository
+    participant JS as GameEffect(JavaScript)
 
-## 24.1 複数選択
-
-要求：A～Gのうち2つ・3つ選択などに対応する。
-
-設計：
-
-```text
-Question.requiredAnswerCount
-Choice.isCorrect
-AnswerHistorySelectedChoice
+    T->>UI: 0秒
+    UI->>UI: SUBMITTINGへ変更・入力ロック
+    UI->>AC: POST /api/answers
+    AC->>AS: 回答処理
+    AS->>AS: startedAt / totalPausedMs / 現在時刻を確認
+    AS->>SR: StageSession更新
+    AS->>GR: GameSession更新（Combo=0）
+    AS->>HR: AnswerHistory保存
+    AS-->>AC: timeout=trueのAnswerResponse
+    AC-->>UI: JSON Response
+    UI->>JS: TIME UP演出
+    UI->>UI: RESULT表示
+    UI->>UI: 次のStageQuestionを表示
 ```
 
-回答判定：
+時間切れはクライアントの自己申告ではなく、Java側で実時間を判定します。
 
-```text
-selectedChoiceSet == correctChoiceSet
+## 32. シーケンス図：Stage進行
+
+```mermaid
+sequenceDiagram
+    participant UI as Game画面
+    participant AS as AnswerService
+    participant SS as StageSession
+    participant GS as GameSession
+
+    UI->>AS: 1問分の回答
+    AS->>SS: HP / 正解数 / 問題位置を更新
+    AS->>GS: Score / Comboを更新
+
+    alt 1～4問目
+        AS-->>UI: 次のStageQuestionを返す
+    else 5問目
+        AS->>AS: 5問終了を確認
+        AS->>AS: Perfect判定
+        AS->>SS: StageSession.status = CLEARED
+        AS-->>UI: Stage Resultへ
+    end
 ```
 
-部分点はなし。
+### 1～4問目
 
-## 24.2 ステージHP
+`回答 → 正誤判定 → HP / Combo / Score更新 → 履歴保存 → 次のStageQuestion`
 
-要求：1問正解ごとに敵HPを1減らす。
+### 5問目
 
-設計：
+`5問目回答 → 正誤判定 → 履歴保存 → 5問終了 → Perfect判定 → Stage Clear → Stage Result`
 
-```text
-Stage.questionCount
-        ↓
-最大HP
+### 10問 / 20問
 
-StageSession.correctCount
-        ↓
-残HP = 最大HP - 正解数
+Stage Result後、まだGameSession内のStageが残っていれば次のStageを開始します。すべて終了したらGame Resultへ進みます。
+
+## 33. クラス図
+
+MVPで実装するEntity・Controller・Service・Repositoryと、状態・問題形式・MiniGame種別をここで固定します。
+
+```mermaid
+classDiagram
+    class Chapter {
+        +Long chapterId
+        +String name
+        +String description
+    }
+    class Question {
+        +Long questionId
+        +Long chapterId
+        +QuestionType questionType
+        +String questionText
+        +int timeLimitSeconds
+        +String shortExplanation
+        +String detailedExplanation
+    }
+    class Choice {
+        +Long choiceId
+        +Long questionId
+        +String choiceText
+        +int choiceOrder
+        +boolean correct
+    }
+    class StageDefinition {
+        +Long stageId
+        +Long chapterId
+        +int stageNumber
+        +String playerCharacterKey
+        +String enemyKey
+        +String fieldKey
+        +MiniGameType miniGameType
+        +int maxEnemyHp
+    }
+    class GameSession {
+        +Long gameSessionId
+        +Long chapterId
+        +int questionCount
+        +int totalStageCount
+        +int currentStageNumber
+        +int score
+        +GameSessionStatus status
+        +Instant startedAt
+        +Instant endedAt
+    }
+    class StageSession {
+        +Long stageSessionId
+        +Long gameSessionId
+        +Long stageId
+        +int currentQuestionIndex
+        +int correctCount
+        +int enemyHp
+        +int combo
+        +StageSessionStatus status
+        +Instant startedAt
+        +Instant endedAt
+        +Instant pausedAt
+        +long totalPausedMs
+    }
+    class StageQuestion {
+        +Long stageQuestionId
+        +Long stageSessionId
+        +Long questionId
+        +int questionOrder
+        +Instant startedAt
+        +Instant answeredAt
+        +Instant pausedAt
+        +long totalPausedMs
+    }
+    class AnswerHistory {
+        +Long answerHistoryId
+        +Long gameSessionId
+        +Long stageSessionId
+        +Long stageQuestionId
+        +boolean correct
+        +boolean timeout
+        +long answerTimeMs
+    }
+    class AnswerHistoryChoice {
+        +Long id
+        +Long answerHistoryId
+        +Long choiceId
+    }
+    class AnswerController {
+        +submitAnswer()
+    }
+    class AnswerService {
+        +judgeAnswer()
+        +updateStage()
+        +saveHistory()
+    }
+    class GameSessionService {
+        +createSession()
+        +pause()
+        +resume()
+        +abandon()
+    }
+    class StageQuestionRepository {
+        +findById()
+    }
+    class QuestionRepository {
+        +findById()
+    }
+    class StageSessionRepository {
+        +findById()
+        +save()
+    }
+    class GameSessionRepository {
+        +findById()
+        +save()
+    }
+    class AnswerHistoryRepository {
+        +save()
+    }
+    class AnswerHistoryChoiceRepository {
+        +save()
+    }
+    class QuestionType {
+        <<enumeration>>
+        SINGLE_A_E
+        SINGLE_A_G
+        MULTIPLE_2_A_E
+        MULTIPLE_2_A_G
+        MULTIPLE_3_A_G
+        CODE_SINGLE_A_E
+        CODE_MULTIPLE_2_A_G
+    }
+    class MiniGameType {
+        <<enumeration>>
+        TYPING_SAMURAI
+        CODE_TARGET
+    }
+    class GameSessionStatus {
+        <<enumeration>>
+        PLAYING
+        PAUSED
+        COMPLETED
+        ABANDONED
+    }
+    class StageSessionStatus {
+        <<enumeration>>
+        PLAYING
+        PAUSED
+        CLEARED
+        ABANDONED
+    }
+
+    Chapter --> Question
+    Question --> Choice
+    Chapter --> StageDefinition
+    StageDefinition --> MiniGameType
+    GameSession --> StageSession
+    StageSession --> StageDefinition
+    StageSession --> StageQuestion
+    StageQuestion --> Question
+    GameSession --> AnswerHistory
+    StageSession --> AnswerHistory
+    StageQuestion --> AnswerHistory
+    AnswerHistory --> AnswerHistoryChoice
+    AnswerHistoryChoice --> Choice
+    Question --> QuestionType
+    GameSession --> GameSessionStatus
+    StageSession --> StageSessionStatus
+    AnswerController --> AnswerService
+    AnswerService --> StageQuestionRepository
+    AnswerService --> QuestionRepository
+    AnswerService --> StageSessionRepository
+    AnswerService --> GameSessionRepository
+    AnswerService --> AnswerHistoryRepository
+    AnswerService --> AnswerHistoryChoiceRepository
 ```
 
-`enemyCurrentHp` をStageマスターに持たせず、プレイ中の状態として `StageSession` に保持する。
+`QuestionProgress`はMVPのクラス図・Entity・Repositoryには含めません。将来の学習進捗機能で追加します。
 
-## 24.3 制限時間
+## 33.1 Javaクラス名
 
-要求：問題ごとに時間が異なる。
+### Controller
 
-設計：
+`ChapterController`, `GameSessionController`, `AnswerController`, `ResultController`, `ReviewController`
 
-```text
-Question.timeLimitSeconds
+### Service
+
+`ChapterService`, `GameSessionService`, `AnswerService`, `ResultService`, `ReviewService`
+
+### Repository（MVP）
+
+`ChapterRepository`, `QuestionRepository`, `ChoiceRepository`, `StageDefinitionRepository`, `GameSessionRepository`, `StageSessionRepository`, `StageQuestionRepository`, `AnswerHistoryRepository`, `AnswerHistoryChoiceRepository`
+
+### Entity（MVP）
+
+`Chapter`, `Question`, `Choice`, `StageDefinition`, `GameSession`, `StageSession`, `StageQuestion`, `AnswerHistory`, `AnswerHistoryChoice`
+
+### Enum（MVP）
+
+`QuestionType`, `MiniGameType`, `GameSessionStatus`, `StageSessionStatus`
+
+### 将来拡張
+
+`QuestionProgress`はMVPでは実装しません。学習進捗機能を追加するときにEntity・Repository・Serviceを追加します。
+
+## 33.2 回答処理の詳細クラス図
+
+回答を送信したときに実際に呼び出すJavaクラスだけを抜き出した図です。
+
+```mermaid
+classDiagram
+    class AnswerController {
+        +submitAnswer()
+    }
+    class AnswerService {
+        +judgeAnswer()
+        +updateStage()
+        +saveHistory()
+    }
+    class StageQuestionRepository {
+        +findById()
+    }
+    class QuestionRepository {
+        +findById()
+    }
+    class StageSessionRepository {
+        +findById()
+        +save()
+    }
+    class GameSessionRepository {
+        +findById()
+        +save()
+    }
+    class AnswerHistoryRepository {
+        +save()
+    }
+    class AnswerHistoryChoiceRepository {
+        +save()
+    }
+
+    AnswerController --> AnswerService
+    AnswerService --> StageQuestionRepository
+    AnswerService --> QuestionRepository
+    AnswerService --> StageSessionRepository
+    AnswerService --> GameSessionRepository
+    AnswerService --> AnswerHistoryRepository
+    AnswerService --> AnswerHistoryChoiceRepository
 ```
 
-Stageに標準値がある場合は、Questionの個別値を優先する。
+## 34. MiniGame / GameEffectの設計
 
-## 24.4 時間切れ
+### Question / MiniGame / GameEffectの分離
 
-```text
-TIME = 0
- ↓
-入力ロック
- ↓
-不正解確定
- ↓
-履歴保存
- ↓
-コンボ0
- ↓
-解説
- ↓
-次問題
+```mermaid
+flowchart LR
+    Q[Question<br/>何を答えるか]
+    M[MiniGame<br/>どう遊ぶか]
+    J[AnswerService<br/>共通の回答判定]
+    FX[GameEffect<br/>JavaScript側の演出]
+    R[結果<br/>correct / HP / Combo / Score / History]
+
+    Q --> J
+    M --> J
+    J --> R
+    R --> FX
 ```
 
-## 24.5 ステージクリア
+Questionは「何を答えるか」、MiniGameは「どう遊ぶか」、GameEffectは「結果をどう見せるか」を担当します。
 
-```text
-全問回答
-AND
-全問正解
-↓
-STAGE CLEAR
+MVPの`MiniGameType`は`TYPING_SAMURAI`と`CODE_TARGET`の2種類です。`CODE_WACK_A_MOLE`と`CODE_BREAKER`は将来拡張としてのみ扱い、MVPのEnum実装には含めません。
+
+### MVP MiniGame
+
+- `TYPING_SAMURAI`
+- `CODE_TARGET`
+
+MVPではこの2種類を実装します。`CODE_WACK_A_MOLE`と`CODE_BREAKER`は将来追加候補です。
+
+MiniGameを追加する場合は新しいゲーム処理コードを実装します。問題データやStageデータの追加だけで新しいMiniGameが生まれる設計ではありません。
+
+### GameEffect
+
+GameEffectはJavaScript側で実装します。
+
+- 攻撃アニメーション
+- MISS演出
+- TIME UP演出
+- HP表示更新
+- Combo表示更新
+- Perfect演出
+- Stage終了演出
+
+## 35. REST APIの事前確認
+
+### REST APIの位置付け
+
+```mermaid
+flowchart LR
+    B[Browser<br/>HTML / CSS / JavaScript]
+    API[REST API]
+    C[Controller]
+    S[Service]
+    R[Repository]
+    DB[(Database)]
+
+    B -->|HTTP Request / JSON| API
+    API --> C
+    C --> S
+    S --> R
+    R --> DB
+    S --> C
+    C -->|JSON Response| B
 ```
 
-このチェックを、UML・実装・テストケースの共通基準にする。
+APIは画面とJavaをつなぐ窓口です。
 
----
-
-# 24. SOLID / KISS / DRY
-
-## SOLID
-
-特にSRP（単一責任の原則）を意識する。
-
-例えば、QuestionServiceが、
-
-- 問題取得
-- 画面描画
-- スコア計算
-- DB保存
-- 復習処理
-
-をすべて持つ構造を避ける。
-
-必要に応じて、
+### 主ゲームAPI（正規仕様）
 
 ```text
-QuestionService
-AnswerService
-ScoreService
-StageService
-ReviewService
-MiniGameService
-```
-
-などに責務を分ける。
-
-## KISS
-
-必要以上に複雑な仕組みを作らない。
-
-## DRY
-
-正誤判定、タイマー、履歴保存などの共通処理を複数箇所へコピーしない。
-
----
-
-# 25. REST API候補
-
-```text
-GET  /api/questions
-GET  /api/questions/{id}
+POST /api/game-sessions
+POST /api/stage-questions/{stageQuestionId}/start
+GET  /api/game-sessions/{gameSessionId}/current
+GET  /api/stage-questions/{stageQuestionId}
 POST /api/answers
-GET  /api/results/{stageId}
-GET  /api/history
-GET  /api/reviews
-GET  /api/statistics
+POST /api/stage-sessions/{stageSessionId}/pause
+POST /api/stage-sessions/{stageSessionId}/resume
+POST /api/game-sessions/{gameSessionId}/advance-stage
+GET  /api/game-sessions/{gameSessionId}/result
+GET  /api/game-sessions/{gameSessionId}/review
 ```
 
-Python連携を行う場合：
+補助APIとして、Chapter一覧取得とHome終了時のABANDONED処理を実装できます。これらは上記の「主ゲームAPI」には含めません。
 
 ```text
-GET /api/v1/questions/generate
+GET  /api/chapters
+POST /api/game-sessions/{gameSessionId}/abandon
 ```
 
-などを候補とする。
+`/abandon`はHome終了時にのみ使用し、再開対象にはしません。
 
-実際のエンドポイントは設計時に確定する。
+### APIで使うIDのルール
 
----
-
-# 26. AI活用方針
-
-生成AIは**開発補助ツール**として利用する。
-
-## AIを利用する部分
-
-- Java問題の案出し
-- オリジナル問題のバリエーション作成
-- UIアイデア
-- 画面構成
-- 設計の相談
-- エラー原因調査
-- コードレビュー
-- テスト観点の整理
-- READMEの文章整理
-
-## 自分で行う部分
-
-- 要求・仕様の決定
-- UML設計
-- クラス設計
-- Javaコードの入力・実装
-- HTML / CSS / JavaScriptの実装
-- DB設計
-- 実行確認
-- デバッグ
-- リファクタリング
-
-### 開発サイクル
+ゲーム中は`QuestionId`ではなく`StageQuestionId`を基準にします。
 
 ```text
-AIに相談
-  ↓
-内容を理解
-  ↓
-自分で判断
-  ↓
-自分でコードを書く
-  ↓
-実行
-  ↓
-エラー
-  ↓
-AIに原因を相談
-  ↓
-自分で修正
+StageSession
+   ↓
+StageQuestion
+   ↓
+Question
 ```
 
-> **「AIに作ってもらった作品」ではなく、「AIを開発補助として使い、自分で設計・実装・完成させた作品」を目指す。**
+したがって、`nextStageQuestionId`も必ず**StageQuestion ID**です。
 
----
+### POST /api/game-sessions
 
-# 27. 問題作成と著作権方針
+Request：
 
-問題はAIも活用しながら、Java Bronzeの学習範囲を参考に**オリジナル問題**として作成する。
+```json
+{
+  "chapterId": 1,
+  "questionCount": 10
+}
+```
+
+Response：
+
+```json
+{
+  "gameSessionId": 1001,
+  "chapterId": 1,
+  "questionCount": 10,
+  "totalStageCount": 2,
+  "currentStageNumber": 1,
+  "status": "PLAYING"
+}
+```
+
+`questionCount`は5・10・20だけを許可します。
+
+### POST /api/stage-questions/{stageQuestionId}/start
+
+Request bodyは不要です。
+
+成功条件：`startedAt == null` かつ`answeredAt == null`かつ対象StageSessionが`PLAYING`。
+
+このAPIを呼ぶまでTimerは開始しません。`start`成功後にだけJavaScriptが表示Timerを開始します。
+
+処理：
 
 ```text
-AIで問題案を作成
-   ↓
-Javaの仕様・動作を自分で確認
-   ↓
-問題を選別・修正
-   ↓
-DBへ登録
+startedAt = Instant.now()
+StageQuestionを保存
+200 OK
+→ JavaScriptがTimer開始
 ```
 
-特定の試験問題、問題集、学校教材の文章・解説・画像をそのまま転載しない。
+Response：
 
-また、既存ゲームのキャラクター・画面・ロゴ・素材などをそのままコピーしない。
-
-フリー素材を利用する場合は、商用利用、改変、クレジット、再配布、GitHub公開などの利用規約を確認する。
-
-READMEには必要に応じて、次の趣旨を明記する。
-
-> 本アプリに収録している問題は、Javaの学習範囲を参考に制作者が作成したオリジナル問題です。特定の試験問題・問題集の文章や解説を転載したものではありません。
-
----
-
-# 28. 実務を意識した開発方法
-
-## 28.1 アジャイル開発・スクラム的な進め方
-
-学校の納期が決まっているため、1週間程度のタイムボックスで作業範囲を区切り、MVPを優先する。
-
-```text
-Backlog
-   ↓
-Sprint Planning
-   ↓
-実装
-   ↓
-動作確認
-   ↓
-レビュー・振り返り
-   ↓
-次Sprint
+```json
+{
+  "stageQuestionId": 3001,
+  "startedAt": "2026-10-08T00:00:00Z",
+  "remainingTimeMs": 20000
+}
 ```
 
-スクラムの用語を採用する場合でも、学校の短期間開発に合わせた軽量な運用とする。
+すでに開始済みの問題を再StartしてTimerをリセットしてはいけません。
 
-## 28.2 Git / GitHub
+### GET /api/game-sessions/{gameSessionId}/current
 
-タスクを機能単位に分解し、Issue / Projectsを利用できる場合は、
+現在プレイ中の状態を取得します。Refresh後の復元にも使用します。
+`remainingTimeMs`はJava側で現在時刻から再計算して返します。`WAITING_TO_START`ではTimer未開始のため`remainingTimeMs`は`null`、`ANSWERING`ではサーバー計算値を返します。Refresh後もJavaScriptはこの値を基準に表示Timerを再開します。
 
-```text
-Todo
-  ↓
-In Progress
-  ↓
-Review
-  ↓
-Done
+Response：
+
+```json
+{
+  "gameSessionId": 1001,
+  "stageSessionId": 2001,
+  "stageQuestionId": 3001,
+  "questionState": "ANSWERING",
+  "questionNumber": 1,
+  "totalQuestionsInStage": 5,
+  "remainingTimeMs": 20000,
+  "enemyHp": 5,
+  "combo": 0,
+  "score": 0,
+  "gameSessionStatus": "PLAYING",
+  "stageSessionStatus": "PLAYING",
+  "question": {
+    "questionId": 501,
+    "questionType": "SINGLE_A_E",
+    "questionText": "...",
+    "timeLimitSeconds": 20,
+    "shortExplanation": "...",
+    "codeBlock": "...",
+    "choices": [
+      {"choiceId": 12, "choiceText": "A", "choiceOrder": 1},
+      {"choiceId": 13, "choiceText": "B", "choiceOrder": 2}
+    ]
+  },
+  "playerCharacterKey": "SWORDSMAN",
+  "enemyKey": "JAVA_GUARD",
+  "fieldKey": "GRASSLAND",
+  "miniGameType": "CODE_TARGET"
+}
 ```
 
-で管理する。
+`Choice.correct`はクライアントへ返しません。
 
-### コミット例
+### POST /api/answers
 
-```text
-READMEを更新
-トップページを作成
-問題表示機能を実装
-回答判定機能を実装
-回答履歴保存を実装
-ゲーム演出を追加
-レビュー画面を追加
-回答処理のバグを修正
+Request：
+
+```json
+{
+  "stageQuestionId": 3001,
+  "selectedChoiceIds": [12]
+}
 ```
 
-コミット単位を細かくし、何を変更したか分かる履歴を残す。
+複数選択：
 
----
-
-# 29. テスト方針
-
-学校のガイダンスにある導通テストを最低限実施し、余裕があれば単体・結合観点も整理する。
-
-## 主要確認項目
-
-- 問題が正しく出題される
-- 問題がランダムに選ばれる
-- タイマーが動作する
-- 正解を正しく判定する
-- 複数選択を正しく判定する
-- 正解時に演出が出る
-- 敵HPが正しく減る
-- 全問終了でステージクリアになる
-- 回答履歴が保存される
-- 間違えた問題が復習対象になる
-- グラフ・統計値が正しく表示される
-- 次ステージが解放される
-
----
-
-# 30. Must / Should / Could
-
-## 🔴 MUST
-
-- Java Bronze学習システムとして最後まで完成
-- A～E / A～G
-- 単一選択 / 複数選択
-- 問題ごとの制限時間
-- 章・ステージ
-- ステージ内ランダム出題
-- 正誤判定
-- 回答後の短い解説
-- 正解時のゲーム演出
-- ステージクリア演出
-- スコア
-- 回答履歴
-- 間違えた問題の復習
-- グラフ・データによる振り返り
-- DB
-- Java / Spring Boot
-- HTML / CSS / JavaScript
-
-## 🟡 SHOULD
-
-- コンボ
-- タイムアタック
-- 複数の演出パターン
-- バスケ / ボウリング / 釣り / レース等の追加演出
-- サウンド
-- エフェクト
-- 成績グラフ強化
-- 問題管理機能
-- Pythonによる問題データ処理
-
-## 🟢 COULD
-
-- Blender 3D
-- 3Dキャラクター
-- 複雑なエフェクト
-- キャラクター成長
-- Java Silver / Gold
-- オンラインランキング
-- Python / FastAPIによる類似問題生成
-
-> **追加機能より、本体の完成を優先する。**
-
----
-
-# 31. MVP完成条件
-
-以下の一連の流れが最後まで動けばMVP完成とする。
-
-```text
-HOME
- ↓
-CHAPTER
- ↓
-STAGE 1-1
- ↓
-ランダム問題
- ↓
-回答
- ↓
-正誤判定
- ↓
-短い解説
- ↓
-正解ならゲーム演出
- ↓
-スコア / コンボ / HP更新
- ↓
-次の問題
- ↓
-全問終了
- ↓
-STAGE CLEAR
- ↓
-RESULT
- ↓
-間違えた問題の確認
- ↓
-解説・グラフ・再挑戦
+```json
+{
+  "stageQuestionId": 3001,
+  "selectedChoiceIds": [12, 15]
+}
 ```
 
----
+時間切れ：
 
-# 32. 開発スケジュール
+```json
+{
+  "stageQuestionId": 3001,
+  "selectedChoiceIds": []
+}
+```
 
-学校の総合演習スケジュールを基準とする。
+`timeout`はRequestに持たせません。時間切れかどうかはJava側で`startedAt`、`pausedAt`、`totalPausedMs`、現在時刻から判定します。
 
-| 日付 | フェーズ | 内容 |
+### POST /api/answers のResponse
+
+`score`はGameSessionの累積Scoreです。`stageScore`は現在Stageで得たScoreです。
+
+通常の正解：
+
+```json
+{
+  "correct": true,
+  "timeout": false,
+  "enemyHp": 4,
+  "combo": 1,
+  "score": 100,
+  "effectType": "HIT",
+  "stageCorrectCount": 1,
+  "stageScore": 100,
+  "maxCombo": 1,
+  "stageClear": false,
+  "perfect": false,
+  "nextStageQuestionId": 3002
+}
+```
+
+不正解：
+
+```json
+{
+  "correct": false,
+  "timeout": false,
+  "enemyHp": 5,
+  "combo": 0,
+  "score": 0,
+  "effectType": "MISS",
+  "stageCorrectCount": 0,
+  "stageScore": 0,
+  "maxCombo": 0,
+  "stageClear": false,
+  "perfect": false,
+  "nextStageQuestionId": 3002
+}
+```
+
+時間切れ：
+
+```json
+{
+  "correct": false,
+  "timeout": true,
+  "enemyHp": 5,
+  "combo": 0,
+  "score": 0,
+  "effectType": "TIME_UP",
+  "stageCorrectCount": 0,
+  "stageScore": 0,
+  "maxCombo": 0,
+  "stageClear": false,
+  "perfect": false,
+  "nextStageQuestionId": 3002
+}
+```
+
+5問目でStage Clear / Perfect：
+
+```json
+{
+  "correct": true,
+  "timeout": false,
+  "enemyHp": 0,
+  "combo": 5,
+  "score": 500,
+  "effectType": "PERFECT",
+  "stageCorrectCount": 5,
+  "stageScore": 500,
+  "maxCombo": 5,
+  "stageClear": true,
+  "perfect": true,
+  "nextStageQuestionId": null
+}
+```
+
+`effectType=PERFECT`はStage 5問目かつ5/5正解のときのみ使用します。
+
+### その他のResponse DTO
+
+Game Result画面は、結果を確認するエリアとReviewへ進むためのエリアを分けて表示します。Reviewへ進むことで、各問題の詳しい振り返りを行えます。
+
+`ResultResponse`：
+
+```json
+{
+  "gameSessionId": 1001,
+  "questionCount": 20,
+  "totalStageCount": 4,
+  "completedStageCount": 4,
+  "totalCorrectCount": 15,
+  "totalScore": 1500,
+  "perfectStageCount": 2,
+  "status": "COMPLETED"
+}
+```
+
+`ReviewResponse`：
+
+```json
+{
+  "items": [
+    {
+      "stageQuestionId": 3001,
+      "questionText": "...",
+      "selectedChoiceIds": [12],
+      "correctChoiceIds": [15],
+      "correct": false,
+      "timeout": false,
+      "answerTimeMs": 8420,
+      "detailedExplanation": "..."
+    }
+  ]
+}
+```
+
+`ErrorResponse`：
+
+```json
+{
+  "code": "ALREADY_ANSWERED",
+  "message": "この問題はすでに回答されています。"
+}
+```
+
+### HTTPステータス
+
+| Status | 意味 | 例 |
 |---|---|---|
-| 10/2 | 企画 | 検討項目1～5 第1版 |
-| 10/6 | 要求 | 要求モデル完成 |
-| 10/9 | 分析 | 分析モデル完成 |
-| 10/13 | 設計 | 設計モデル完成（オプション） |
-| 10/14 | 実装 | プログラミング開始 |
-| 10/20頃 | Sprint | コア機能・ゲーム機能実装 |
-| 10/25頃 | MVP | 一連の学習フローを完成 |
-| 10/26 | 品質向上 | 動作確認・デバッグ・リファクタリング |
-| 10/28 | 納品 | 納品・発表資料作成 |
-| 10/29 | 発表 | プレゼン・実演 |
+| `200 OK` | 正常処理 | 回答、Pause、Resume、Result取得など |
+| `400 Bad Request` | リクエスト不正 | 必須項目不足、無効なquestionCount |
+| `404 Not Found` | 対象なし | StageQuestionが存在しない |
+| `409 Conflict` | 状態不整合 | すでに回答済み、PAUSED中に回答など |
 
----
+## 35.1 実装固定仕様（AIコーディング用 Source of Truth）
 
-# 33. 現在の開発状況
+この節は、**実際にJava / Spring Boot / JPA / JavaScriptを実装するときの最優先ルール**です。クラス図・過去の図・例示JSONと内容が異なる場合、この節を正とします。
 
-> 実際の進捗に合わせてこの表を更新する。
+### 35.1.1 状態と責任範囲
 
-| 項目 | 状況 |
-|---|---|
-| 企画 | ✅ 方針整理済み |
-| コンセプト | ✅ 決定 |
-| Must / Should / Could | ✅ 整理済み |
-| 問題形式 | ✅ 方針決定 |
-| ゲーム演出案 | ✅ 整理済み |
-| 要求モデル | 🔄 作成中 |
-| 分析モデル | ⏳ |
-| 設計モデル | ⏳ |
-| DB設計 | ⏳ |
-| Java / Spring Boot | ⏳ |
-| HTML / CSS / JavaScript | ⏳ |
-| ゲーム演出 | ⏳ |
-| 履歴・復習 | ⏳ |
-| テスト | ⏳ |
-| Blender / 3D | ⏳ 追加候補 |
-
----
-
-# 34. 今後の詳細設計で決める項目
-
-基本的な業務ルールは上記で確定した。残りは実装規模・UI・データ量に関する詳細設計で決定する。
-
-- 実際の問題数とQuestion Poolの件数
-- Java Bronzeの学習範囲ごとの具体的な問題配分
-- 各問題の具体的な制限時間
-- 問題の重複出題防止ルール
-- スコア演出・残り時間ボーナスをMVPに入れるか
-- 具体的なゲーム演出パターンと素材
-- 効果音・BGMの有無
-- ユーザー認証をMVPに含めるか
-- Python / FastAPIをMVPに含めるか
-- DBのINDEX・UNIQUE・FKなどの物理設計
-- APIの詳細なrequest / response形式
-- 長文問題のスクロール量・レスポンシブ表示
-
-**ここにある項目は「基本仕様が未定」という意味ではなく、実装時に具体値を決める詳細設計項目である。**
-
----
-# 35. ポートフォリオとして伝えたいこと
-
-この作品では、ゲームの見た目だけではなく、開発プロセス全体を説明できることを重視する。
-
-### 企画
-
-なぜJava学習システムを作るのか。
-
-### 要求
-
-ユーザーが何をしたいのか。
-
-### 分析
-
-画面・処理・データをどう分けるのか。
-
-### 設計
-
-責務を分離し、拡張しやすくするにはどうするのか。
-
-### 実装
-
-Java / Spring Boot / JavaScript / DBをどう連携させるのか。
-
-### 品質
-
-Git、テスト、デバッグ、リファクタリングをどう行うのか。
-
-### AI
-
-AIをどこに使い、どこを自分で判断・実装したのか。
-
----
-
-# 36. SES / SE向けの技術的な見どころ
-
-本システムでは、
-
-- Java / Spring Boot
-- 3層アーキテクチャ
-- DB設計
-- REST API
-- UML
-- ロバストネス図
-- シーケンス図
-- クラス図
-- SOLID
-- KISS
-- DRY
-- Git / GitHub
-- アジャイル的なタスク管理
-- AIの開発補助利用
-- UI / UX
-- データ分析・復習
-
-を、小規模な一つのWebシステムの中で実践する。
-
-特に、
-
-> **問題データとゲーム演出を分離し、正解イベントを共通化する。**
-
-ことで、新しい演出を追加しても問題判定・回答履歴・学習管理への影響を抑える設計を目指す。
-
----
-
-# 37. 最終コンセプト
-
-## JAVA QUEST
-### Javaを、遊びながら身につけよう。
-
-**Java Bronze学習 × 選択式問題 × 時間制限 × ランダム出題 × ゲーム演出 × 成績管理 × 復習**
-
-を組み合わせたJava学習管理システム。
-
-1問正解するたびに、
+問題1問の状態は次の4段階で固定します。
 
 ```text
-🥷 攻撃
-🏀 シュート
-🎣 釣る
-🎳 倒す
-🏎️ 追い抜く
-🚆 追い抜く
-🐧 捕まえる
+WAITING_TO_START
+    ↓ Enter
+POST /api/stage-questions/{stageQuestionId}/start
+    ↓ 200 OK
+ANSWERING
+    ↓ 回答キー / Enter / TIME UP
+SUBMITTING
+    ↓ POST /api/answers
+RESULT
+    ↓ 次の問題
+WAITING_TO_START
 ```
 
-など、ゲーム内の世界が動く。
+- `WAITING_TO_START`：問題は表示済みだがTimerは開始しない
+- `ANSWERING`：Timer表示中。単一選択はキー入力で送信、複数選択はEnterで送信
+- `SUBMITTING`：送信中。A～G・Enter・送信操作をすべてロック
+- `RESULT`：回答結果とGameEffectを表示し、次問題またはStage Resultへ進む
 
-全問終了後には、
+正誤・時間・HP・Combo・Score・Stage Clear・PerfectはJava側が正です。JavaScriptは入力・表示・Timer表示・演出だけを担当します。
+
+### 35.1.2 日時型・経過時間の型
 
 ```text
-正答率
-回答時間
-苦手カテゴリ
-間違えた問題
-問題文
-解説
-再挑戦
+日時        = java.time.Instant
+経過時間    = Long（ミリ秒）
+秒数        = Integer / int
 ```
 
-を確認できる。
+`startedAt`、`answeredAt`、`pausedAt`、`endedAt`は`Instant`で統一します。`totalPausedMs`、`answerTimeMs`、`remainingTimeMs`はミリ秒の`Long`で統一します。
 
-**「答えること」と「ゲームが進むこと」を一つにつなげることで、反復学習を続けやすくする。**
+IDは全Entityで`Long`を使用し、DBの自動採番（`GenerationType.IDENTITY`）を基本とします。`answerHistoryId`の大小だけを最新判定の根拠にはしません。最新のAnswerHistoryは`answeredAt DESC`、同値の場合は`answerHistoryId DESC`で決定します。
+### 35.1.3 JPAリレーション固定
 
----
+MVPの関連は次のとおりです。
 
-# 38. 開発上の基本ルール
+```text
+Chapter 1 ── * Question
+Question 1 ── * Choice
+Chapter 1 ── * StageDefinition
+GameSession 1 ── * StageSession
+StageDefinition 1 ── * StageSession
+StageSession 1 ── 5 StageQuestion
+StageQuestion * ── 1 Question
+GameSession 1 ── * AnswerHistory
+StageSession 1 ── * AnswerHistory
+StageQuestion 1 ── 0..1 AnswerHistory
+AnswerHistory 1 ── * AnswerHistoryChoice
+AnswerHistoryChoice * ── 1 Choice
+```
 
-1. まず動くものを作る。
-2. 1つの機能を完成させてから次へ進む。
-3. AIの出力を理解せずコピーしない。
-4. エラーは原因を理解してから修正する。
-5. 共通処理をコピーして増やさない。
-6. 必要以上に機能を増やさない。
-7. 既存作品の文章・キャラクター・画面をそのままコピーしない。
-8. Blender等の追加要素より本体完成を優先する。
-9. 未実装の機能を実装済みとしてREADMEに書かない。
-10. READMEは開発状況に合わせて更新する。
+JPA実装方針：
 
----
+- 子Entity側の`@ManyToOne`を基本とする
+- MVPでは不要な双方向リレーションを作らない
+- ControllerからEntityを直接JSON返却しない。必ずDTOを使用する
+- `CascadeType.ALL`を安易に付けない
+- 親Entityの削除によって問題マスタまで消える設計にしない
 
-# 39. README更新履歴
+推奨する基本形：
 
-## 2026/10/05
+```java
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "chapter_id", nullable = false)
+private Chapter chapter;
+```
 
-- Java Bronze学習管理システムとして全体方針を整理
-- 短い問題だけでなく長文問題にも対応する方針を追加
-- 問題ごと・章ごとの制限時間を設定する方針を整理
-- ステージ内で問題をランダム出題する方針を追加
-- 正解1回ごとに敵HPを減らすステージ進行を整理
-- 正解時の派手な演出、ステージクリア演出を追加
-- 忍者・侍・サラリーマン・医者・学生・小学生などのキャラクター案を整理
-- バスケ・ペンギン・釣り・ボウリング・自動車レース・電車レース等の演出案を整理
-- 問題処理とゲーム演出を分離する設計方針を追加
-- 回答後の短い解説を追加
-- 全問終了後のグラフ・データ・問題・解説による振り返りを追加
-- ロバストネス図・クラス図・シーケンス図を追加
-- Spring Boot 3層アーキテクチャを整理
-- Python / FastAPI連携を「採用時の拡張構想」として整理
-- AI活用方針を整理
-- アジャイル的な開発・Git / GitHubによるタスク管理方針を追加
-- 初心者とSE / SESの双方が読みやすい「概要 → 機能 → 設計 → 実装」の順番に整理
-- 複数選択・HP・時間切れ・ステージクリア条件など、要求と設計モデルの整合性を整理
+`Long chapterId`などのFK列を単なるprimitive値として重複保持するのではなく、JPA上の関連をEntityとして表現します。APIのJSONではIDだけをDTOとして返します。
 
----
+### 35.1.4 Entityの正規項目
 
-## License / Notes
+MVP Entityは**9クラス固定**です。追加Entityを勝手に作りません。
 
-本リポジトリに含まれるコード・問題データ・画像・3D素材等については、各ファイル・素材のライセンスおよび利用規約を確認したうえで利用・公開する。
+```text
+Chapter
+- chapterId
+- name
+- description
+
+Question
+- questionId
+- chapterId（JPAではChapterへの@ManyToOne）
+- questionType
+- questionText
+- codeBlock
+- timeLimitSeconds
+- shortExplanation
+- detailedExplanation
+
+Choice
+- choiceId
+- questionId（JPAではQuestionへの@ManyToOne）
+- choiceText
+- choiceOrder
+- correct（サーバー専用。APIに出さない）
+
+StageDefinition
+- stageId
+- chapterId（JPAではChapterへの@ManyToOne）
+- stageNumber
+- playerCharacterKey
+- enemyKey
+- fieldKey
+- miniGameType
+- maxEnemyHp
+
+GameSession
+- gameSessionId
+- chapterId（JPAではChapterへの@ManyToOne）
+- questionCount
+- totalStageCount
+- currentStageNumber
+- score
+- status
+- startedAt
+- endedAt
+
+StageSession
+- stageSessionId
+- gameSessionId（JPAではGameSessionへの@ManyToOne）
+- stageId（JPAではStageDefinitionへの@ManyToOne）
+- currentQuestionIndex
+- correctCount
+- enemyHp
+- combo
+- status
+- startedAt
+- endedAt
+- pausedAt
+- totalPausedMs
+
+StageQuestion
+- stageQuestionId
+- stageSessionId（JPAではStageSessionへの@ManyToOne）
+- questionId（JPAではQuestionへの@ManyToOne）
+- questionOrder
+- startedAt
+- answeredAt
+- pausedAt
+- totalPausedMs
+
+AnswerHistory
+- answerHistoryId
+- gameSessionId（JPAではGameSessionへの@ManyToOne）
+- stageSessionId（JPAではStageSessionへの@ManyToOne）
+- stageQuestionId（JPAではStageQuestionへの@ManyToOne）
+- correct
+- timeout
+- answerTimeMs
+
+AnswerHistoryChoice
+- id
+- answerHistoryId（JPAではAnswerHistoryへの@ManyToOne）
+- choiceId（JPAではChoiceへの@ManyToOne）
+```
+
+`QuestionProgress`はMVPでは作成しません。`actionPattern`もMVP仕様から削除し、実装しません。
+
+### 35.1.5 時間管理の正規ルール
+
+Timerは問題表示時ではなく、Start API成功後に開始します。
+
+```text
+1. 問題を表示
+2. WAITING_TO_START
+3. Enter
+4. POST /api/stage-questions/{stageQuestionId}/start
+5. JavaがstartedAtを記録
+6. 200 OKを返す
+7. JavaScriptがTimer表示を開始
+```
+
+残り時間の正式な計算式とPause中の計算方法は、第12節「制限時間」を正とします。
+
+実装上の固定ルールは次のとおりです。
+
+* `startedAt`が`null`の場合はTimer未開始です。
+* `remainingTimeMs == null`の場合、JavaScriptは初期表示だけを行い、カウントダウンを開始しません。
+* Start APIが`200 OK`を返した後にだけTimer表示を開始します。
+* Refresh時は`GET /api/game-sessions/{gameSessionId}/current`の返却値を基準に表示を復元します。
+* Pause中は`StageQuestion.pausedAt`を基準に残り時間を固定します。
+* 回答API受信時にはJava側で残り時間を再計算します。
+* 残り時間が0以下なら、選択肢の正誤判定よりもTIME UP判定を優先します。
+* 時間が残っている場合の空配列送信は`400 INVALID_ANSWER_COUNT`とします。
+* JavaScriptのローカルTimerだけで時間切れや正解を確定しません。
+
+`answerTimeMs`は第12節で定義した計算式に従い、ミリ秒の`long`として管理します。
+
+経過時間が何らかの理由で負数になった場合は`0L`として扱います。
+
+
+### 35.1.6 Start APIの二重実行防止
+
+`POST /api/stage-questions/{stageQuestionId}/start`は次の場合だけ成功します。
+
+```text
+startedAt == null
+answeredAt == null
+StageSession.status == PLAYING
+```
+
+すでに`startedAt`が設定されている問題を再StartしてTimerをリセットしてはいけません。再Startは`409 INVALID_GAME_STATE`とします。
+
+### 35.1.7 Pause / Resumeの正規ルール
+
+Pauseは回答中の問題に対してのみ可能です。`WAITING_TO_START`、`SUBMITTING`、`RESULT`ではPauseできません。
+
+APIの成功条件は、GameSessionとStageSessionがともに`PLAYING`であり、対象のStageQuestionが開始済み・未回答で、まだPauseされていないことです。
+
+### Pause時
+
+```text
+pauseStartedAt = 現在時刻
+
+GameSession.status = PAUSED
+StageSession.status = PAUSED
+
+StageSession.pausedAt = pauseStartedAt
+StageQuestion.pausedAt = pauseStartedAt
+```
+
+`StageSession.pausedAt`と`StageQuestion.pausedAt`には、同じ`Instant`の値を設定します。
+
+### Resume時
+
+```text
+resumedAt = 現在時刻
+
+pauseDurationMs =
+    max(0, resumedAt - StageQuestion.pausedAt)
+
+StageSession.totalPausedMs += pauseDurationMs
+StageQuestion.totalPausedMs += pauseDurationMs
+
+StageSession.pausedAt = null
+StageQuestion.pausedAt = null
+
+GameSession.status = PLAYING
+StageSession.status = PLAYING
+```
+
+日時の差はミリ秒で計算します。Resume APIはGameSessionとStageSessionがともに`PAUSED`で、必要なPause時刻が設定されている場合にのみ成功します。
+
+### Pause時間の管理
+
+* `StageQuestion.totalPausedMs`は、その問題の残り時間と回答時間の計算に使用します。
+* `StageSession.totalPausedMs`は、Stage全体のPause時間の記録として保持します。
+* Pause中は`StageQuestion.pausedAt`を使って残り時間を固定します。
+* Resume時にはPause時間を両方の累積値に加算します。
+* Pause中は回答を受け付けず、Timer表示も停止します。
+
+GameSessionとStageSessionの状態遷移は次のとおりです。
+
+| 操作     | GameSession.status        | StageSession.status |
+| ------ | ------------------------- | ------------------- |
+| 通常プレイ中 | `PLAYING`                 | `PLAYING`           |
+| Pause  | `PAUSED`                  | `PAUSED`            |
+| Resume | `PLAYING`                 | `PLAYING`           |
+| ゲーム終了  | `COMPLETED`または`ABANDONED` | 終了条件に応じた状態          |
+
+Pause／Resume処理はサーバー側で管理します。画面側の状態表示だけを切り替えてPauseが完了したことにはせず、API成功後に状態を更新します。
+
+### 35.1.8 回答APIの正規処理順
+
+`POST /api/answers`は`@Transactional`で処理します。
+
+```text
+1. StageQuestionを取得
+2. 対象のGameSession / StageSession / StageQuestionの状態を確認
+3. AnswerHistoryが既に存在するか確認
+4. 存在する場合は409 ALREADY_ANSWERED
+5. 開始済み・未回答であることを確認
+6. Java側で残り時間を再計算
+7. 残り時間が0以下ならTIME UPとして処理
+8. 時間が残っていてselectedChoiceIdsが空配列なら400 INVALID_ANSWER_COUNT
+9. QuestionTypeに応じて選択数とChoiceの所属を検証
+10. 正解集合と選択集合を完全一致で比較
+11. StageSessionを更新
+12. GameSessionを更新
+13. AnswerHistoryを保存
+14. AnswerHistoryChoiceを保存
+15. 5問目ならStage Clear / Perfectを確定
+16. AnswerResponseを返す
+```
+
+TIME UPは`correct=false`、HP変更なし、Combo=0、Score加算なしです。
+
+回答APIでは、GameSessionとStageSessionが`PLAYING`であること、対象のStageQuestionが開始済みで未回答であることを確認します。Pause中の問題や、現在の進行状態と一致しない問題への回答は受け付けません。
+
+複数選択は集合の完全一致で判定します。順番は無視し、部分点はありません。時間が残っている状態で必要数より少ない、または多い選択をした場合は`400 INVALID_ANSWER_COUNT`とします。
+
+`selectedChoiceIds=[]`の場合でも、時間切れ判定を行う前に無条件にTIME UPとして扱ってはいけません。
+
+同時送信によって二重回答が発生しないよう、UIロック・Serviceの回答済み確認・DB UNIQUE制約を併用します。DB制約違反が二重回答によるものと確認できた場合は、`409 ALREADY_ANSWERED`として返します。
+
+
+### 35.1.9 二重回答防止の3層構造
+
+```text
+第1層：JavaScript
+→ SUBMITTING中はA～G / Enterをロック
+
+第2層：Service
+→ AnswerHistory存在チェック
+→ 存在すれば409 ALREADY_ANSWERED
+
+第3層：DB
+→ AnswerHistory.stageQuestionId UNIQUE
+```
+
+DB UNIQUEはレースコンディションに対する最終防衛線です。
+
+回答処理のトランザクション単位は次です。
+
+```text
+StageSession更新
+→ GameSession更新
+→ AnswerHistory保存
+→ AnswerHistoryChoice保存
+```
+
+途中で失敗した場合はトランザクション全体をロールバックします。
+
+### 35.1.10 Stage進行の正規ルール
+
+```text
+GameSession開始
+↓
+Stage 1を作成
+↓
+StageQuestionを5件作成
+↓
+Stage 1をプレイ
+↓
+5問目回答
+↓
+Stage Result
+↓
+残りStageあり？
+ ├─ Yes → POST /api/game-sessions/{id}/advance-stage
+ │         ↓
+ │       次StageSession作成
+ │       StageQuestionを5件作成
+ │         ↓
+ │       次StageのGameへ
+ └─ No  → Game Result
+```
+
+GameSession開始時に20問すべてのStageQuestionを一括作成しません。**最初はStage 1の5件だけ作成し、以後はadvance-stageで5件ずつ作成**します。
+
+ただしGameSession開始時には、Chapterの未使用問題数が`questionCount`以上あることを確認します。不足する場合は`409 INSUFFICIENT_QUESTIONS`としてGameSessionを作成しません。
+
+`advance-stage`は次の条件でのみ成功します。
+
+```text
+- 現在StageSession.status == CLEARED
+- GameSessionに未作成の次Stageが存在する
+- 次Stageが同一GameSession内でまだ作成されていない
+```
+
+同じStageを二重作成しないため、DBに`UNIQUE(gameSessionId, stageId)`を設定します。
+
+### 35.1.11 Stage Clear / Perfectの正規ルール
+
+Stage Clearは**敵HPではなく5問回答完了**で判定します。
+
+```text
+5問すべて回答完了
+→ StageSession.status = CLEARED
+→ Stage Result
+```
+
+Perfectは次の条件だけです。
+
+```text
+StageQuestion 5件のcorrectがすべてtrue
+→ perfect = true
+→ effectType = PERFECT
+```
+
+4/5正解、3/5正解などでもStageはClearします。敵HPは5から正解数に応じて減りますが、Stage Clear条件そのものではありません。
+
+Perfectによる追加Scoreはありません。通常どおり正解1問につき+100です。
+
+### 35.1.12 Question選択アルゴリズム
+
+同一GameSession内では同じQuestionを再利用しません。
+
+問題をStage用に選ぶときは、まず現在GameSessionで既に使用したQuestionを除外します。その後、**全過去回答履歴のうちQuestionごとの最新AnswerHistory**を確認します。Questionごとの「最新AnswerHistory」は、`answeredAt DESC`、同値の場合は`answerHistoryId DESC`で1件を決定します。`answerHistoryId`の最大値だけでは最新判定しません。
+
+優先順位：
+
+```text
+1. UNANSWERED
+   AnswerHistoryが1件もない
+
+2. REVIEW
+   最新AnswerHistoryが
+   correct=false または timeout=true
+
+3. CLEARED
+   最新AnswerHistoryが
+   correct=true かつ timeout=false
+```
+
+選択手順：
+
+```text
+1. Chapter内のQuestionを取得
+2. 現在GameSessionですでに使用したQuestionを除外
+3. Questionごとの最新AnswerHistoryを確認
+4. UNANSWERED / REVIEW / CLEAREDへ分類
+5. UNANSWERED → REVIEW → CLEAREDの順に取得
+6. 各グループ内をシャッフル
+7. 必要数5件を選択
+8. 5件未満しか残らなければ409 INSUFFICIENT_QUESTIONS
+9. questionOrder=1～5でStageQuestionを作成
+```
+
+### 35.1.13 API / DTOの命名固定
+
+`CurrentGameResponse`は、現在の問題状態を`questionState`で返します。
+
+Javaクラス名・JSONキー・JavaScriptの参照名を次の名前から変更しません。
+
+```text
+GameSessionCreateRequest
+- chapterId
+- questionCount
+
+AnswerRequest
+- stageQuestionId
+- selectedChoiceIds
+
+AnswerResponse
+- correct
+- timeout
+- enemyHp
+- combo
+- score
+- effectType
+- stageClear
+- perfect
+- stageCorrectCount
+- stageScore
+- maxCombo
+- nextStageQuestionId
+
+CurrentGameResponse
+- gameSessionId
+- stageSessionId
+- stageQuestionId
+- questionState
+- questionNumber
+- totalQuestionsInStage
+- remainingTimeMs
+- enemyHp
+- combo
+- score
+- gameSessionStatus
+- stageSessionStatus
+- question
+- playerCharacterKey
+- enemyKey
+- fieldKey
+- miniGameType
+
+StartStageQuestionResponse
+- stageQuestionId
+- startedAt
+- remainingTimeMs
+
+AdvanceStageResponse
+- gameSessionId
+- currentStageNumber
+- stageSessionId
+- stageQuestionId
+- status
+
+ResultResponse
+- gameSessionId
+- questionCount
+- totalStageCount
+- completedStageCount
+- totalCorrectCount
+- totalScore
+- perfectStageCount
+- status
+```
+
+回答時の演出結果は`effectType`で固定します。
+
+```text
+HIT
+MISS
+TIME_UP
+PERFECT
+```
+
+`PERFECT`は5問目かつ5/5正解のときに使用し、それ以外の正解は`HIT`です。
+
+### 35.1.14 ErrorResponse / HTTPステータス固定
+
+```json
+{
+  "code": "ALREADY_ANSWERED",
+  "message": "この問題はすでに回答されています。"
+}
+```
+
+主なHTTPステータス：
+
+| Status | code例 | 用途 |
+|---|---|---|
+| 200 | - | 正常 |
+| 400 | INVALID_REQUEST / INVALID_ANSWER_COUNT | 入力不正 |
+| 404 | NOT_FOUND | ID不存在 |
+| 409 | ALREADY_ANSWERED | 二重回答 |
+| 409 | INVALID_GAME_STATE | 状態不正 |
+| 409 | INSUFFICIENT_QUESTIONS | 問題不足 |
+
+### 35.1.15 DB UNIQUE制約固定
+
+最低限、次をDB制約として定義します。
+
+```text
+UNIQUE(stageSessionId, questionOrder)
+UNIQUE(stageSessionId, questionId)
+UNIQUE(stageQuestionId)                       // AnswerHistory
+UNIQUE(answerHistoryId, choiceId)             // AnswerHistoryChoice
+UNIQUE(gameSessionId, stageId)                 // StageSession
+```
+
+同一GameSession内のQuestion再利用禁止はService側で制御します。
+
+### 35.1.16 Repositoryの最小責務
+
+AIがRepositoryに不要な処理を追加しないよう、MVPで必要なDB操作を次に固定します。
+
+Repositoryの検索メソッドは、EntityのJavaプロパティとJPAリレーションに一致させます。外部キーを数値として直接保持するのではなく、関連Entityをたどって検索します。
+
+#### Javaプロパティ名の固定
+
+Repositoryのメソッド名は、次の関連フィールドを前提とします。
+
+| Entity          | Javaプロパティ     |　関連先　　　　　 |
+| --------------- | ----------------- | --------------- |
+| Question        | `chapter`         | Chapter         |
+| Choice          | `question`        | Question        |
+| StageDefinition | `chapter`         | Chapter         |
+| StageSession    | `gameSession`     | GameSession     |
+| StageSession    | `stageDefinition` | StageDefinition |
+| StageQuestion   | `stageSession`    | StageSession    |
+| StageQuestion   | `question`        | Question        |
+| AnswerHistory   | `gameSession`     | GameSession     |
+| AnswerHistory   | `stageSession`    | StageSession    |
+| AnswerHistory   | `stageQuestion`   | StageQuestion   |
+| AnswerHistoryChoice | `answerHistory` | AnswerHistory |
+| AnswerHistoryChoice | `choice`        | Choice        |
+
+これらの関連フィールド名を、Repositoryのメソッド名と一致させます。必要なフィールドは既存のEntity仕様に従って実装し、別の関連フィールドを勝手に追加しません。
+
+#### Repositoryごとの最小責務
+
+```text
+ChapterRepository
+- findAll()
+- findById()
+
+QuestionRepository
+- findByChapter_ChapterId(Long chapterId)
+- findById()
+
+ChoiceRepository
+- findByQuestion_QuestionIdOrderByChoiceOrder(Long questionId)
+
+StageDefinitionRepository
+- findByChapter_ChapterIdAndStageNumber(
+    Long chapterId,
+    int stageNumber
+  )
+
+GameSessionRepository
+- findById()
+- save()
+
+StageSessionRepository
+- findById()
+- existsByGameSession_GameSessionIdAndStageDefinition_StageId(
+    Long gameSessionId,
+    Long stageId
+  )
+- save()
+- findByGameSession_GameSessionId(Long gameSessionId)
+
+StageQuestionRepository
+- findById()
+- findByStageSession_StageSessionIdAndQuestionOrder(
+    Long stageSessionId,
+    int questionOrder
+  )
+- findByStageSession_StageSessionIdOrderByQuestionOrder(
+    Long stageSessionId
+  )
+- saveAll()
+- findByStageSession_GameSession_GameSessionId(Long gameSessionId)
+
+AnswerHistoryRepository
+- existsByStageQuestion_StageQuestionId(
+    Long stageQuestionId
+  )
+- findFirstByStageQuestion_Question_QuestionIdOrderByAnsweredAtDescAnswerHistoryIdDesc(
+    Long questionId
+  )
+- save()
+- findByGameSession_GameSessionId(Long gameSessionId)
+
+AnswerHistoryChoiceRepository
+- saveAll()
+- findByAnswerHistory_AnswerHistoryId(Long answerHistoryId)
+```
+
+`findAll()`、`findById()`、`save()`、`saveAll()`は、基本的に`JpaRepository`から継承して利用します。独自の検索メソッドを必要以上に追加しません。
+
+#### 関連Entityをたどる検索
+
+例えば、次のメソッドは、指定したChapterに属するQuestionを取得します。
+
+```java
+findByChapter_ChapterId(Long chapterId)
+```
+
+これは、`Question.chapter.chapterId`というプロパティの経路を表します。
+
+また、次のメソッドは、指定したQuestionに対する最新のAnswerHistoryを1件取得します。
+
+```java
+findFirstByStageQuestion_Question_QuestionIdOrderByAnsweredAtDescAnswerHistoryIdDesc(
+    Long questionId
+)
+```
+
+これは、`AnswerHistory.stageQuestion.question.questionId`という経路で検索し、`answeredAt DESC`、同値の場合は`answerHistoryId DESC`の順で最新の1件を取得するためのメソッドです。
+
+最新判定は`answeredAt DESC`、同値の場合は`answerHistoryId DESC`で決定します。`answerHistoryId`の大小だけを最新判定の根拠にはしません。
+
+回答済み確認では、次のメソッドを使用します。
+
+```java
+existsByStageQuestion_StageQuestionId(Long stageQuestionId)
+```
+
+指定したStageQuestionに対するAnswerHistoryが存在するかを確認します。
+
+実装時には、Entityの関連フィールド名とRepositoryメソッド名が一致していることを確認し、アプリケーションの起動テストおよびRepositoryのテストで検証します。
+
+
+## 36. 設計整合性チェック
+
+| ルール | 要求 | 設計 | API | 実装 |
+|---|---:|---:|---:|---:|
+| Stageは自動進行 | ○ | ○ | ○ | 確認 |
+| 1 Stage = 5問 | ○ | ○ | ○ | 確認 |
+| StageQuestion = 5件 | ○ | ○ | ○ | 確認 |
+| 敵HP = 5 | ○ | ○ | ○ | 確認 |
+| 正解でHP -1 | ○ | ○ | ○ | 確認 |
+| 不正解でHP維持 | ○ | ○ | ○ | 確認 |
+| 時間切れでHP維持 | ○ | ○ | ○ | 確認 |
+| 正解でCombo +1 | ○ | ○ | ○ | 確認 |
+| Stage開始でCombo 0 | ○ | ○ | ○ | 確認 |
+| 正解でScore +100 | ○ | ○ | ○ | 確認 |
+| 5問終了でStage Clear | ○ | ○ | ○ | 確認 |
+| 5/5でPerfect | ○ | ○ | ○ | 確認 |
+| PerfectはStage単位 | ○ | ○ | ○ | 確認 |
+| 回答履歴保存 | ○ | ○ | ○ | 確認 |
+| StageQuestionで5問固定 | ○ | ○ | ○ | 確認 |
+| AnswerHistoryChoice保存 | ○ | ○ | ○ | 確認 |
+| miniGameTypeで統一 | ○ | ○ | ○ | 確認 |
+| playerCharacterKey等で管理 | ○ | ○ | ○ | 確認 |
+| GameEffectはJavaScript | ○ | ○ | ○ | 確認 |
+| nextStageQuestionIdはStageQuestionId | ○ | ○ | ○ | 確認 |
+| POST /api/answers Response固定 | ○ | ○ | ○ | 確認 |
+| HTTPステータス固定 | ○ | ○ | ○ | 確認 |
+| Pauseでタイマー停止 | ○ | ○ | ○ | 確認 |
+| Submit中は入力ロック | ○ | ○ | ○ | 確認 |
+| DB重複制約あり | ○ | ○ | ○ | 確認 |
+| Answer処理は@Transactional | ○ | ○ | ○ | 確認 |
+| QuestionProgressはMVP外 | ○ | ○ | ○ | 確認 |
+
+## 37. 回答処理の共通ルール
+
+```mermaid
+flowchart LR
+    A[回答受付] --> B[入力ロック / SUBMITTING]
+    B --> C[StageQuestion確認]
+    C --> D[Question取得]
+    D --> E[正解・時間・選択数判定]
+    E --> F[StageSession更新]
+    F --> G[GameSession更新]
+    G --> H[AnswerHistory保存]
+    H --> I[AnswerHistoryChoice保存]
+    I --> J[AnswerResponse返却]
+    J --> K[JavaScript GameEffect]
+    K --> L[次のStageQuestion]
+```
+
+すべての更新は`AnswerService`のトランザクション内で処理します。
+
+## 38. 二重回答防止
+
+二重回答は、画面・Java・DBの3段階で防止します。
+
+```mermaid
+flowchart TD
+    A[キー入力 / TIME UP] --> B[SUBMITTINGへ変更]
+    B --> C[入力ロック]
+    C --> D[POST /api/answers]
+    D --> E{未回答?}
+    E -->|Yes| F[処理実行]
+    E -->|No| G[409 Conflict]
+```
+
+### UI側
+
+回答送信中はA～G、Enter、送信ボタンを無効化します。
+
+### Service側
+
+対象の`StageQuestion`に対する回答済み状態を確認します。
+
+### DB側
+
+`AnswerHistory.stageQuestionId`を一意にして、同じStageQuestionに2件の回答履歴を保存できないようにします。
+
+### トランザクション
+
+`StageSession更新 → GameSession更新 → AnswerHistory保存 → AnswerHistoryChoice保存`を1つの`@Transactional`処理として扱います。
+
+## 39. データモデル
+
+READMEのクラス図と実装するEntityの項目を完全に一致させます。以下がMVPの正規データモデルです。
+
+### Chapter
+
+`chapterId`, `name`, `description`
+
+### Question
+
+`questionId`, `chapterId`, `questionType`, `questionText`, `codeBlock`, `timeLimitSeconds`, `shortExplanation`, `detailedExplanation`
+
+### Choice
+
+`choiceId`, `questionId`, `choiceText`, `choiceOrder`, `correct`
+
+### StageDefinition
+
+`stageId`, `chapterId`, `stageNumber`, `playerCharacterKey`, `enemyKey`, `fieldKey`, `miniGameType`, `maxEnemyHp`
+
+### GameSession
+
+`gameSessionId`, `chapterId`, `questionCount`, `totalStageCount`, `currentStageNumber`, `score`, `status`, `startedAt`, `endedAt`
+
+### StageSession
+
+`stageSessionId`, `gameSessionId`, `stageId`, `currentQuestionIndex`, `correctCount`, `enemyHp`, `combo`, `status`, `startedAt`, `endedAt`, `pausedAt`, `totalPausedMs`
+
+`currentQuestionIndex`は**1～5**で管理します。
+
+### StageQuestion
+
+`stageQuestionId`, `stageSessionId`, `questionId`, `questionOrder`, `startedAt`, `answeredAt`, `pausedAt`, `totalPausedMs`
+
+`questionOrder`は**1～5**で、1 Stageあたり必ず5件です。
+
+### AnswerHistory
+
+```text
+AnswerHistory
+├─ answerHistoryId
+├─ gameSessionId
+├─ stageSessionId
+├─ stageQuestionId
+├─ correct
+├─ timeout
+└─ answerTimeMs
+```
+
+`answerTimeMs`の単位は**ミリ秒**です。
+
+`StageQuestion → Question`で対象問題を特定できるため、MVPでは`questionId`をAnswerHistoryに重複保存しません。Question選択時もこの関連をJOINして、Questionごとの最新AnswerHistoryを判定します。
+
+### AnswerHistoryChoice
+
+`id`, `answerHistoryId`, `choiceId`
+
+複数選択問題を含め、実際に選ばれたChoiceを保存します。
+
+### QuestionProgress
+
+MVPでは実装しません。将来拡張です。
+
+## 40. QuestionProgressとAnswerHistory
+
+MVPでは`AnswerHistory`だけを使って復習します。
+
+- **AnswerHistory**：過去に何を回答したか
+- **QuestionProgress**：その問題をどの程度習得しているか。将来実装
+
+この2つを分離し、MVPのデータ構造を複雑にしません。
+
+## 41. 学習状態
+
+`QuestionProgress`はMVPでは使用しません。
+
+将来追加する場合は、例えば以下を利用できます。
+
+```text
+UNSEEN → REVIEW → CLEAR → MASTERED
+```
+
+MASTEREDになる条件は、学習進捗機能を実装する段階で決定します。
+
+## 42. 設計上の基本ルール
+
+- 役割を分ける
+- 同じ処理を重複させない
+- 必要以上に複雑にしない
+- Javaのクラス名とREADMEのクラス名を一致させる
+- 画面から直接DBを操作しない
+- 正誤・時間・HP・Combo・ScoreはJava側を正とする
+- GameEffectはJavaScript側だけで担当する
+- キャラクター・敵・フィールドはKeyで管理する
+
+### Enum / Status
+
+- `QuestionType`
+- `MiniGameType`
+- `GameSessionStatus`
+- `StageSessionStatus`
+
+## 43. 画面とゲーム処理の分離
+
+### Java側
+
+- 正誤判定
+- 時間切れ判定
+- HP更新
+- Combo更新
+- Score更新
+- Stage Clear / Perfect判定
+- GameSession / StageSession状態更新
+- AnswerHistory保存
+
+### JavaScript側
+
+- キー入力
+- 入力ロック
+- Timer表示
+- 画面更新
+- キャラクターアニメーション
+- 敵・背景アニメーション
+- GameEffect
+- HP / Combo / Score表示
+
+**JavaScriptだけで正解やScoreを確定しません。**
+
+## 44. 設計から実装への流れ
+
+```mermaid
+flowchart LR
+    A[要求] --> B[Use Case]
+    B --> C[データモデル]
+    C --> D[ロバストネス]
+    D --> E[シーケンス]
+    E --> F[クラス]
+    F --> G[REST API / DTO]
+    G --> H[Java実装]
+    H --> I[HTML / CSS / JavaScript]
+    I --> J[テスト]
+```
+
+各図を「何となく作る」のではなく、前の設計を次の設計へつなげるために使用します。
+
+### 実装開始前の最終チェック
+
+1. **時間管理**：Start API成功後にTimer開始。remainingTimeMsはJava計算。
+2. **JPAリレーション**：子Entity側の`@ManyToOne(fetch = LAZY)`を基本とする。
+3. **DTO/API名**：JSONキー・DTOフィールド・JavaScript参照名を固定。
+4. **Stage進行**：Stage 1をGameSession開始時に作成し、以後はadvance-stageで5問ずつ作成。
+5. **Pause/Resume**：StageQuestionとStageSessionのPause時間を個別に累積。
+6. **二重実行**：UIロック + Service事前チェック + DB UNIQUE。
+7. **Question選択**：UNANSWERED → REVIEW → CLEARED、同一GameSession内重複なし。
+8. **Stage Clear**：5問回答完了でClear。敵HP0はClear条件ではない。
+9. **Perfect**：Stage 5/5のみ。追加点なし。
+10. **TIME UP**：回答API受信時にJava側で残り時間を再計算する。残り時間が0以下の場合はTIME UPとして処理し、時間が残っている状態で空配列が送信された場合は400 INVALID_ANSWER_COUNTとする。
+11. **Entity固定**：MVP 9 Entity。`QuestionProgress` / `actionPattern`は実装しない。
+12. **状態**：`WAITING_TO_START → ANSWERING → SUBMITTING → RESULT`を固定。
+
+## 45. 開発手順
+
+1. Spring Boot起動確認
+2. DB接続
+3. Entity / Enum
+4. Repository
+5. Service
+6. Controller / DTO
+7. `GET /api/game-sessions/{id}/current`まで確認
+8. `POST /api/answers`を実装
+9. 正解でHP 5→4までを実装
+10. JavaScript GameEffectを実装
+11. Stage Clear / Perfect
+12. Stage Result / Game Result
+13. Pause / Resume / Refresh / Abandon
+14. Review
+15. テスト・修正
+
+### 最初の縦切り
+
+```text
+Question
+ ↓
+Repository
+ ↓
+Question API
+ ↓
+Game画面
+ ↓
+Answer API
+ ↓
+AnswerService
+ ↓
+HP 5 → 4
+ ↓
+GameEffect
+```
+
+最初から全機能を一気に作らず、「1問回答してHPが減る」までを縦に完成させてから広げます。
+
+## 46. Git / GitHub
+
+初心者でも変更内容が分かる日本語コミットを使用します。
+
+例：`READMEを初心者向けに更新`、`回答判定処理を追加`、`Stage進行処理を追加`、`ゲーム画面を作成`、`回答履歴の保存処理を追加`
+
+## 47. AI活用方針
+
+AIは補助として使用します。
+
+AIを活用：問題案、解説案、エラー原因調査、設計確認、コードの意味の説明。
+
+自分で理解して行う：Javaコード入力、クラス作成、API実装、HTML/CSS/JavaScript調整、Git操作、テスト、エラー修正。
+
+## 48. 問題データ
+
+既存教材の文章をそのまま大量転載せず、学習用として自分で問題を構成します。
+
+## 49. データ品質
+
+問題文、正解、選択肢、解説、制限時間、複数選択数を確認します。
+
+## 50. テスト
+
+### 必須テスト
+
+- 正解：HP-1 / Combo+1 / Score+100
+- 不正解：HP維持 / Combo0 / Score変化なし
+- TIME UP：HP維持 / Combo0
+- 5問目：Stage Clear判定
+- 5/5：Perfect / HP0
+- 複数選択：正解集合と完全一致
+- Submit中：キー入力が無効
+- 同時送信：409またはDB制約で二重保存されない
+- Pause：タイマー停止
+- Resume：Pause時間を除外して再開
+- Refresh：現在状態を復元
+- Home：GameSession / StageSessionをABANDONED
+- 10問：2 Stage完了
+- 20問：4 Stage完了
+- Stage 1から自動進行する
+
+### APIテスト
+
+- `200 OK`
+- `400 Bad Request`
+- `404 Not Found`
+- `409 Conflict`
+
+## 51. Must / Should / Could
+
+### Must
+
+- Chapter選択
+- 5 / 10 / 20問の選択
+- Stage 1からの自動進行
+- 1 Stage 5問
+- 敵HP5
+- 問題表示
+- キーボード回答
+- 正誤判定
+- Java側時間判定
+- HP / Combo / Score
+- Stage Result / Game Result
+- AnswerHistory
+- AnswerHistoryChoice
+- Review
+- Pause / Resume / Refresh / Abandon
+- 二重回答防止
+- Typing Samurai型 / Code Target
+
+### Should
+
+- Perfect演出
+- MISS時の敵 / 背景反応
+- Stage開始演出
+- Reviewからの再挑戦
+
+### Could
+
+- MiniGame種類追加
+- Blender 3D
+- キャラクター成長
+- ランキング
+- Java Silver / Gold
+
+## 52. 拡張方針
+
+```mermaid
+flowchart LR
+    B[Java Bronze] --> C[Chapter追加]
+    C --> S[Stage追加]
+    S --> Q[Question追加]
+    Q --> M[MiniGame追加]
+    M --> SI[Java Silver]
+    SI --> GO[Java Gold]
+```
+
+データ追加は既存コードへの影響をできるだけ小さくします。
+
+- Chapter / Question / Stage：データ追加中心
+- 新MiniGame：新しいゲーム処理コードが必要
+- Silver / Gold：Question / Chapter / Stageを追加する方向で拡張
+
+## 53. MVP
+
+```text
+Chapter選択
+↓
+5 / 10 / 20問を選択
+↓
+GameSession開始
+↓
+Stage 1から自動進行
+↓
+StageQuestionを5問作成
+↓
+Game
+↓
+回答
+↓
+Javaで正誤・時間判定
+↓
+HP / Combo / Score更新
+↓
+JavaScript GameEffect
+↓
+Stage Result
+↓
+次Stage（10 / 20問の場合）
+↓
+Game Result
+↓
+Review
+```
+
+MVPでは、**StageQuestion = 5、敵HP = 5**を固定します。MiniGameはTyping Samurai型とCode Targetの2種類から開始します。
+
+## 54. 開発スケジュール
+
+```text
+10/02 企画・検討
+10/06 要求整理
+10/09 分析
+10/13 設計
+10/08～10/15 Java Bronzeの問題データ・回答判定・タイマー・Stage進行などのコア機能を完成させて動作確認
+10/16～ UI・デザイン・演出の充実
+10/26 テスト・デバッグ・リファクタリング
+10/28 提出物・発表資料
+10/29 発表
+```
+
+設計を追加し続けず、**このREADMEの実装固定仕様をSource of Truthとして実装へ移ります。**
+
+## 55. 実装優先順位
+
+### 最優先：10月15日まで
+
+- Question / Choice
+- Chapter / Question Pool
+- StageDefinition / StageQuestion
+- GameSession / StageSession
+- AnswerHistory / AnswerHistoryChoice
+- AnswerController / AnswerService
+- `POST /api/answers`
+- タイマーとJava側時間判定
+- HP / Combo / Score
+- Stage自動進行
+- 5 / 10 / 20問のGameSession
+- 問題を最後まで実際に動かすこと
+
+### その後
+
+- Stage Result / Game Result
+- Review
+- Pause / Resume / Refresh / Abandonの仕上げ
+- UI / CSS / デザイン充実
+- Perfect演出
+- MISS時の敵 / 背景反応
+
+### 最後
+
+- キャラクター追加
+- 敵追加
+- MiniGame追加
+- 3D
+- Java Silver / Gold
+- ランキング
+
+## 56. コードを書く前に確認
+
+### 最終12項目チェック
+
+- [x] Stageは自動進行
+- [x] MVPはStageQuestion = 5
+- [x] MVPは敵HP = 5
+- [x] playerCharacterKey / enemyKey / fieldKeyで管理
+- [x] miniGameTypeで統一
+- [x] GameEffectはJavaScript側
+- [x] Pause時間を`pausedAt` / `totalPausedMs`で管理
+- [x] Stage ResultとGame Resultを分離
+- [x] 10 / 20問はStageを複数回進行
+- [x] ComboはStage開始で0
+- [x] PerfectはStage単位
+- [x] QuestionTypeをEnum化
+- [x] GameSessionStatus / StageSessionStatusをEnum化
+- [x] currentQuestionIndexは1～5
+- [x] answerTimeMsはミリ秒
+- [x] API DTOを固定
+- [x] DB UNIQUE制約を固定
+- [x] AnswerServiceを@Transactionalにする
+- [x] Submit中は入力ロック
+- [x] Refresh / Pause / Home / Abandonの状態を固定
+
+### 実装前に迷わないための正規仕様
+
+```text
+Chapter / 5・10・20問選択       = 自由
+StageQuestion   = 1～5の5件
+Enemy HP        = 5
+Combo           = Stage開始時0
+Perfect         = Stage単位
+currentQuestionIndex = 1～5
+answerTimeMs     = ms
+miniGameType    = MiniGameType Enum
+playerCharacterKey / enemyKey / fieldKey = Key文字列
+GameEffect      = JavaScript
+```
+
+## 57. 画面デザイン前に確認
+
+- 問題文とコードが読みやすい
+- A～Gの選択肢が押しやすい
+- 複数選択の選択状態が明確
+- Timerが見える
+- HPが見える
+- Comboが見える
+- Scoreが見える
+- キャラクターが見える
+- 正解・MISS・TIME UPがすぐ分かる
+- SUBMITTING中は入力できない
+- Pause中はタイマーが止まって見える
+- Stage Result / Game Resultの役割が分かる
+- 次のStage / Reviewへの導線が分かる
+
+## 58. 説明するときのポイント
+
+最初は難しい用語ではなく、
+
+> Java Bronzeの問題をゲーム形式で解く学習Webアプリです。
+
+と説明します。
+
+次に、
+
+> 正解するとキャラクターが攻撃し、敵のHPが減ります。1 Stageは5問で、5問すべて正解するとPerfectになります。Stageは自由選択せず、Stage 1から自動進行します。
+
+と説明します。
+
+技術説明は、
+
+> 画面はHTML/CSS/JavaScript、サーバー側はJava/Spring Boot、データはデータベースで管理しています。正誤判定やゲームルールはJava、演出はJavaScriptが担当します。
+
+と説明します。
+
+## 59. ポートフォリオで見せるポイント
+
+この作品では、単にJavaの問題を表示するだけでなく、
+
+```text
+要求整理
+↓
+画面設計
+↓
+データ設計
+↓
+Java / Spring Boot
+↓
+REST API
+↓
+JavaScriptゲーム演出
+↓
+DB保存
+↓
+テスト
+```
+
+まで一通り経験したことを見せます。
+
+特に「Javaでゲームルールを確定し、JavaScriptで結果を演出する」という責任分担を説明できるようにします。
+
+## 60. 現在の設計状態
+
+要求、Use Case、データモデル、データ関係、システム全体像、アーキテクチャ、ロバストネス、シーケンス、クラス図、REST API、DTO、状態遷移、二重回答防止、DB制約、MVP範囲を整理済みとします。
+
+### コーディング開始前の最終状態
+
+```text
+要求
+ ↓
+画面
+ ↓
+データ
+ ↓
+処理
+ ↓
+API / DTO
+ ↓
+Javaクラス
+ ↓
+JavaScript演出
+ ↓
+テスト
+```
+
+ここからは設計を増やすより、実装とテストに進みます。
+
+設計がバグを完全にゼロにするわけではありませんが、README・設計・API・コードで別々のルールが生まれることを防ぐことを目的とします。
+
+## 61. 実装時のルール
+
+1. 小さく動かす
+2. 1機能ずつ実装する
+3. まず1問の縦切りを完成させる
+4. 動いたらコミットする
+5. 分からないコードは確認する
+6. AI生成コードを理解せず使わない
+7. JavaScriptだけで正解やScoreを確定しない
+8. DB制約とTransactionで重複・中途半端な保存を防ぐ
+9. 設計とコードがズレたらどちらかを修正する
+
+## 62. 最終コンセプト
+
+```text
+考える
+↓
+キーを押す
+↓
+SUBMITTING
+↓
+Javaで即判定
+↓
+GameEffect
+↓
+キャラクターが動く
+↓
+敵HPが変化
+↓
+結果が分かる
+↓
+次へ
+```
+
+「考える → キーを押す → すぐ反応 → 次へ」のテンポを保ち、Java Bronze学習をゲームとして繰り返せるようにします。
+
+## 63. 今後追加できる要素
+
+- 新キャラクター
+- 新しい敵
+- 新Stage
+- 新MiniGame
+- Java Silver
+- Java Gold
+- 3Dモデル
+- より派手なエフェクト
+- キャラクター成長
+- ランキング
+- QuestionProgressによる学習進捗
+
+MVP完成後に追加します。
+
+## 64. README更新履歴
+
+### 2026/10/08
+
+- Stage自動進行を正式仕様化
+- MVPのStageQuestion = 5、敵HP = 5を固定
+- MVPのMiniGameをTyping Samurai型＋Code Targetの2種類に絞り、追加MiniGameは将来拡張へ整理
+- ゲーム終了時はセーブせず、HOMEへ戻る前に終了確認を行う仕様を追加
+- Refresh / 再アクセス時は再開確認を行い、選択した場合は現在状態を復元する仕様を整理
+- 10/15までにコアの問題・回答・動作を完成させ、UI・デザインを後から充実させる優先順位を追加
+- Pause時間を`pausedAt` / `totalPausedMs`で管理する方針を追加
+- Stage Result / Game Resultを分離
+- ComboをStage開始時に0へリセット
+- PerfectをStage単位に統一
+- QuestionType / StatusをEnum化
+- currentQuestionIndexを1～5に統一
+- answerTimeMsをミリ秒に統一
+- REST API Request / Response DTOを整理
+- HTTP 200 / 400 / 404 / 409を固定
+- Submit中の入力ロックを仕様化
+- DB UNIQUE制約と`@Transactional`を仕様化
+- Refresh / Pause / Resume / Home / Abandonの状態を仕様化
+- playerCharacterKey / enemyKey / fieldKeyを正式採用
+- GameEffectをJavaScript側の責任として整理
+
+### 2026/10/07
+
+-   ゲーム基本ループ更新
+-   1Stage = 5問に統一
+-   敵HP = 5に統一
+-   Perfect条件統一
+-   正解・不正解・時間切れを統一
+-   データ関係、システム全体像、アーキテクチャを整理
+-   要求モデル、Use Case、ロバストネス分析を整理
+-   回答判定・時間切れ・Stage進行シーケンスを整理
+-   クラス図・Javaクラス名を整理
+-   REST APIのRequest / Response / HTTPステータスを整理
+-   nextStageQuestionIdをStageQuestion IDとして統一
+-   設計整合性チェックを追加
+-   Git / GitHub運用とAI活用方針を整理
+-   実装優先順位を整理
+
+## 65. 用語
+
+  用語               意味
+  ------------------ ------------------------
+  Chapter            学習テーマ
+  Question           問題
+  Stage              5問を遊ぶ単位
+  GameSession        1回のプレイ全体
+  StageSession       現在のStage状態
+  AnswerHistory      過去の回答記録
+  QuestionProgress   問題ごとの学習状態
+  API                画面とJavaをつなぐ窓口
+  Controller         リクエスト受付
+  Service            ゲームルール処理
+  Repository         DBとのやり取り
+  Entity             保存するデータ
+  Boundary           画面
+  Control            処理
+  UML                システムを図で表す方法
+
+## 66. READMEの使い方
+
+コードを書くときはクラス名・データ・API・処理順を確認します。デザインするときは画面遷移・ゲーム画面・操作方法を確認します。説明するときは「何を作るか」「なぜ作るか」「どう動くか」「どう作るか」を確認します。
+
+## 67. 開発開始チェック
+
+``` text
+□ Spring Boot起動
+□ DB接続
+□ Entity
+□ Repository
+□ Service
+□ Controller
+□ API
+□ Question取得
+□ Answer送信
+□ 正誤判定
+□ HP更新
+□ Combo更新
+□ Score更新
+□ AnswerHistory保存
+□ 5問でStage Clear
+□ 5/5でPerfect
+□ 結果画面
+```
+
+## 68. 最終仕様のチェック
+
+実装開始前に、以下がすべて同じ仕様になっていることを確認します。
+
+```text
+README
+ ↕
+データモデル
+ ↕
+クラス図
+ ↕
+シーケンス図
+ ↕
+REST API / DTO
+ ↕
+Java実装
+ ↕
+JavaScript実装
+```
+
+特に以下を1つでも別ルールにしないことを最終チェックとします。
+
+- StageはGameSession開始後に自動進行
+- 1 Stage = 5問
+- StageQuestion = 5件
+- 敵HP = 5
+- ComboはStage開始時0
+- PerfectはStage単位
+- `miniGameType`で統一
+- Keyでキャラクター等を管理
+- GameEffectはJavaScript
+- `StageSession → StageQuestion → Question`
+- `AnswerHistory → AnswerHistoryChoice → Choice`
+- `nextStageQuestionId`はStageQuestion ID
+- 時間切れ判定はJava側
+- Submit中は入力ロック
+- Pause中はタイマー停止
+- 二重回答はUI / Service / DBで防止
+- `@Transactional`で回答処理を一括確定
+- 最新AnswerHistoryは`answeredAt DESC → answerHistoryId DESC`で決定
+
+## 69. 完成の最終目標
+
+Java
+Bronzeを勉強したいが、通常の問題演習だけでは続きにくい人が、ゲーム感覚で何度も問題を解けるWebアプリを完成させます。
+
+まずJava
+Bronze学習ゲームを最後まで完成させることを最優先とし、3Dモデルや高度なエフェクトなどは完成後の追加機能とします。
