@@ -31,6 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+.history/
 
 ### 🔒 実務セキュリティ対策：機密情報の流出防止 ###
 # ローカル開発環境（Local）や本番環境（Prod）の接続パスワード・秘密鍵が書かれたファイル
@@ -38,6 +39,14 @@ build/
 /src/main/resources/application-prod.properties
 /src/main/resources/application-*.properties
 /src/main/resources/application-*.yml
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.log
 
 ### 💻 OS・個人環境のゴミデータ除外 ###
 # MacやWindowsが自動生成する不要なインデックスファイル
