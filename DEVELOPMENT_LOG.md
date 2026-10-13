@@ -29,7 +29,7 @@ Spring Initializrは、選択したJavaのバージョンやライブラリな�
 
 `pom.xml` から、次の設定を確認できる。
 
-- Javaのバージョン：17
+- STEP 1を記録した時点のJavaバージョン：17。現在の設定と更新履歴はSTEP 11を参照。
 - Spring Bootのバージョン：4.1.1
 - ビルド・依存関係管理：Maven
 - Webアプリケーション関連：Spring Boot Web MVC
@@ -388,3 +388,31 @@ Chapter一覧API、問題・選択肢の保存と並び順、Stage設定の保�
 ### 6. 次に行うこと
 
 READMEに沿ってGameSession開始の処理を作る。入力されたChapterと5・10・20問の選択を検証し、必要なStage設定や問題数を確認してから、最初のGameSessionとStageSessionを作成し、APIのテストを追加する。入力エラーのHTTPレスポンスもREADMEの仕様に合わせて確認する。
+
+## STEP 11：回答APIと選択肢操作を画面につなぐ
+
+### 1. 目的
+
+STEP 10で追加したStart APIの次の工程として、選んだ選択肢を回答APIへ送り、サーバーが確定した正誤・HP・コンボ・スコアを画面に反映する。実装のルールはREADMEの回答API仕様と状態遷移を参照する。
+
+### 2. 実装した内容
+
+- `AnswerController`、`AnswerService`、`AnswerRequest`、`AnswerResponse`：`POST /api/answers`を追加し、ゲーム・Stage・問題の状態、回答数、選択肢の所属、サーバー側の残り時間を確認してから回答を判定する。
+- `AnswerHistory`、`AnswerHistoryChoice`と各Repository：回答結果と選択した選択肢を保存し、同じ問題への二重回答を防ぐDB制約を設ける。
+- `StageQuestion`、`StageSession`、`GameSession`：回答時刻の記録、正解数・敵HP・コンボ・スコアの更新、5問終了時のStage Clearと最終ゲーム完了を追加する。
+- `index.html`、`game.css`、`game.js`：Enterで問題を開始し、単一選択は選択肢クリックまたはA～Gキーで送信する。複数選択は必要数を選んでEnterで確定する。結果、解説、敵HP、コンボ、スコアを表示し、次の問題を読み込む。
+- `GraduationJavaGameApplicationTests.java`：正解、空回答、他問題の選択肢、二重送信、時間切れ、複数選択、5問全問正解を確認するテストを追加する。
+
+時間切れの最終判定と正誤判定はサーバー側で行う。ブラウザーのタイマーは表示用であり、クライアントからの時間切れ申告や正解情報を判定根拠にしない。今回の画面動作確認では単一選択の不正解表示と、Bキーによる正解・HP・コンボ・スコア更新を確認した。
+
+### 3. 動作確認
+
+Java 25で`mvnw.cmd clean test`を実行し、**24件成功、失敗・エラー0件**を確認した。テスト内訳はゲームAPI統合テスト22件、`StageQuestionTest`2件。さらに`demo`プロファイルの画面をブラウザーで操作し、Enterによる問題開始、クリックとキー入力による回答、結果表示、次の問題の読込みを確認した。起動時に既定の8080番ポートが使用中だったため、今回の画面確認では8081番ポートを使用した。
+
+### 4. 記録と公開に関する訂正
+
+2026-10-13の実装コミット`df91985`（「回答APIと画面操作を接続」）では、コードとテストをGitHubへpushした一方、この`DEVELOPMENT_LOG.md`の追記を含めていなかった。そのためGitHub上で開発ログが更新されていないという指摘は正しい。今回この記録を追加し、Java 25への更新も反映した後、別のコミットとしてGitHubへpushする。
+
+### 5. 現在の状態と次に行うこと
+
+回答APIと単一Stage内の5問の回答・完了処理までは実装した。10問・20問の次Stage作成と進行、Stage ResultやReview画面などはまだ実装済みと扱わない。次はREADMEの進行API仕様に沿ってStage進行を追加し、実装内容・テスト結果・未対応範囲をこのログに記録してからコミットする。
