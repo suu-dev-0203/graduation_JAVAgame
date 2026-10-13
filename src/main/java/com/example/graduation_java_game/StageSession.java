@@ -165,4 +165,27 @@ public class StageSession {
 	public long getTotalPausedMs() {
 		return totalPausedMs;
 	}
+
+	/**
+	 * 回答結果を反映し、次の問題またはStage Clearへ進めます。
+	 */
+	public void recordAnswer(boolean correct, boolean stageClear) {
+		if (status != StageSessionStatus.PLAYING) {
+			throw new IllegalStateException("プレイ中のStageにだけ回答を反映できます。");
+		}
+
+		if (correct) {
+			correctCount++;
+			enemyHp = Math.max(0, enemyHp - 1);
+			combo++;
+		} else {
+			combo = 0;
+		}
+
+		if (stageClear) {
+			status = StageSessionStatus.CLEARED;
+		} else {
+			currentQuestionIndex++;
+		}
+	}
 }

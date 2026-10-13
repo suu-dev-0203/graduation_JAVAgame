@@ -36,6 +36,8 @@
 				<span id="question-progress">Stage 1 · 問題 1 / 5</span>
 				<span id="score-status">スコア 0</span>
 				<span id="enemy-status">敵HP 5</span>
+				<span id="combo-status">Combo 0</span>
+				<span id="timer-status" role="timer">開始前</span>
 			</div>
 			<div class="question-heading">
 				<p class="eyebrow" id="question-type">問題</p>
@@ -44,12 +46,23 @@
 			<pre class="code-block" id="code-block" hidden><code></code></pre>
 			<div class="choices-heading">選択肢</div>
 			<ol class="choices" id="choices"></ol>
+			<button class="primary-button" id="start-question-button" type="button" hidden>
+				Enter またはクリックで問題開始
+			</button>
+			<section class="answer-result" id="answer-result" hidden aria-live="polite">
+				<h3 id="answer-result-title"></h3>
+				<p id="answer-result-details"></p>
+				<p id="answer-explanation"></p>
+				<button class="primary-button" id="next-question-button" type="button" hidden>
+					次の問題へ
+				</button>
+			</section>
 			<details class="explanation">
 				<summary>問題の短い解説を見る</summary>
 				<p id="short-explanation"></p>
 			</details>
 			<p class="game-note">
-				この画面では問題の表示まで確認できます。回答の送信と正誤判定は次の開発工程で追加します。
+				Enterでタイマーを開始します。単一選択はA～Gキーまたは選択肢のクリック、複数選択はA～Gキーまたはクリックで選び、Enterで確定します。
 			</p>
 		</section>
 

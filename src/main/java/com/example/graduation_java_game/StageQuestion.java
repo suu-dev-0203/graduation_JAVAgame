@@ -118,6 +118,23 @@ public class StageQuestion {
 		return true;
 	}
 
+	/**
+	 * この問題の回答時刻を記録します。
+	 *
+	 * @return 初回回答の場合はtrue、回答できない状態ならfalse
+	 */
+	public boolean recordAnswer(Instant answerTime) {
+		if (answerTime == null) {
+			throw new IllegalArgumentException("問題の回答時刻は必須です。");
+		}
+		if (startedAt == null || answeredAt != null || pausedAt != null) {
+			return false;
+		}
+
+		answeredAt = answerTime;
+		return true;
+	}
+
 	/** 問題に回答した日時を返します。まだ回答していなければnullです。 */
 	public Instant getAnsweredAt() {
 		return answeredAt;

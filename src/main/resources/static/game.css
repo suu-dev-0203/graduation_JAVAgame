@@ -132,6 +132,7 @@ summary:focus-visible {
 
 .game-status {
 	display: flex;
+	flex-wrap: wrap;
 	justify-content: space-between;
 	gap: 12px;
 	padding-bottom: 16px;
@@ -174,20 +175,37 @@ summary:focus-visible {
 }
 
 .choices li {
+	min-height: 52px;
+}
+
+.choice-button {
 	display: grid;
+	width: 100%;
+	min-height: 52px;
 	grid-template-columns: 38px 1fr;
 	gap: 12px;
 	align-items: center;
-	min-height: 52px;
-	padding: 12px;
+	padding: 9px 12px;
 	border: 1px solid #dfe4ef;
 	border-radius: 12px;
 	background: #fbfcff;
-	counter-increment: choice;
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
 	overflow-wrap: anywhere;
 }
 
-.choices li::before {
+.choice-button:hover:not(:disabled),
+.choice-button.selected {
+	border-color: #6574cc;
+	background: #f0f2ff;
+}
+
+.choice-button:disabled {
+	cursor: default;
+}
+
+.choice-letter {
 	display: grid;
 	width: 32px;
 	height: 32px;
@@ -197,6 +215,35 @@ summary:focus-visible {
 	color: #384aa9;
 	content: counter(choice, upper-alpha);
 	font-weight: 800;
+}
+
+.choice-text {
+	line-height: 1.5;
+}
+
+.answer-result {
+	margin-top: 20px;
+	padding: 16px;
+	border-radius: 12px;
+	background: #f2f4fc;
+	line-height: 1.7;
+}
+
+.answer-result h3 {
+	margin: 0 0 8px;
+	color: #33449f;
+}
+
+.answer-result p {
+	margin: 8px 0 14px;
+}
+
+.answer-result .correct-result {
+	color: #197044;
+}
+
+.answer-result .incorrect-result {
+	color: #a32735;
 }
 
 .explanation {
@@ -224,6 +271,12 @@ summary:focus-visible {
 	color: #59647a;
 	font-size: 0.9rem;
 	line-height: 1.6;
+}
+
+@media (max-width: 520px) {
+	.game-status {
+		justify-content: flex-start;
+	}
 }
 
 footer {

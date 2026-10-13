@@ -127,4 +127,24 @@ public class GameSession {
 	public Instant getEndedAt() {
 		return endedAt;
 	}
+
+	/** 正解時の得点を加算します。 */
+	public void addScore(int points) {
+		if (points < 0) {
+			throw new IllegalArgumentException("加算する得点は0以上である必要があります。");
+		}
+		score += points;
+	}
+
+	/** 最終Stageを終えたゲームを完了状態にします。 */
+	public void complete(Instant completedAt) {
+		if (completedAt == null) {
+			throw new IllegalArgumentException("ゲーム完了時刻は必須です。");
+		}
+		if (status != GameSessionStatus.PLAYING) {
+			throw new IllegalStateException("プレイ中のゲームだけ完了できます。");
+		}
+		status = GameSessionStatus.COMPLETED;
+		endedAt = completedAt;
+	}
 }

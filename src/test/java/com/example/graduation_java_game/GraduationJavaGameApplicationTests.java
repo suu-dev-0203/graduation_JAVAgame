@@ -59,6 +59,14 @@ class GraduationJavaGameApplicationTests {
 	@Autowired
 	private StageQuestionRepository stageQuestionRepository;
 
+	/** 回答履歴が作成されたことを確認します。 */
+	@Autowired
+	private AnswerHistoryRepository answerHistoryRepository;
+
+	/** 回答履歴に選択内容が記録されたことを確認します。 */
+	@Autowired
+	private AnswerHistoryChoiceRepository answerHistoryChoiceRepository;
+
 	/** ゲーム開始処理で最初のゲームデータを準備します。 */
 	@Autowired
 	private GameSessionService gameSessionService;
@@ -390,6 +398,281 @@ class GraduationJavaGameApplicationTests {
 				.andExpect(jsonPath("$.code").value("NOT_FOUND"));
 	}
 
+	/** 正解回答を記録し、Score・Combo・次の問題を返します。 */
+	@Test
+	@Transactional
+	void submitAnswerUpdatesGameAndReturnsNextQuestion() throws Exception {
+		Chapter chapter = createChapterWithQuestions(5);
+		createStageDefinition(chapter, 1);
+		createChoicesForQuestions(chapter);
+		GameSessionCreateResponse startedGame = gameSessionService.create(
+				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+		CurrentGameResponse currentGame = gameSessionService.findCurrent(startedGame.gameSessionId());
+		List<Choice> choices = choiceRepository.findByQuestion_QuestionIdOrderByChoiceOrder(
+				currentGame.question().questionId());
+		Long correctChoiceId = choices.stream()
+				.filter(choice -> choice.isCorrect())
+				.findFirst()
+				.orElseThrow()
+				.getChoiceId();
+
+		mockMvc.perform(post("/api/stage-questions/{id}/start", currentGame.stageQuestionId()))
+				.andExpect(status().isOk());
+		mockMvc.perform(post("/api/answers")
+				.contentType("application/json")
+				.content("""
+						{"stageQuestionId": %d, "selectedChoiceIds": [%d]}
+						""".formatted(currentGame.stageQuestionId(), correctChoiceId)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.correct").value(true))
+				.andExpect(jsonPath("$.timeout").value(false))
+				.andExpect(jsonPath("$.enemyHp").value(4))
+				.andExpect(jsonPath("$.combo").value(1))
+				.andExpect(jsonPath("$.score").value(100))
+				.andExpect(jsonPath("$.effectType").value("HIT"))
+				.andExpect(jsonPath("$.stageCorrectCount").value(1))
+				.andExpect(jsonPath("$.stageScore").value(100))
+				.andExpect(jsonPath("$.maxCombo").value(1))
+				.andExpect(jsonPath("$.stageClear").value(false))
+				.andExpect(jsonPath("$.perfect").value(false))
+				.andExpect(jsonPath("$.nextStageQuestionId").isNumber());
+
+		mockMvc.perform(get("/api/game-sessions/{id}/current", startedGame.gameSessionId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.questionNumber").value(2))
+				.andExpect(jsonPath("$.questionState").value("WAITING_TO_START"))
+				.andExpect(jsonPath("$.score").value(100))
+				.andExpect(jsonPath("$.enemyHp").value(4))
+				.andExpect(jsonPath("$.combo").value(1));
+		assertEquals(1, answerHistoryRepository.count());
+		assertEquals(1, answerHistoryChoiceRepository.count());
+	}
+
+	/** 時間が残っている空回答は入力不正として扱い、問題を未回答のままにします。 */
+	@Test
+	@Transactional
+	void submitAnswerRejectsEmptySelectionBeforeTimeout() throws Exception {
+		Chapter chapter = createChapterWithQuestions(5);
+		createStageDefinition(chapter, 1);
+		createChoicesForQuestions(chapter);
+		GameSessionCreateResponse startedGame = gameSessionService.create(
+				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+		CurrentGameResponse currentGame = gameSessionService.findCurrent(startedGame.gameSessionId());
+		mockMvc.perform(post("/api/stage-questions/{id}/start", currentGame.stageQuestionId()))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/answers")
+				.contentType("application/json")
+				.content("""
+						{"stageQuestionId": %d, "selectedChoiceIds": []}
+						""".formatted(currentGame.stageQuestionId())))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_ANSWER_COUNT"));
+
+		assertEquals(0, answerHistoryRepository.count());
+	}
+
+	/** 別問題の選択肢を送信した回答は受け付けません。 */
+	@Test
+	@Transactional
+	void submitAnswerRejectsChoiceFromAnotherQuestion() throws Exception {
+		Chapter chapter = createChapterWithQuestions(5);
+		createStageDefinition(chapter, 1);
+		List<Question> questions = questionRepository.findByChapter_ChapterId(chapter.getChapterId());
+		createChoicesForQuestions(chapter);
+		GameSessionCreateResponse startedGame = gameSessionService.create(
+				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+		CurrentGameResponse currentGame = gameSessionService.findCurrent(startedGame.gameSessionId());
+		Long unrelatedChoiceId = choiceRepository
+				.findByQuestion_QuestionIdOrderByChoiceOrder(
+						questions.stream()
+								.filter(question -> !question.getQuestionId()
+										.equals(currentGame.question().questionId()))
+								.findFirst()
+								.orElseThrow()
+								.getQuestionId())
+				.get(0)
+				.getChoiceId();
+		mockMvc.perform(post("/api/stage-questions/{id}/start", currentGame.stageQuestionId()))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/answers")
+				.contentType("application/json")
+				.content("""
+						{"stageQuestionId": %d, "selectedChoiceIds": [%d]}
+						""".formatted(currentGame.stageQuestionId(), unrelatedChoiceId)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_ANSWER"));
+
+		assertEquals(0, answerHistoryRepository.count());
+	}
+
+	/** 回答済みの問題に対する再送信は409を返します。 */
+	@Test
+	@Transactional
+	void submitAnswerRejectsDuplicateSubmission() throws Exception {
+		Chapter chapter = createChapterWithQuestions(5);
+		createStageDefinition(chapter, 1);
+		createChoicesForQuestions(chapter);
+		GameSessionCreateResponse startedGame = gameSessionService.create(
+				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+		CurrentGameResponse currentGame = gameSessionService.findCurrent(startedGame.gameSessionId());
+		Long choiceId = choiceRepository
+				.findByQuestion_QuestionIdOrderByChoiceOrder(currentGame.question().questionId())
+				.get(0)
+				.getChoiceId();
+		String answerBody = """
+				{"stageQuestionId": %d, "selectedChoiceIds": [%d]}
+				""".formatted(currentGame.stageQuestionId(), choiceId);
+		mockMvc.perform(post("/api/stage-questions/{id}/start", currentGame.stageQuestionId()))
+				.andExpect(status().isOk());
+		mockMvc.perform(post("/api/answers")
+				.contentType("application/json")
+				.content(answerBody))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/answers")
+				.contentType("application/json")
+				.content(answerBody))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("ALREADY_ANSWERED"));
+
+		assertEquals(1, answerHistoryRepository.count());
+	}
+
+	/** 制限時間を超えた回答はTIME UPとして処理し、正解選択肢でもHPを減らしません。 */
+	@Test
+	@Transactional
+	void submitAnswerPrioritizesServerSideTimeout() throws Exception {
+		Chapter chapter = createChapterWithQuestions(5);
+		createStageDefinition(chapter, 1);
+		createChoicesForQuestions(chapter);
+		GameSessionCreateResponse startedGame = gameSessionService.create(
+				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+		CurrentGameResponse currentGame = gameSessionService.findCurrent(startedGame.gameSessionId());
+		StageQuestion stageQuestion = stageQuestionRepository
+				.findById(currentGame.stageQuestionId())
+				.orElseThrow();
+		stageQuestion.start(Instant.now().minusSeconds(30));
+		stageQuestionRepository.save(stageQuestion);
+		Long correctChoiceId = choiceRepository
+				.findByQuestion_QuestionIdOrderByChoiceOrder(currentGame.question().questionId())
+				.stream()
+				.filter(choice -> choice.isCorrect())
+				.findFirst()
+				.orElseThrow()
+				.getChoiceId();
+
+		mockMvc.perform(post("/api/answers")
+				.contentType("application/json")
+				.content("""
+						{"stageQuestionId": %d, "selectedChoiceIds": [%d]}
+						""".formatted(currentGame.stageQuestionId(), correctChoiceId)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.correct").value(false))
+				.andExpect(jsonPath("$.timeout").value(true))
+				.andExpect(jsonPath("$.enemyHp").value(5))
+				.andExpect(jsonPath("$.combo").value(0))
+				.andExpect(jsonPath("$.score").value(0))
+				.andExpect(jsonPath("$.effectType").value("TIME_UP"));
+	}
+
+	/** 複数選択は必要数を満たした選択肢の集合が正解集合と一致した場合だけ正解です。 */
+	@Test
+	@Transactional
+	void submitAnswerValidatesMultipleChoiceCountAndExactSet() throws Exception {
+		Chapter chapter = chapterRepository.save(new Chapter("複数選択", "複数選択テスト"));
+		createStageDefinition(chapter, 1);
+		for (int index = 1; index <= 5; index++) {
+			Question question = questionRepository.save(new Question(
+					chapter,
+					QuestionType.MULTIPLE_2_A_E,
+					"複数選択問題 " + index,
+					null,
+					20,
+					"短い解説です。",
+					"詳しい解説です。"));
+			choiceRepository.save(new Choice(question, "選択肢A", 1, true));
+			choiceRepository.save(new Choice(question, "選択肢B", 2, false));
+			choiceRepository.save(new Choice(question, "選択肢C", 3, true));
+		}
+		GameSessionCreateResponse startedGame = gameSessionService.create(
+				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+		CurrentGameResponse currentGame = gameSessionService.findCurrent(startedGame.gameSessionId());
+		List<Choice> choices = choiceRepository.findByQuestion_QuestionIdOrderByChoiceOrder(
+				currentGame.question().questionId());
+		Long choiceA = choices.get(0).getChoiceId();
+		Long choiceC = choices.get(2).getChoiceId();
+		mockMvc.perform(post("/api/stage-questions/{id}/start", currentGame.stageQuestionId()))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/answers")
+				.contentType("application/json")
+				.content("""
+						{"stageQuestionId": %d, "selectedChoiceIds": [%d]}
+						""".formatted(currentGame.stageQuestionId(), choiceA)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_ANSWER_COUNT"));
+
+		mockMvc.perform(post("/api/answers")
+				.contentType("application/json")
+				.content("""
+						{"stageQuestionId": %d, "selectedChoiceIds": [%d, %d]}
+						""".formatted(currentGame.stageQuestionId(), choiceC, choiceA)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.correct").value(true))
+				.andExpect(jsonPath("$.score").value(100));
+		assertEquals(2, answerHistoryChoiceRepository.count());
+	}
+
+	/** 5問すべて正解した場合にPERFECT・Stage Clear・ゲーム完了を返します。 */
+	@Test
+	@Transactional
+	void completingFiveCorrectAnswersClearsStageAndGame() throws Exception {
+		Chapter chapter = createChapterWithQuestions(5);
+		createStageDefinition(chapter, 1);
+		createChoicesForQuestions(chapter);
+		GameSessionCreateResponse startedGame = gameSessionService.create(
+				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+
+		for (int index = 0; index < 5; index++) {
+			CurrentGameResponse currentGame = gameSessionService.findCurrent(startedGame.gameSessionId());
+			Long correctChoiceId = choiceRepository
+					.findByQuestion_QuestionIdOrderByChoiceOrder(currentGame.question().questionId())
+					.stream()
+					.filter(choice -> choice.isCorrect())
+					.findFirst()
+					.orElseThrow()
+					.getChoiceId();
+			mockMvc.perform(post("/api/stage-questions/{id}/start", currentGame.stageQuestionId()))
+					.andExpect(status().isOk());
+			var result = mockMvc.perform(post("/api/answers")
+					.contentType("application/json")
+					.content("""
+							{"stageQuestionId": %d, "selectedChoiceIds": [%d]}
+							""".formatted(currentGame.stageQuestionId(), correctChoiceId)))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.correct").value(true))
+					.andExpect(jsonPath("$.score").value((index + 1) * 100))
+					.andExpect(jsonPath("$.maxCombo").value(index + 1));
+			if (index == 4) {
+				result.andExpect(jsonPath("$.effectType").value("PERFECT"))
+						.andExpect(jsonPath("$.perfect").value(true))
+						.andExpect(jsonPath("$.stageClear").value(true))
+						.andExpect(jsonPath("$.stageCorrectCount").value(5))
+						.andExpect(jsonPath("$.nextStageQuestionId").value(org.hamcrest.Matchers.nullValue()));
+			} else {
+				result.andExpect(jsonPath("$.stageClear").value(false))
+						.andExpect(jsonPath("$.nextStageQuestionId").isNumber());
+			}
+		}
+
+		assertEquals(GameSessionStatus.COMPLETED, gameSessionRepository
+				.findById(startedGame.gameSessionId())
+				.orElseThrow()
+				.getStatus());
+	}
+
 	/** 存在しないゲームIDで現在状態を要求した場合、404を返すことを確認します。 */
 	@Test
 	@Transactional
@@ -426,5 +709,13 @@ class GraduationJavaGameApplicationTests {
 				"GRASSLAND",
 				MiniGameType.TYPING_SAMURAI,
 				5));
+	}
+
+	/** 各問題に正解・不正解の選択肢を作ります。 */
+	private void createChoicesForQuestions(Chapter chapter) {
+		for (Question question : questionRepository.findByChapter_ChapterId(chapter.getChapterId())) {
+			choiceRepository.save(new Choice(question, "不正解", 1, false));
+			choiceRepository.save(new Choice(question, "正解", 2, true));
+		}
 	}
 }
