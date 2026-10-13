@@ -193,6 +193,46 @@ public class GameSessionService {
 				stageSession.getStageDefinition().getMiniGameType());
 	}
 
+	/**
+	 * 現在の問題を初めて開始し、サーバーの開始時刻と残り時間を返します。
+	 */
+	@Transactional
+	public StartStageQuestionResponse startQuestion(Long stageQuestionId) {
+		StageQuestion stageQuestion = stageQuestionRepository.findById(stageQuestionId)
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.NOT_FOUND,
+						"NOT_FOUND",
+						"指定されたStageQuestionが見つかりません。"));
+
+		StageSession stageSession = stageQuestion.getStageSession();
+		GameSession gameSession = stageSession.getGameSession();
+		if (gameSession.getStatus() != GameSessionStatus.PLAYING
+				|| stageSession.getStatus() != StageSessionStatus.PLAYING) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"INVALID_GAME_STATE",
+					"プレイ中のゲームとStageの問題だけ開始できます。");
+		}
+
+		Instant startedAt = Instant.now();
+		if (!stageQuestion.start(startedAt)) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"INVALID_GAME_STATE",
+					"この問題はすでに開始済み、または回答済みです。");
+		}
+
+		StageQuestion savedStageQuestion = stageQuestionRepository.save(stageQuestion);
+		long remainingTimeMs = calculateRemainingTimeMs(
+				savedStageQuestion,
+				savedStageQuestion.getQuestion());
+
+		return new StartStageQuestionResponse(
+				savedStageQuestion.getStageQuestionId(),
+				savedStageQuestion.getStartedAt(),
+				remainingTimeMs);
+	}
+
 	/** 問題開始前はnullを返し、開始後はサーバーの時刻から残り時間を計算します。 */
 	private Long calculateRemainingTimeMs(StageQuestion stageQuestion, Question question) {
 		if (stageQuestion.getStartedAt() == null) {

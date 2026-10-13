@@ -356,6 +356,40 @@ class GraduationJavaGameApplicationTests {
 				.andExpect(jsonPath("$.miniGameType").value("TYPING_SAMURAI"));
 	}
 
+	/** Start APIで開始時刻と残り時間を返し、同じ問題の再Startを拒否します。 */
+	@Test
+	@Transactional
+	void startStageQuestionRecordsStartTimeAndRejectsRestart() throws Exception {
+		Chapter chapter = createChapterWithQuestions(5);
+		createStageDefinition(chapter, 1);
+		GameSessionCreateResponse startedGame = gameSessionService.create(
+				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+		CurrentGameResponse currentGame = gameSessionService.findCurrent(startedGame.gameSessionId());
+
+		mockMvc.perform(post("/api/stage-questions/{id}/start", currentGame.stageQuestionId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.stageQuestionId").value(currentGame.stageQuestionId()))
+				.andExpect(jsonPath("$.startedAt").isString())
+				.andExpect(jsonPath("$.remainingTimeMs").isNumber());
+
+		mockMvc.perform(get("/api/game-sessions/{id}/current", startedGame.gameSessionId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.questionState").value("ANSWERING"))
+				.andExpect(jsonPath("$.remainingTimeMs").isNumber());
+
+		mockMvc.perform(post("/api/stage-questions/{id}/start", currentGame.stageQuestionId()))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
+	}
+
+	/** 存在しないStageQuestion IDでStartした場合は404を返します。 */
+	@Test
+	void startStageQuestionRejectsUnknownId() throws Exception {
+		mockMvc.perform(post("/api/stage-questions/{id}/start", 999))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.code").value("NOT_FOUND"));
+	}
+
 	/** 存在しないゲームIDで現在状態を要求した場合、404を返すことを確認します。 */
 	@Test
 	@Transactional

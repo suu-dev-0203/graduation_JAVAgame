@@ -331,7 +331,18 @@ Start APIを作る前に、問題データ自身が「初めて開始した時�
 
 ### 4. 次に行うこと
 
-Start APIのServiceで対象の問題とStageの状態を確認し、`start`メソッドを呼び出して開始時刻を保存する。再実行時のAPIエラーと成功時の残り時間もテストする。
+Start APIの後に、A/B/Cの選択肢を実際に押せるボタンにし、キーボード入力でも回答を選べるようにする。回答APIで正誤判定してから、正解時の敵HP更新へ進む。
+
+### 5. Start APIの追加
+
+前の小さな実装をブラウザーから利用できるよう、`POST /api/stage-questions/{stageQuestionId}/start`を追加した。ゲームとStageがプレイ中であることを確認してから開始時刻を保存する。まだ開始済み、または回答済みなら再Startを拒否する。成功すると、開始時刻とサーバー計算の残り時間を返す。
+
+- `StartStageQuestionResponse.java`：API成功時に返すID・開始時刻・残り時間。
+- `StageQuestionController.java`：Start APIへのHTTPリクエストを受け付ける。
+- `GameSessionService.java`：ゲーム・Stageの状態を確認してから、問題開始処理を行う。
+- `GraduationJavaGameApplicationTests.java`：開始成功、開始後の`ANSWERING`状態、再Startの409、存在しない問題IDの404をテスト。
+
+テストは**17件成功、失敗・エラー0件**。Start APIだけではA/B/Cを押して回答したり、次の問題へ進んだりはしない。これは回答APIのあとで実装する。
 
 ## STEP 5：ゲーム全体とStageの進行記録を保存する
 
