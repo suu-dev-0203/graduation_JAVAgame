@@ -181,6 +181,52 @@ Spring Bootの起動、Chapter一覧API、問題・選択肢の保存、Stage設
 
 QuestionとChoiceを安全な画面用データに変換して返す読み取りAPIを作り、その後GameSessionとStageSessionのデータを1つずつ追加する。どの工程も、機能・テスト・作業記録を一緒に確認してから個別にコミットする。
 
+## STEP 6：ゲームを開始するAPIを作る
+
+### 1. 今回しようと考えたこと
+
+これまでにデータベースへ保存できるようにしたChapter・Question・Stage設定を、1回のゲームとしてつなぐ。ブラウザからChapter IDと問題数を受け取り、遊べる内容がそろっているか確認してから、GameSession・最初のStageSession・そのStageの5問をまとめて作る。
+
+ゲーム開始時にはすべてのStageの問題を作らず、最初のStage分だけ用意する。これはREADMEのルールに沿った動きで、10問や20問を選んでも、次のStageの記録はそのStageへ進む処理を作るまで作らない。
+
+### 2. 新しく作ったファイル
+
+- `GameSessionController.java`：`POST /api/game-sessions`を受け付けるAPIの窓口。
+- `GameSessionService.java`：入力、Chapter、問題数、必要なStage設定を確認し、ゲーム開始時の記録を作る処理。
+- `GameSessionCreateRequest.java`：ブラウザから受け取るChapter IDと問題数。
+- `GameSessionCreateResponse.java`：開始後にブラウザへ返すゲームID、問題数、Stage数、現在Stage、状態。
+- `StageQuestion.java`、`StageQuestionRepository.java`：最初のStageで出題する5問と順番を保存するEntity・Repository。
+- `GameApiException.java`、`GameApiExceptionHandler.java`、`ErrorResponse.java`：Chapter不存在や問題不足などを、HTTPステータスとエラーコード付きJSONで返す仕組み。
+
+### 3. 今回のチェックとゲーム開始の流れ
+
+1. `chapterId`と`questionCount`が指定されているか確認する。
+2. 問題数がREADMEで許可された5・10・20のいずれかか確認する。
+3. Chapterが存在するか確認する。
+4. 遊ぶStage数分（問題数÷5）のStage設定が存在するか確認する。
+5. Chapterに選んだ問題数以上の問題があるか確認する。
+6. ゲーム全体の記録とStage 1の進行記録を作る。
+7. Chapter内から重複しない問題を5問選び、出題順1～5で保存する。
+8. Game IDと開始時の状態を返す。
+
+すべての保存を1つのトランザクションで行うため、途中でエラーになった場合にGameSessionだけが残る、といった不完全な状態を防ぐ。エラーは隠さず、`400 INVALID_REQUEST`、`404 NOT_FOUND`、`409 INSUFFICIENT_QUESTIONS`、Stage設定不足時の`409 INVALID_GAME_STATE`として伝える。
+
+### 4. 動作確認
+
+MockMvcでAPIを呼び出し、5問・10問・20問すべてで開始できること、レスポンスの問題数・Stage数・最初のStage番号・状態を確認した。10問・20問の場合も、最初に作られるStageSessionがStage 1の1件だけで、StageQuestionはそのStageの5件だけであることを確認した。
+
+さらに、未対応の問題数、存在しないChapter、Chapter内の問題不足、必要なStage設定不足をそれぞれ確認し、失敗時にGameSessionが保存されないことをテストした。テストは**10件成功、失敗・エラー0件**、Java診断エラーなし、`git diff --check`成功。
+
+### 5. 現時点での出題と、次に必要な改良
+
+現在は回答履歴を保存する機能がまだないため、Chapter内の問題をシャッフルしてStage 1用の5問を選ぶ。これにより1回のゲームの中では、同じ問題が重複しない。READMEで定めた「過去の最新回答を見て未回答・復習・正解済みの優先順にする」処理は、回答履歴が存在しない今の段階ではまだ判定できない。回答履歴を作る工程でこの選び方を拡張する。
+
+また、今回作ったのはゲーム開始APIまでで、画面に問題文を返すAPI、問題のタイマー開始、回答判定、次のStageへの進行はまだ実装していない。
+
+### 6. 次に行うこと
+
+Stage 1で選ばれた問題と選択肢を画面用DTOに変換し、正解情報を外に漏らさない問題取得APIを作る。その後、Start APIでJava側の開始時刻を記録してから、回答・履歴保存へ進む。機能ごとにテストし、実際に確認した結果を作業ログへ追記してからコミットする。
+
 ## STEP 5：ゲーム全体とStageの進行記録を保存する
 
 ### 1. 今回しようと考えたこと

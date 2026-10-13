@@ -1,6 +1,7 @@
 package com.example.graduation_java_game;
 
 import java.time.Instant;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -50,6 +52,10 @@ class GraduationJavaGameApplicationTests {
 	/** Stageごとの進行記録をテスト用DBに保存するRepositoryです。 */
 	@Autowired
 	private StageSessionRepository stageSessionRepository;
+
+	/** Stageで出題する問題と、その順番をテスト用DBから確認します。 */
+	@Autowired
+	private StageQuestionRepository stageQuestionRepository;
 
 	/** Spring Bootが必要な設定を読み込み、起動できることを確認します。 */
 	@Test
@@ -183,5 +189,143 @@ class GraduationJavaGameApplicationTests {
 		assertEquals(5, foundStageSession.getEnemyHp());
 		assertEquals(0, foundStageSession.getCombo());
 		assertEquals(0, foundStageSession.getTotalPausedMs());
+	}
+
+	/** 5・10・20問を受け付け、最初のStageの5問だけを作ることを確認します。 */
+	@Test
+	@Transactional
+	void createGameSessionStartsFirstStageAndCreatesOnlyItsFiveQuestions() throws Exception {
+		Chapter chapter = createChapterWithQuestions(20);
+		for (int stageNumber = 1; stageNumber <= 4; stageNumber++) {
+			createStageDefinition(chapter, stageNumber);
+		}
+
+		// どの選択肢でもゲームを始められ、まだ最初のStageだけが作られます。
+		for (int questionCount : List.of(5, 10, 20)) {
+			mockMvc.perform(post("/api/game-sessions")
+					.contentType("application/json")
+					.content("""
+							{"chapterId": %d, "questionCount": %d}
+							""".formatted(chapter.getChapterId(), questionCount)))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.gameSessionId").isNumber())
+					.andExpect(jsonPath("$.chapterId").value(chapter.getChapterId()))
+					.andExpect(jsonPath("$.questionCount").value(questionCount))
+					.andExpect(jsonPath("$.totalStageCount").value(questionCount / 5))
+					.andExpect(jsonPath("$.currentStageNumber").value(1))
+					.andExpect(jsonPath("$.status").value("PLAYING"));
+		}
+
+		var gameSessions = gameSessionRepository.findAll();
+		assertEquals(3, gameSessions.size());
+		for (GameSession gameSession : gameSessions) {
+			var stageSessions = stageSessionRepository
+					.findByGameSession_GameSessionId(gameSession.getGameSessionId());
+			assertEquals(1, stageSessions.size());
+			assertEquals(1, stageSessions.get(0).getStageDefinition().getStageNumber());
+			assertEquals(5, stageQuestionRepository
+					.findByStageSession_StageSessionIdOrderByQuestionOrder(
+							stageSessions.get(0).getStageSessionId())
+					.size());
+		}
+	}
+
+	/** 5・10・20以外の問題数は受け付けず、ゲーム記録も作らないことを確認します。 */
+	@Test
+	@Transactional
+	void createGameSessionRejectsUnsupportedQuestionCount() throws Exception {
+		Chapter chapter = chapterRepository.save(
+				new Chapter("Java Bronze 基礎", "基本文法を学びます。"));
+
+		mockMvc.perform(post("/api/game-sessions")
+				.contentType("application/json")
+				.content("""
+						{"chapterId": %d, "questionCount": 7}
+						""".formatted(chapter.getChapterId())))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+		assertEquals(0, gameSessionRepository.count());
+	}
+
+	/** 存在しないChapter IDを指定した場合は404を返すことを確認します。 */
+	@Test
+	@Transactional
+	void createGameSessionRejectsUnknownChapter() throws Exception {
+		mockMvc.perform(post("/api/game-sessions")
+				.contentType("application/json")
+				.content("""
+						{"chapterId": 999, "questionCount": 5}
+						"""))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+		assertEquals(0, gameSessionRepository.count());
+	}
+
+	/** Chapterの問題が不足している場合は409を返し、部分的なゲーム記録を残さないことを確認します。 */
+	@Test
+	@Transactional
+	void createGameSessionRejectsInsufficientQuestions() throws Exception {
+		Chapter chapter = createChapterWithQuestions(4);
+		createStageDefinition(chapter, 1);
+
+		mockMvc.perform(post("/api/game-sessions")
+				.contentType("application/json")
+				.content("""
+						{"chapterId": %d, "questionCount": 5}
+						""".formatted(chapter.getChapterId())))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("INSUFFICIENT_QUESTIONS"));
+
+		assertEquals(0, gameSessionRepository.count());
+		assertEquals(0, stageSessionRepository.count());
+	}
+
+	/** 必要なStage設定がないとき、ゲーム開始を拒否することを確認します。 */
+	@Test
+	@Transactional
+	void createGameSessionRejectsMissingStageDefinition() throws Exception {
+		Chapter chapter = createChapterWithQuestions(10);
+		createStageDefinition(chapter, 1);
+
+		mockMvc.perform(post("/api/game-sessions")
+				.contentType("application/json")
+				.content("""
+						{"chapterId": %d, "questionCount": 10}
+						""".formatted(chapter.getChapterId())))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
+
+		assertEquals(0, gameSessionRepository.count());
+	}
+
+	/** テスト用のChapterと、指定された個数の問題をDBに準備します。 */
+	private Chapter createChapterWithQuestions(int questionCount) {
+		Chapter chapter = chapterRepository.save(
+				new Chapter("Java Bronze 基礎", "基本文法を学びます。"));
+		for (int index = 1; index <= questionCount; index++) {
+			questionRepository.save(new Question(
+					chapter,
+					QuestionType.SINGLE_A_E,
+					"テスト問題 " + index,
+					null,
+					20,
+					"短い解説です。",
+					"詳しい解説です。"));
+		}
+		return chapter;
+	}
+
+	/** テスト用のChapterに、MVPルールに合ったStage設定を1件作ります。 */
+	private void createStageDefinition(Chapter chapter, int stageNumber) {
+		stageDefinitionRepository.save(new StageDefinition(
+				chapter,
+				stageNumber,
+				"SWORDSMAN",
+				"JAVA_GUARD",
+				"GRASSLAND",
+				MiniGameType.TYPING_SAMURAI,
+				5));
 	}
 }
