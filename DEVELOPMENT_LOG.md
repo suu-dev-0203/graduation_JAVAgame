@@ -80,3 +80,35 @@ Spring Initializrは、選択したJavaのバージョンやライブラリな�
 作業ごとに「目的」「実際に行った操作」「確認結果」「学んだこと」「次に行うこと」を記録する。
 
 確認できていない操作や、まだ実装していない機能を、実施済みとして記録しない。
+
+## STEP 2：Chapter一覧APIを作る
+
+### 1. 目的
+
+READMEの補助APIとして記載されている `GET /api/chapters` を作り、ブラウザからChapter一覧を取得できるようにする。
+
+### 2. 実装した内容
+
+- `Chapter`：ChapterのID・名前・説明をDBに保存するEntity。
+- `ChapterRepository`：Spring Data JPAを使ってChapterを検索・保存する窓口。
+- `ChapterService`：Repositoryから取得したEntityをAPI用データに変換する処理。
+- `ChapterResponse`：APIから返すID・名前・説明だけをまとめるDTO。
+- `ChapterController`：`GET /api/chapters` のリクエストを受け付けるController。
+
+ControllerがEntityをそのままJSONにしないよう、Serviceで `ChapterResponse` に変換してから返す。Chapterがまだ登録されていない場合は、空の配列を返す。READMEにないChapterの初期データは追加していない。
+
+### 3. 動作確認
+
+Chapterをテスト用DBに保存してから `GET /api/chapters` を呼び出し、HTTP 200とID・名前・説明が返ることをMockMvcで確認した。既存のSpring Boot起動テストも含めて、テスト2件が成功した（失敗0件）。
+
+最初のテスト実行では `JAVA_HOME` が未設定だったため、インストール済みJDK 25をその実行コマンド内で指定した。また、Spring Boot 4の `@AutoConfigureMockMvc` は以前とpackageが異なっていたため、実際の依存ライブラリに含まれるpackageに修正してから再実行した。`pom.xml` のJavaバージョン設定は変更していない。
+
+### 4. 学んだこと
+
+- EntityはDBに保存するデータ、RepositoryはDB操作、Serviceはアプリの処理、ControllerはHTTP APIの窓口を担当する。
+- DTOを使うと、画面に返すデータをEntityの内部構造から分けられる。
+- テストではMockMvcを使って、アプリを起動した状態に近い形でHTTP APIを確認できる。
+
+### 5. 次に行うこと
+
+Chapter一覧を画面から利用するか、READMEの実装優先順位に沿ってQuestionとChoiceのデータ・APIを小さな単位で追加する。各変更はテストし、今回と同様に実際の確認結果を記録してからコミットする。
