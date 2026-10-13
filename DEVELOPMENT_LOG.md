@@ -227,6 +227,41 @@ MockMvcでAPIを呼び出し、5問・10問・20問すべてで開始できる�
 
 Stage 1で選ばれた問題と選択肢を画面用DTOに変換し、正解情報を外に漏らさない問題取得APIを作る。その後、Start APIでJava側の開始時刻を記録してから、回答・履歴保存へ進む。機能ごとにテストし、実際に確認した結果を作業ログへ追記してからコミットする。
 
+## STEP 7：現在の問題と選択肢を取得する
+
+### 1. 今回しようと考えたこと
+
+ゲームを開始して問題をデータベースへ用意できても、ブラウザがその問題を受け取るAPIがなければ画面に表示できない。そこで、開始済みのゲームIDから今のStageと問題を探し、画面に必要な情報だけを返すAPIを作る。
+
+問題を取得した時点ではまだ回答時間を始めない。READMEに合わせて状態は`WAITING_TO_START`、`remainingTimeMs`は`null`にし、次の工程で作るStart APIが成功してからタイマーを動かす。
+
+### 2. 新しく作ったファイル
+
+- `CurrentGameResponse.java`：現在のゲーム状態、問題、画面に出す選択肢、キャラクターや背景のKeyをまとめたレスポンスDTO。
+
+### 3. 修正したファイル
+
+- `GameSessionController.java`：`GET /api/game-sessions/{gameSessionId}/current`を追加。
+- `GameSessionService.java`：現在のGameSession・StageSession・StageQuestionを探し、問題と表示順の選択肢を画面用DTOへ変換する処理を追加。
+- `StageQuestionRepository.java`：Stage内の出題番号から現在のStageQuestionを探すメソッドを追加。
+- `GraduationJavaGameApplicationTests.java`：現在の問題が取得できること、開始前のタイマー状態、選択肢の表示順、正解情報が返らないこと、存在しないゲームIDのエラーをテスト。
+
+画面へ返す選択肢にはID・文章・表示順だけを入れる。Entityにある`Choice.correct`はサーバー内の回答判定用情報なので、画面用DTOに含めない。
+
+### 4. テストと修正の記録
+
+最初のビルドでは、問題の選択肢を探す`ChoiceRepository`をServiceの依存関係に追加し忘れていることがコンパイルエラーで分かった。ServiceのコンストラクターでRepositoryを受け取るように修正し、改めてテストを実行した。
+
+最終確認では、ゲーム開始を含むテスト**12件が成功し、失敗・エラーは0件**だった。問題文・問題形式・制限時間・選択肢・Stageの画面設定を取得でき、`correct`がJSONに含まれないこと、開始前は`WAITING_TO_START`でタイマー用の残り時間がないこと、存在しないゲームIDには404 `NOT_FOUND`を返すことを確認した。Java診断エラーはなく、`git diff --check`も成功。
+
+### 5. まだできないこと
+
+この工程でできるのは、現在の問題を画面向けに取得するところまで。問題のStart API、タイマー開始、選択肢を送る回答API、正誤判定とスコア更新、画面そのものは次の工程で作る。
+
+### 6. 次に行うこと
+
+StageQuestionのStart APIを作り、未開始の問題にJava側の開始日時を一度だけ記録する。再Startでタイマーをリセットできないようにし、API成功時の残り時間を返すテストを追加する。その後、回答APIと画面の実装へ進む。
+
 ## STEP 5：ゲーム全体とStageの進行記録を保存する
 
 ### 1. 今回しようと考えたこと

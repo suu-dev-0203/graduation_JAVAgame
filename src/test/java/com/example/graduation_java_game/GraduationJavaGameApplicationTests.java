@@ -57,6 +57,10 @@ class GraduationJavaGameApplicationTests {
 	@Autowired
 	private StageQuestionRepository stageQuestionRepository;
 
+	/** ゲーム開始処理で最初のゲームデータを準備します。 */
+	@Autowired
+	private GameSessionService gameSessionService;
+
 	/** Spring Bootが必要な設定を読み込み、起動できることを確認します。 */
 	@Test
 	void contextLoads() {
@@ -298,6 +302,56 @@ class GraduationJavaGameApplicationTests {
 				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
 
 		assertEquals(0, gameSessionRepository.count());
+	}
+
+	/** 現在の問題と選択肢を返し、Timer未開始と正解非公開を確認します。 */
+	@Test
+	@Transactional
+	void getCurrentGameReturnsQuestionWithoutExposingCorrectAnswers() throws Exception {
+		Chapter chapter = createChapterWithQuestions(5);
+		createStageDefinition(chapter, 1);
+		for (Question question : questionRepository.findByChapter_ChapterId(chapter.getChapterId())) {
+			choiceRepository.save(new Choice(question, "不正解の選択肢", 2, false));
+			choiceRepository.save(new Choice(question, "正解の選択肢", 1, true));
+		}
+		GameSessionCreateResponse startedGame = gameSessionService.create(
+				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+
+		mockMvc.perform(get("/api/game-sessions/{id}/current", startedGame.gameSessionId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.gameSessionId").value(startedGame.gameSessionId()))
+				.andExpect(jsonPath("$.stageSessionId").isNumber())
+				.andExpect(jsonPath("$.stageQuestionId").isNumber())
+				.andExpect(jsonPath("$.questionState").value("WAITING_TO_START"))
+				.andExpect(jsonPath("$.questionNumber").value(1))
+				.andExpect(jsonPath("$.totalQuestionsInStage").value(5))
+				.andExpect(jsonPath("$.remainingTimeMs").doesNotExist())
+				.andExpect(jsonPath("$.enemyHp").value(5))
+				.andExpect(jsonPath("$.combo").value(0))
+				.andExpect(jsonPath("$.score").value(0))
+				.andExpect(jsonPath("$.gameSessionStatus").value("PLAYING"))
+				.andExpect(jsonPath("$.stageSessionStatus").value("PLAYING"))
+				.andExpect(jsonPath("$.question.questionId").isNumber())
+				.andExpect(jsonPath("$.question.questionType").value("SINGLE_A_E"))
+				.andExpect(jsonPath("$.question.questionText").isString())
+				.andExpect(jsonPath("$.question.timeLimitSeconds").value(20))
+				.andExpect(jsonPath("$.question.choices", hasSize(2)))
+				.andExpect(jsonPath("$.question.choices[0].choiceText").value("正解の選択肢"))
+				.andExpect(jsonPath("$.question.choices[0].choiceOrder").value(1))
+				.andExpect(jsonPath("$.question.choices[0].correct").doesNotExist())
+				.andExpect(jsonPath("$.playerCharacterKey").value("SWORDSMAN"))
+				.andExpect(jsonPath("$.enemyKey").value("JAVA_GUARD"))
+				.andExpect(jsonPath("$.fieldKey").value("GRASSLAND"))
+				.andExpect(jsonPath("$.miniGameType").value("TYPING_SAMURAI"));
+	}
+
+	/** 存在しないゲームIDで現在状態を要求した場合、404を返すことを確認します。 */
+	@Test
+	@Transactional
+	void getCurrentGameRejectsUnknownGameSession() throws Exception {
+		mockMvc.perform(get("/api/game-sessions/{id}/current", 999))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.code").value("NOT_FOUND"));
 	}
 
 	/** テスト用のChapterと、指定された個数の問題をDBに準備します。 */

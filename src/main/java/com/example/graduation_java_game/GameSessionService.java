@@ -1,6 +1,7 @@
 package com.example.graduation_java_game;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -20,6 +21,7 @@ public class GameSessionService {
 
 	private final ChapterRepository chapterRepository;
 	private final QuestionRepository questionRepository;
+	private final ChoiceRepository choiceRepository;
 	private final StageDefinitionRepository stageDefinitionRepository;
 	private final GameSessionRepository gameSessionRepository;
 	private final StageSessionRepository stageSessionRepository;
@@ -28,12 +30,14 @@ public class GameSessionService {
 	public GameSessionService(
 			ChapterRepository chapterRepository,
 			QuestionRepository questionRepository,
+			ChoiceRepository choiceRepository,
 			StageDefinitionRepository stageDefinitionRepository,
 			GameSessionRepository gameSessionRepository,
 			StageSessionRepository stageSessionRepository,
 			StageQuestionRepository stageQuestionRepository) {
 		this.chapterRepository = chapterRepository;
 		this.questionRepository = questionRepository;
+		this.choiceRepository = choiceRepository;
 		this.stageDefinitionRepository = stageDefinitionRepository;
 		this.gameSessionRepository = gameSessionRepository;
 		this.stageSessionRepository = stageSessionRepository;
@@ -113,6 +117,97 @@ public class GameSessionService {
 				totalStageCount,
 				1,
 				GameSessionStatus.PLAYING);
+	}
+
+	/**
+	 * ゲームIDから現在のStageと問題を探し、画面向けのデータにして返します。
+	 * Choice.correctは回答の正誤を決める情報なので、画面用DTOへ移しません。
+	 */
+	@Transactional(readOnly = true)
+	public CurrentGameResponse findCurrent(Long gameSessionId) {
+		GameSession gameSession = gameSessionRepository.findById(gameSessionId)
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.NOT_FOUND,
+						"NOT_FOUND",
+						"指定されたGameSessionが見つかりません。"));
+
+		StageSession stageSession = stageSessionRepository
+				.findByGameSession_GameSessionId(gameSessionId)
+				.stream()
+				.filter(candidate -> candidate.getStageDefinition().getStageNumber()
+						== gameSession.getCurrentStageNumber())
+				.findFirst()
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.CONFLICT,
+						"INVALID_GAME_STATE",
+						"現在のStage進行記録が見つかりません。"));
+
+		StageQuestion stageQuestion = stageQuestionRepository
+				.findByStageSession_StageSessionIdAndQuestionOrder(
+						stageSession.getStageSessionId(),
+						stageSession.getCurrentQuestionIndex())
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.CONFLICT,
+						"INVALID_GAME_STATE",
+						"現在の問題が見つかりません。"));
+
+		Question question = stageQuestion.getQuestion();
+		List<CurrentGameResponse.ChoiceResponse> choices = choiceRepository
+				.findByQuestion_QuestionIdOrderByChoiceOrder(question.getQuestionId())
+				.stream()
+				.map(choice -> new CurrentGameResponse.ChoiceResponse(
+						choice.getChoiceId(),
+						choice.getChoiceText(),
+						choice.getChoiceOrder()))
+				.toList();
+
+		String questionState = stageQuestion.getAnsweredAt() != null
+				? "RESULT"
+				: stageQuestion.getStartedAt() == null ? "WAITING_TO_START" : "ANSWERING";
+		Long remainingTimeMs = calculateRemainingTimeMs(stageQuestion, question);
+
+		return new CurrentGameResponse(
+				gameSession.getGameSessionId(),
+				stageSession.getStageSessionId(),
+				stageQuestion.getStageQuestionId(),
+				questionState,
+				stageQuestion.getQuestionOrder(),
+				QUESTIONS_PER_STAGE,
+				remainingTimeMs,
+				stageSession.getEnemyHp(),
+				stageSession.getCombo(),
+				gameSession.getScore(),
+				gameSession.getStatus(),
+				stageSession.getStatus(),
+				new CurrentGameResponse.QuestionResponse(
+						question.getQuestionId(),
+						question.getQuestionType(),
+						question.getQuestionText(),
+						question.getTimeLimitSeconds(),
+						question.getShortExplanation(),
+						question.getCodeBlock(),
+						choices),
+				stageSession.getStageDefinition().getPlayerCharacterKey(),
+				stageSession.getStageDefinition().getEnemyKey(),
+				stageSession.getStageDefinition().getFieldKey(),
+				stageSession.getStageDefinition().getMiniGameType());
+	}
+
+	/** 問題開始前はnullを返し、開始後はサーバーの時刻から残り時間を計算します。 */
+	private Long calculateRemainingTimeMs(StageQuestion stageQuestion, Question question) {
+		if (stageQuestion.getStartedAt() == null) {
+			return null;
+		}
+
+		Instant effectiveNow = stageQuestion.getPausedAt() == null
+				? Instant.now()
+				: stageQuestion.getPausedAt();
+		long elapsedMs = Math.max(
+				0,
+				Duration.between(stageQuestion.getStartedAt(), effectiveNow).toMillis()
+						- stageQuestion.getTotalPausedMs());
+		long timeLimitMs = question.getTimeLimitSeconds() * 1000L;
+		return Math.max(0, timeLimitMs - elapsedMs);
 	}
 
 	/** 必須項目とREADMEで許可された問題数だけを受け付けます。 */
