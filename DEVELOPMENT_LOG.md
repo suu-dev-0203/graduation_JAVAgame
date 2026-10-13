@@ -144,3 +144,39 @@ Chapter一覧API、問題・選択肢の保存と表示順、Spring Bootの起�
 ### 5. 次に行うこと
 
 問題と選択肢を画面に渡す読み取りAPIを、READMEのAPI仕様に沿って作る。その後、Stageと回答処理へ小さく進み、各段階でテストしてからコミットする。
+
+## STEP 4：ChapterごとのStage設定を保存する
+
+### 1. 今回しようと考えたこと
+
+問題と選択肢の次に、Chapterをゲームとして進めるためのStage設定が必要になる。まず1つのStageに「何番目のStageか」「どのキャラクター・敵・背景を使うか」「どのミニゲームを使うか」を保存し、ChapterとStage番号を使って検索できるようにする。
+
+この段階ではゲーム開始APIや画面はまだ作らない。Stage設定を安全に保存・検索できることだけを先に確かめ、次の作業と原因を切り分けやすくする。
+
+### 2. 新しく作ったファイル
+
+- `MiniGameType.java`：READMEで決められたMVPのミニゲーム2種類（`TYPING_SAMURAI`、`CODE_TARGET`）を表すEnum。
+- `StageDefinition.java`：Chapter、Stage番号、キャラクター・敵・背景のKey、ミニゲーム種類、敵HPをDBに保存するEntity。
+- `StageDefinitionRepository.java`：Chapter IDとStage番号を指定してStage設定を検索するRepository。
+
+既存の `GraduationJavaGameApplicationTests.java` に、Stage設定を保存して検索するテストも追加した。敵HPはREADMEにあるMVPの固定値5を使って確認する。
+
+### 3. 動作確認
+
+Spring Bootの起動、Chapter一覧API、問題・選択肢の保存、Stage設定の保存・検索を含むテストを実行した。**テスト4件が成功し、失敗・エラーは0件**だった。Javaの診断でもエラーはなく、`git diff --check`も成功した。
+
+### 4. 初心者向け用語メモ
+
+- **Stage**：5問をひとまとまりにしたゲーム上のステージ。
+- **StageDefinition**：そのStageで使う設定。今回はStage 1の設定データを保存できるようにした。
+- **Key**：キャラクターや背景などを識別するための文字列。画像そのものではなく、あとで対応する画像を選ぶ目印。
+- **Enum**：プログラムで選べる値をあらかじめ限定する仕組み。ミニゲーム種類の入力間違いを防ぎやすくする。
+- **Repository**：Javaの処理からデータベースを検索・保存する窓口。
+
+### 5. まだ作っていないもの
+
+このコミットでは、ChapterにStage設定を作成するAPI、GameSession開始、Stageの自動進行、実際のゲーム画面はまだ作っていない。保存処理があることと、プレイヤーがゲームを遊べることは別の段階である。
+
+### 6. 次に行うこと
+
+QuestionとChoiceを安全な画面用データに変換して返す読み取りAPIを作り、その後GameSessionとStageSessionのデータを1つずつ追加する。どの工程も、機能・テスト・作業記録を一緒に確認してから個別にコミットする。

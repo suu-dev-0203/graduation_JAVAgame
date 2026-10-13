@@ -33,6 +33,9 @@ class GraduationJavaGameApplicationTests {
 	@Autowired
 	private ChoiceRepository choiceRepository;
 
+	@Autowired
+	private StageDefinitionRepository stageDefinitionRepository;
+
 	@Test
 	void contextLoads() {
 	}
@@ -77,5 +80,33 @@ class GraduationJavaGameApplicationTests {
 		assertEquals("選択肢A", choices.get(0).getChoiceText());
 		assertEquals("選択肢B", choices.get(1).getChoiceText());
 		assertTrue(choices.get(0).isCorrect());
+	}
+
+	@Test
+	@Transactional
+	void stageDefinitionIsFoundByChapterAndStageNumber() {
+		// StageはChapterに属し、使うキャラクターなどの設定を持ちます。
+		Chapter chapter = chapterRepository.save(
+				new Chapter("Java Bronze 基礎", "基本文法を学びます。"));
+		StageDefinition stage = stageDefinitionRepository.save(new StageDefinition(
+				chapter,
+				1,
+				"SWORDSMAN",
+				"JAVA_GUARD",
+				"GRASSLAND",
+				MiniGameType.TYPING_SAMURAI,
+				5));
+
+		// GameSession開始時に必要となるChapter内のStage番号で設定を検索します。
+		StageDefinition foundStage = stageDefinitionRepository
+				.findByChapter_ChapterIdAndStageNumber(chapter.getChapterId(), 1)
+				.orElseThrow();
+
+		assertEquals(stage.getStageId(), foundStage.getStageId());
+		assertEquals("SWORDSMAN", foundStage.getPlayerCharacterKey());
+		assertEquals("JAVA_GUARD", foundStage.getEnemyKey());
+		assertEquals("GRASSLAND", foundStage.getFieldKey());
+		assertEquals(MiniGameType.TYPING_SAMURAI, foundStage.getMiniGameType());
+		assertEquals(5, foundStage.getMaxEnemyHp());
 	}
 }
