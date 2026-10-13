@@ -99,6 +99,25 @@ public class StageQuestion {
 		return startedAt;
 	}
 
+	/**
+	 * この問題の開始時刻を記録します。
+	 * 開始済み、または回答済みの問題を開始し直すことはできません。
+	 *
+	 * @param startTime サーバーが決めた問題開始時刻
+	 * @return 初回の記録に成功した場合はtrue、すでに開始・回答済みの場合はfalse
+	 */
+	public boolean start(Instant startTime) {
+		if (startTime == null) {
+			throw new IllegalArgumentException("問題の開始時刻は必須です。");
+		}
+		if (startedAt != null || answeredAt != null) {
+			return false;
+		}
+
+		this.startedAt = startTime;
+		return true;
+	}
+
 	/** 問題に回答した日時を返します。まだ回答していなければnullです。 */
 	public Instant getAnsweredAt() {
 		return answeredAt;
