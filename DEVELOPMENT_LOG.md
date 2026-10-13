@@ -112,3 +112,35 @@ Chapterをテスト用DBに保存してから `GET /api/chapters` を呼び出�
 ### 5. 次に行うこと
 
 Chapter一覧を画面から利用するか、READMEの実装優先順位に沿ってQuestionとChoiceのデータ・APIを小さな単位で追加する。各変更はテストし、今回と同様に実際の確認結果を記録してからコミットする。
+
+## STEP 3：問題と選択肢をDBに保存する
+
+### 1. 目的
+
+READMEに書かれているChapter・Question・Choiceのつながりを作り、問題と選択肢をDBに保存できるようにする。
+
+### 2. 実装した内容
+
+- `QuestionType`：READMEで定められた7種類の問題形式を表すEnum。
+- `Question`：Chapterとの関連、問題形式、問題文、コード、制限時間、解説を保存するEntity。
+- `Choice`：Questionとの関連、選択肢の文章・表示順・正解情報を保存するEntity。
+- `QuestionRepository`：Chapter IDを指定して問題を検索するメソッドを追加。
+- `ChoiceRepository`：問題IDを指定して表示順に選択肢を検索するメソッドを追加。
+- 統合テスト：問題と選択肢をDBに保存し、選択肢が表示順に取得できることを確認。
+
+QuestionとChoiceから親データへの関連には、READMEの方針に沿ってLAZY読み込みの@ManyToOneを使用する。QuestionTypeは文字列としてDBに保存する。Choiceの正解情報はDB内の判定用データであり、ブラウザへ返すAPIはまだ作成していない。
+
+### 3. 動作確認
+
+Chapter一覧API、問題・選択肢の保存と表示順、Spring Bootの起動を確認するテストを実行した。テスト3件が成功し、失敗・エラーは0件だった。
+
+### 4. 学んだこと
+
+- Enumを使うと、問題形式を決められた値から選ぶ形にできる。
+- `@ManyToOne`は「複数の問題が1つのChapterに属する」などの関係を表す。
+- Repositoryのメソッド名に検索条件や並び順を含めると、Spring Data JPAがその条件に沿ったDB検索を行う。
+- 正解情報はサーバー内に保管し、画面向けデータとは分ける必要がある。
+
+### 5. 次に行うこと
+
+問題と選択肢を画面に渡す読み取りAPIを、READMEのAPI仕様に沿って作る。その後、Stageと回答処理へ小さく進み、各段階でテストしてからコミットする。
