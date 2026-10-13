@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Java Learning System</title>
+	<link rel="stylesheet" href="/game.css">
+</head>
+<body>
+	<main class="page">
+		<header class="page-header">
+			<p class="eyebrow">JAVA LEARNING SYSTEM</p>
+			<h1>Javaクエスト</h1>
+			<p>問題を読んで、Javaの知識を身につけよう。</p>
+		</header>
+
+		<section class="panel start-panel" aria-labelledby="start-title">
+			<h2 id="start-title">冒険の準備</h2>
+			<div class="form-row">
+				<label for="chapter-select">学習テーマ</label>
+				<select id="chapter-select" disabled>
+					<option>学習テーマを読み込み中...</option>
+				</select>
+			</div>
+			<button class="primary-button" id="start-button" type="button" disabled>
+				5問のゲームを始める
+			</button>
+		</section>
+
+		<p class="notice" id="message" role="status" aria-live="polite">
+			サーバーから学習テーマを読み込んでいます。
+		</p>
+
+		<section class="panel game-panel" id="game-panel" hidden aria-labelledby="question-title">
+			<div class="game-status">
+				<span id="question-progress">Stage 1 · 問題 1 / 5</span>
+				<span id="score-status">スコア 0</span>
+				<span id="enemy-status">敵HP 5</span>
+			</div>
+			<div class="question-heading">
+				<p class="eyebrow" id="question-type">問題</p>
+				<h2 id="question-title"></h2>
+			</div>
+			<pre class="code-block" id="code-block" hidden><code></code></pre>
+			<div class="choices-heading">選択肢</div>
+			<ol class="choices" id="choices"></ol>
+			<details class="explanation">
+				<summary>問題の短い解説を見る</summary>
+				<p id="short-explanation"></p>
+			</details>
+			<p class="game-note">
+				この画面では問題の表示まで確認できます。回答の送信と正誤判定は次の開発工程で追加します。
+			</p>
+		</section>
+
+		<footer>学習テーマ・問題・選択肢はゲームAPIから読み込みます。</footer>
+	</main>
+	<script src="/game.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,237 @@
+:root {
+	color-scheme: light;
+	font-family: "Yu Gothic UI", "Meiryo", sans-serif;
+	color: #1b2540;
+	background: #f2f5fb;
+	font-synthesis: none;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	min-width: 320px;
+}
+
+button,
+select {
+	font: inherit;
+}
+
+.page {
+	width: min(100% - 32px, 760px);
+	margin: 0 auto;
+	padding: 40px 0 28px;
+}
+
+.page-header {
+	margin-bottom: 24px;
+}
+
+.eyebrow {
+	margin: 0 0 8px;
+	color: #5263bd;
+	font-size: 0.75rem;
+	font-weight: 800;
+	letter-spacing: 0.14em;
+}
+
+h1,
+h2,
+p {
+	margin-top: 0;
+}
+
+.page-header h1 {
+	margin-bottom: 8px;
+	font-size: clamp(2rem, 8vw, 3rem);
+}
+
+.page-header > p:last-child {
+	margin-bottom: 0;
+	color: #59647a;
+}
+
+.panel {
+	padding: clamp(20px, 5vw, 32px);
+	border: 1px solid #e1e6f0;
+	border-radius: 20px;
+	background: #fff;
+	box-shadow: 0 12px 36px rgb(32 49 93 / 7%);
+}
+
+.start-panel h2,
+.question-heading h2 {
+	margin-bottom: 20px;
+}
+
+.form-row {
+	display: grid;
+	gap: 8px;
+	margin-bottom: 18px;
+}
+
+.form-row label,
+.choices-heading {
+	font-weight: 700;
+}
+
+select {
+	width: 100%;
+	min-height: 48px;
+	padding: 10px 12px;
+	border: 1px solid #cbd3e4;
+	border-radius: 10px;
+	background: #fff;
+	color: inherit;
+}
+
+button:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+	outline: 3px solid #9ba8ff;
+	outline-offset: 3px;
+}
+
+.primary-button {
+	min-height: 48px;
+	padding: 10px 18px;
+	border: 0;
+	border-radius: 10px;
+	background: #4657b8;
+	color: #fff;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.primary-button:hover:not(:disabled) {
+	background: #33449f;
+}
+
+.primary-button:disabled {
+	background: #a8afc8;
+	cursor: not-allowed;
+}
+
+.notice {
+	min-height: 24px;
+	margin: 14px 2px;
+	color: #59647a;
+}
+
+.notice.error {
+	color: #a32735;
+	font-weight: 700;
+}
+
+.game-panel {
+	margin-top: 20px;
+}
+
+.game-status {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	padding-bottom: 16px;
+	border-bottom: 1px solid #e7eaf2;
+	color: #4657b8;
+	font-weight: 700;
+}
+
+.question-heading {
+	padding-top: 24px;
+}
+
+.question-heading h2 {
+	font-size: clamp(1.25rem, 5vw, 1.7rem);
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+}
+
+.code-block {
+	overflow-x: auto;
+	padding: 16px;
+	border-radius: 12px;
+	background: #17213c;
+	color: #edf1ff;
+	font: 0.95rem/1.7 Consolas, "Cascadia Code", monospace;
+	white-space: pre-wrap;
+}
+
+.choices-heading {
+	margin: 20px 0 10px;
+}
+
+.choices {
+	display: grid;
+	gap: 10px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	counter-reset: choice;
+}
+
+.choices li {
+	display: grid;
+	grid-template-columns: 38px 1fr;
+	gap: 12px;
+	align-items: center;
+	min-height: 52px;
+	padding: 12px;
+	border: 1px solid #dfe4ef;
+	border-radius: 12px;
+	background: #fbfcff;
+	counter-increment: choice;
+	overflow-wrap: anywhere;
+}
+
+.choices li::before {
+	display: grid;
+	width: 32px;
+	height: 32px;
+	place-items: center;
+	border-radius: 9px;
+	background: #e9ecfb;
+	color: #384aa9;
+	content: counter(choice, upper-alpha);
+	font-weight: 800;
+}
+
+.explanation {
+	margin-top: 20px;
+	color: #46516a;
+}
+
+.explanation summary {
+	width: fit-content;
+	color: #394aa8;
+	cursor: pointer;
+	font-weight: 700;
+}
+
+.explanation p {
+	margin: 10px 0 0;
+	line-height: 1.7;
+}
+
+.game-note {
+	margin: 22px 0 0;
+	padding: 12px;
+	border-radius: 10px;
+	background: #f2f4fc;
+	color: #59647a;
+	font-size: 0.9rem;
+	line-height: 1.6;
+}
+
+footer {
+	padding: 24px 4px 0;
+	color: #69738a;
+	font-size: 0.85rem;
+}
+
+[hidden] {
+	display: none !important;
+}

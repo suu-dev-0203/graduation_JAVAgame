@@ -10,9 +10,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -64,6 +66,15 @@ class GraduationJavaGameApplicationTests {
 	/** Spring Bootが必要な設定を読み込み、起動できることを確認します。 */
 	@Test
 	void contextLoads() {
+	}
+
+	/** トップページからブラウザー向けのゲーム画面を配信できることを確認します。 */
+	@Test
+	void homePageReturnsTheGameScreen() throws Exception {
+		mockMvc.perform(get("/index.html"))
+				.andExpect(status().isOk())
+				.andExpect(content().string(containsString("id=\"start-button\"")))
+				.andExpect(content().string(containsString("id=\"game-panel\"")));
 	}
 
 	/** Chapter一覧APIがDBに登録した名前と説明を返すことを確認します。 */
