@@ -180,3 +180,48 @@ Spring Bootの起動、Chapter一覧API、問題・選択肢の保存、Stage設
 ### 6. 次に行うこと
 
 QuestionとChoiceを安全な画面用データに変換して返す読み取りAPIを作り、その後GameSessionとStageSessionのデータを1つずつ追加する。どの工程も、機能・テスト・作業記録を一緒に確認してから個別にコミットする。
+
+## STEP 5：ゲーム全体とStageの進行記録を保存する
+
+### 1. 今回しようと考えたこと
+
+Stageの設定だけでは、プレイヤーが今何問目まで進んだか、ゲームを一時停止しているか、何点取ったかを記録できない。そこで、READMEで役割が分かれている2種類の記録を追加する。
+
+- **GameSession**：1回のゲーム全体を記録する。選んだChapter、問題数、Stage数、現在のStage、得点、全体状態を持つ。
+- **StageSession**：そのゲームの各Stageを個別に記録する。現在の問題番号、正解数、敵HP、コンボ、Pause状態を持つ。
+
+こうして全体の進み具合と各Stageの途中経過を別々に記録すると、Stageごとの結果を保ちながら、次のStageへ進める土台になる。
+
+### 2. 新しく作ったファイル
+
+- `GameSessionStatus.java`：ゲーム全体の状態（プレイ中・一時停止・完了・中断）を表すEnum。
+- `StageSessionStatus.java`：Stageの状態（プレイ中・一時停止・クリア・中断）を表すEnum。
+- `GameSession.java`：ゲーム全体の記録をデータベースに保存するEntity。
+- `StageSession.java`：1つのStageの進行状況をデータベースに保存するEntity。
+- `GameSessionRepository.java`：ゲーム全体の記録を保存・検索するRepository。
+- `StageSessionRepository.java`：Stageの記録を保存・検索するRepository。同じゲームに同じStageを重複作成しないための確認メソッドも追加した。
+
+`StageSession`には、同じゲームIDとStage IDの組み合わせを2回登録できないDB制約も設定した。Repositoryで事前確認する方法とDB制約を組み合わせ、Stageの二重作成を防ぐ準備をする。
+
+### 3. 既存ファイルで変更した内容
+
+- `GraduationJavaGameApplicationTests.java`：ゲームとStageの記録をDBに保存し、開始状態やStage検索結果を確認するテストを追加した。
+- `GraduationJavaGameApplication.java`：アプリの起動地点と`main`メソッドの役割をコメントで説明した。
+- Chapter、Question、Choice、StageDefinitionのEntity：DBに保存する各項目と取得メソッドの役割をコメントで説明した。
+- 各Repository：DB操作の窓口としての役割と、独自検索メソッドの意味をコメントで説明した。
+- ChapterController、ChapterService、ChapterResponse：APIリクエスト、データ変換、画面へ返す項目の役割をコメントで説明した。
+- QuestionType、MiniGameType：選べる各値の意味をコメントで説明した。
+
+今回の作業で`src`にあるJavaファイル21個を確認し、クラスやEnumの役割、初学者が迷いやすいフィールド・処理に日本語コメントを追加・補足した。コードを一行ずつ言い換えるのではなく、「このファイルや値は何のためにあるか」を読んで説明できるコメントにする。
+
+### 4. 動作確認
+
+Chapter一覧API、問題・選択肢の保存と並び順、Stage設定の保存と検索、新しいGameSession・StageSessionの保存をテストした。**テスト5件が成功し、失敗・エラーは0件**だった。Javaの診断エラーはなく、`git diff --check`も成功した。
+
+### 5. まだ作っていないもの
+
+今回作ったのはゲームの進行状況を保存する土台であり、GameSessionをブラウザから開始するAPI、5・10・20問の入力検証、Stage開始処理、実際に遊べる画面はまだない。
+
+### 6. 次に行うこと
+
+READMEに沿ってGameSession開始の処理を作る。入力されたChapterと5・10・20問の選択を検証し、必要なStage設定や問題数を確認してから、最初のGameSessionとStageSessionを作成し、APIのテストを追加する。入力エラーのHTTPレスポンスもREADMEの仕様に合わせて確認する。

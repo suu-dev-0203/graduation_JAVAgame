@@ -13,12 +13,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/chapters")
 public class ChapterController {
 
+	/** Chapter一覧を用意する処理をServiceに依頼します。 */
 	private final ChapterService chapterService;
 
 	public ChapterController(ChapterService chapterService) {
 		this.chapterService = chapterService;
 	}
 
+	/**
+	 * GET /api/chaptersへのリクエストを受け、Chapter一覧をJSONで返します。
+	 */
 	@GetMapping
 	public List<ChapterResponse> findAll() {
 		return chapterService.findAll();

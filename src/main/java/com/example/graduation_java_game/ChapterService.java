@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ChapterService {
 
+	/** DBからChapterを読み書きする窓口です。 */
 	private final ChapterRepository chapterRepository;
 
 	public ChapterService(ChapterRepository chapterRepository) {
@@ -17,7 +18,8 @@ public class ChapterService {
 	}
 
 	/**
-	 * DBのChapterを、APIで返す形式に変換して一覧で返します。
+	 * DBのChapterをAPI用データに変換して一覧で返します。
+	 * Streamのmapは、各ChapterからID・名前・説明だけを取り出します。
 	 */
 	public List<ChapterResponse> findAll() {
 		return chapterRepository.findAll().stream()
