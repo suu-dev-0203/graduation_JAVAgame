@@ -37,6 +37,24 @@ public class GameSessionController {
 	}
 
 	/**
+	 * Stageをクリアしたときに、Stage単位の結果を返します。
+	 */
+	@GetMapping("/{gameSessionId}/stages/{stageNumber}/result")
+	public StageResultResponse findStageResult(
+			@PathVariable Long gameSessionId,
+			@PathVariable int stageNumber) {
+		return gameSessionService.findStageResult(gameSessionId, stageNumber);
+	}
+
+	/**
+	 * ゲーム全体を完了したときに、Game Resultを返します。
+	 */
+	@GetMapping("/{gameSessionId}/result")
+	public GameResultResponse findGameResult(@PathVariable Long gameSessionId) {
+		return gameSessionService.findGameResult(gameSessionId);
+	}
+
+	/**
 	 * Stage Clear後、次のStageが残っているゲームを進めます。
 	 */
 	@PostMapping("/{gameSessionId}/advance-stage")

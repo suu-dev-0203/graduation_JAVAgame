@@ -356,6 +356,14 @@ class GraduationJavaGameApplicationTests {
 				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
 
 		answerCurrentStage(createdGame.gameSessionId());
+		mockMvc.perform(get(
+				"/api/game-sessions/{id}/stages/{stageNumber}/result",
+				createdGame.gameSessionId(),
+				1))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.correctCount").value(5))
+				.andExpect(jsonPath("$.hasNextStage").value(true))
+				.andExpect(jsonPath("$.gameCompleted").value(false));
 		mockMvc.perform(post(
 				"/api/game-sessions/{id}/advance-stage", createdGame.gameSessionId()))
 				.andExpect(status().isOk())
@@ -475,6 +483,16 @@ class GraduationJavaGameApplicationTests {
 		}
 		GameSessionCreateResponse startedGame = gameSessionService.create(
 				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+		mockMvc.perform(get(
+				"/api/game-sessions/{gameSessionId}/result", startedGame.gameSessionId()))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
+		mockMvc.perform(get(
+				"/api/game-sessions/{gameSessionId}/stages/{stageNumber}/result",
+				startedGame.gameSessionId(),
+				1))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
 
 		mockMvc.perform(get("/api/game-sessions/{id}/current", startedGame.gameSessionId()))
 				.andExpect(status().isOk())
@@ -774,6 +792,15 @@ class GraduationJavaGameApplicationTests {
 		createChoicesForQuestions(chapter);
 		GameSessionCreateResponse startedGame = gameSessionService.create(
 				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+		mockMvc.perform(get("/api/game-sessions/{id}/result", startedGame.gameSessionId()))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
+		mockMvc.perform(get(
+				"/api/game-sessions/{id}/stages/{stageNumber}/result",
+				startedGame.gameSessionId(),
+				1))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
 
 		for (int index = 0; index < 5; index++) {
 			CurrentGameResponse currentGame = gameSessionService.findCurrent(startedGame.gameSessionId());
@@ -811,6 +838,28 @@ class GraduationJavaGameApplicationTests {
 				.findById(startedGame.gameSessionId())
 				.orElseThrow()
 				.getStatus());
+		mockMvc.perform(get(
+				"/api/game-sessions/{gameSessionId}/stages/{stageNumber}/result",
+				startedGame.gameSessionId(),
+				1))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.stageNumber").value(1))
+				.andExpect(jsonPath("$.correctCount").value(5))
+				.andExpect(jsonPath("$.stageScore").value(500))
+				.andExpect(jsonPath("$.maxCombo").value(5))
+				.andExpect(jsonPath("$.perfect").value(true))
+				.andExpect(jsonPath("$.hasNextStage").value(false))
+				.andExpect(jsonPath("$.gameCompleted").value(true));
+		mockMvc.perform(get(
+				"/api/game-sessions/{gameSessionId}/result", startedGame.gameSessionId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.questionCount").value(5))
+				.andExpect(jsonPath("$.totalStageCount").value(1))
+				.andExpect(jsonPath("$.completedStageCount").value(1))
+				.andExpect(jsonPath("$.totalCorrectCount").value(5))
+				.andExpect(jsonPath("$.totalScore").value(500))
+				.andExpect(jsonPath("$.perfectStageCount").value(1))
+				.andExpect(jsonPath("$.status").value("COMPLETED"));
 	}
 
 	/** 存在しないゲームIDで現在状態を要求した場合、404を返すことを確認します。 */

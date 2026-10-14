@@ -1328,6 +1328,7 @@ POST /api/answers
 POST /api/stage-sessions/{stageSessionId}/pause
 POST /api/stage-sessions/{stageSessionId}/resume
 POST /api/game-sessions/{gameSessionId}/advance-stage
+GET  /api/game-sessions/{gameSessionId}/stages/{stageNumber}/result
 GET  /api/game-sessions/{gameSessionId}/result
 GET  /api/game-sessions/{gameSessionId}/review
 ```
@@ -1570,7 +1571,7 @@ Request：
 
 Game Result画面は、結果を確認するエリアとReviewへ進むためのエリアを分けて表示します。Reviewへ進むことで、各問題の詳しい振り返りを行えます。
 
-`ResultResponse`：
+`GameResultResponse`：
 
 ```json
 {
@@ -1584,6 +1585,30 @@ Game Result画面は、結果を確認するエリアとReviewへ進むための
   "status": "COMPLETED"
 }
 ```
+
+Stageをクリアしたあと、次Stageへ進む前に次のAPIでStage単位の結果を取得します。
+
+```text
+GET /api/game-sessions/{gameSessionId}/stages/{stageNumber}/result
+```
+
+`StageResultResponse`：
+
+```json
+{
+  "gameSessionId": 1001,
+  "stageSessionId": 2001,
+  "stageNumber": 1,
+  "correctCount": 5,
+  "stageScore": 500,
+  "maxCombo": 5,
+  "perfect": true,
+  "hasNextStage": true,
+  "gameCompleted": false
+}
+```
+
+Stage結果は正解数・Stageスコア・最大Combo・Perfect判定・次Stageの有無を示します。結果APIはStageが`CLEARED`になった後だけ利用できます。Game Result APIはGameSessionが`COMPLETED`になった後だけ利用できます。
 
 `ReviewResponse`：
 

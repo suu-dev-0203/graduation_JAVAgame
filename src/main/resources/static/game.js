@@ -5,8 +5,13 @@ const startButton = document.querySelector("#start-button");
 const startPanel = document.querySelector(".start-panel");
 const startQuestionButton = document.querySelector("#start-question-button");
 const nextQuestionButton = document.querySelector("#next-question-button");
+const nextStageButton = document.querySelector("#next-stage-button");
+const finishGameButton = document.querySelector("#finish-game-button");
+const returnHomeButton = document.querySelector("#return-home-button");
 const message = document.querySelector("#message");
 const gamePanel = document.querySelector("#game-panel");
+const stageResultPanel = document.querySelector("#stage-result-panel");
+const gameResultPanel = document.querySelector("#game-result-panel");
 const choicesElement = document.querySelector("#choices");
 const answerResult = document.querySelector("#answer-result");
 const answerResultTitle = document.querySelector("#answer-result-title");
@@ -67,6 +72,8 @@ async function startGame() {
 	stopTimer();
 	startButton.disabled = true;
 	gamePanel.hidden = true;
+	stageResultPanel.hidden = true;
+	gameResultPanel.hidden = true;
 	message.classList.remove("error");
 	message.textContent = "ゲームの準備をしています...";
 
@@ -308,16 +315,11 @@ function showAnswerResult(result) {
 	startQuestionButton.hidden = true;
 
 	if (result.stageClear) {
-		const hasNextStage = currentGame.currentStageNumber < currentGame.totalStageCount;
 		answerResultTitle.textContent = result.perfect ? "PERFECT！ Stage Clear" : "Stage Clear";
-		nextQuestionButton.hidden = !hasNextStage;
-		nextQuestionButton.textContent = "次のStageへ進む";
-		message.textContent = hasNextStage
-			? "Stageをクリアしました。次のStageへ進めます。"
-			: "すべてのStageをクリアしました。ゲーム終了です。";
-		if (hasNextStage) {
-			nextQuestionButton.focus();
-		}
+		nextQuestionButton.hidden = false;
+		nextQuestionButton.textContent = "Stage結果を見る";
+		message.textContent = "Stageをクリアしました。結果を確認してください。";
+		nextQuestionButton.focus();
 	} else {
 		nextQuestionButton.hidden = false;
 		nextQuestionButton.textContent = "次の問題へ";
@@ -333,10 +335,8 @@ async function showNextQuestion() {
 	nextQuestionButton.disabled = true;
 	try {
 		if (currentGame.questionNumber === currentGame.totalQuestionsInStage) {
-			await requestJson(
-				`/api/game-sessions/${gameSessionId}/advance-stage`,
-				{ method: "POST" }
-			);
+			await showStageResult();
+			return;
 		}
 		const next = await getCurrentGame();
 		showQuestion(next);
@@ -348,6 +348,77 @@ async function showNextQuestion() {
 	} finally {
 		nextQuestionButton.disabled = false;
 	}
+}
+
+async function showStageResult() {
+	const result = await requestJson(
+		`/api/game-sessions/${gameSessionId}/stages/${currentGame.currentStageNumber}/result`
+	);
+	document.querySelector("#stage-result-title").textContent = result.perfect
+		? `Stage ${result.stageNumber} PERFECT！`
+		: `Stage ${result.stageNumber} 結果`;
+	document.querySelector("#stage-result-summary").textContent =
+		`正解 ${result.correctCount} / 5問 · Stageスコア ${result.stageScore}`;
+	document.querySelector("#stage-result-combo").textContent =
+		`最大Combo ${result.maxCombo}`;
+	nextStageButton.hidden = !result.hasNextStage;
+	finishGameButton.hidden = !result.gameCompleted;
+	gamePanel.hidden = true;
+	stageResultPanel.hidden = false;
+	stageResultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+	message.textContent = result.gameCompleted
+		? "最終Stageの結果です。Game Resultへ進んでください。"
+		: "Stage結果を確認し、次のStageへ進んでください。";
+}
+
+async function showGameResult() {
+	finishGameButton.disabled = true;
+	try {
+		const result = await requestJson(`/api/game-sessions/${gameSessionId}/result`);
+		document.querySelector("#game-result-summary").textContent =
+			`${result.questionCount}問中 ${result.totalCorrectCount}問正解 · 合計スコア ${result.totalScore}`;
+		document.querySelector("#game-result-perfect").textContent =
+			`クリアしたStage ${result.completedStageCount} / ${result.totalStageCount} · PERFECT ${result.perfectStageCount}回`;
+		stageResultPanel.hidden = true;
+		gameResultPanel.hidden = false;
+		gameResultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+		message.textContent = "ゲーム全体の結果です。おつかれさまでした。";
+	} catch (error) {
+		showError(error);
+	} finally {
+		finishGameButton.disabled = false;
+	}
+}
+
+async function startNextStage() {
+	nextStageButton.disabled = true;
+	try {
+		await requestJson(
+			`/api/game-sessions/${gameSessionId}/advance-stage`,
+			{ method: "POST" }
+		);
+		const next = await getCurrentGame();
+		stageResultPanel.hidden = true;
+		showQuestion(next);
+		message.textContent = "次のStageを開始しました。Enterで問題を開始してください。";
+		gamePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+	} catch (error) {
+		showError(error);
+	} finally {
+		nextStageButton.disabled = false;
+	}
+}
+
+function returnToHome() {
+	gameSessionId = null;
+	currentGame = null;
+	questionState = "WAITING_TO_START";
+	gameResultPanel.hidden = true;
+	stageResultPanel.hidden = true;
+	gamePanel.hidden = true;
+	startPanel.hidden = false;
+	message.textContent = "学習テーマを選んでゲームを始めてください。";
+	startPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function difficultyLabel(difficulty) {
@@ -379,6 +450,9 @@ selectionModeSelect.addEventListener("change", updateQuestionCountOptions);
 questionCountSelect.addEventListener("change", updateQuestionCountOptions);
 startQuestionButton.addEventListener("click", startCurrentQuestion);
 nextQuestionButton.addEventListener("click", showNextQuestion);
+nextStageButton.addEventListener("click", startNextStage);
+finishGameButton.addEventListener("click", showGameResult);
+returnHomeButton.addEventListener("click", returnToHome);
 choicesElement.addEventListener("click", (event) => {
 	if (!(event.target instanceof Element)) {
 		return;

@@ -84,6 +84,23 @@
 			</p>
 		</section>
 
+		<section class="panel result-panel" id="stage-result-panel" hidden aria-labelledby="stage-result-title">
+			<p class="eyebrow">STAGE RESULT</p>
+			<h2 id="stage-result-title">Stage Clear</h2>
+			<p id="stage-result-summary"></p>
+			<p id="stage-result-combo"></p>
+			<button class="primary-button" id="next-stage-button" type="button" hidden>次のStageへ進む</button>
+			<button class="primary-button" id="finish-game-button" type="button" hidden>Game Resultを見る</button>
+		</section>
+
+		<section class="panel result-panel" id="game-result-panel" hidden aria-labelledby="game-result-title">
+			<p class="eyebrow">GAME RESULT</p>
+			<h2 id="game-result-title">ゲームクリア</h2>
+			<p id="game-result-summary"></p>
+			<p id="game-result-perfect"></p>
+			<button class="primary-button" id="return-home-button" type="button">タイトルへ戻る</button>
+		</section>
+
 		<footer>学習テーマ・問題・選択肢はゲームAPIから読み込みます。</footer>
 	</main>
 	<script src="/game.js" defer></script>

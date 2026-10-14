@@ -309,6 +309,101 @@ public class GameSessionService {
 	}
 
 	/**
+	 * クリア済みStageの回答履歴から正解数、得点、最大コンボを集計します。
+	 */
+	@Transactional(readOnly = true)
+	public StageResultResponse findStageResult(Long gameSessionId, int stageNumber) {
+		GameSession gameSession = gameSessionRepository.findById(gameSessionId)
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.NOT_FOUND,
+						"NOT_FOUND",
+						"指定されたGameSessionが見つかりません。"));
+		if (stageNumber < 1 || stageNumber > gameSession.getTotalStageCount()) {
+			throw new GameApiException(
+					HttpStatus.NOT_FOUND,
+					"NOT_FOUND",
+					"指定されたStageが見つかりません。");
+		}
+
+		StageSession stageSession = stageSessionRepository
+				.findByGameSession_GameSessionId(gameSessionId)
+				.stream()
+				.filter(candidate -> candidate.getStageDefinition().getStageNumber() == stageNumber)
+				.findFirst()
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.NOT_FOUND,
+						"NOT_FOUND",
+						"指定されたStageが見つかりません。"));
+		if (stageSession.getStatus() != StageSessionStatus.CLEARED) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"INVALID_GAME_STATE",
+					"Stageをクリアしたあとに結果を確認できます。");
+		}
+
+		List<AnswerHistory> histories = answerHistoryRepository
+				.findByStageSession_StageSessionIdOrderByStageQuestion_QuestionOrder(
+						stageSession.getStageSessionId());
+		int currentCombo = 0;
+		int maxCombo = 0;
+		for (AnswerHistory history : histories) {
+			currentCombo = history.isCorrect() ? currentCombo + 1 : 0;
+			maxCombo = Math.max(maxCombo, currentCombo);
+		}
+
+		return new StageResultResponse(
+				gameSessionId,
+				stageSession.getStageSessionId(),
+				stageNumber,
+				stageSession.getCorrectCount(),
+				stageSession.getCorrectCount() * 100,
+				maxCombo,
+				stageSession.getCorrectCount() == 5,
+				stageNumber < gameSession.getTotalStageCount(),
+				gameSession.getStatus() == GameSessionStatus.COMPLETED);
+	}
+
+	/**
+	 * 完了済みのゲームから、全Stageの結果をまとめます。
+	 */
+	@Transactional(readOnly = true)
+	public GameResultResponse findGameResult(Long gameSessionId) {
+		GameSession gameSession = gameSessionRepository.findById(gameSessionId)
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.NOT_FOUND,
+						"NOT_FOUND",
+						"指定されたGameSessionが見つかりません。"));
+		if (gameSession.getStatus() != GameSessionStatus.COMPLETED) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"INVALID_GAME_STATE",
+					"ゲーム全体を完了したあとに結果を確認できます。");
+		}
+
+		List<StageSession> stageSessions = stageSessionRepository
+				.findByGameSession_GameSessionId(gameSessionId);
+		int totalCorrectCount = stageSessions.stream()
+				.mapToInt(StageSession::getCorrectCount)
+				.sum();
+		int perfectStageCount = (int) stageSessions.stream()
+				.filter(stage -> stage.getStatus() == StageSessionStatus.CLEARED
+						&& stage.getCorrectCount() == 5)
+				.count();
+
+		return new GameResultResponse(
+				gameSessionId,
+				gameSession.getQuestionCount(),
+				gameSession.getTotalStageCount(),
+				(int) stageSessions.stream()
+						.filter(stage -> stage.getStatus() == StageSessionStatus.CLEARED)
+						.count(),
+				totalCorrectCount,
+				gameSession.getScore(),
+				perfectStageCount,
+				gameSession.getStatus());
+	}
+
+	/**
 	 * 現在の問題を初めて開始し、サーバーの開始時刻と残り時間を返します。
 	 */
 	@Transactional

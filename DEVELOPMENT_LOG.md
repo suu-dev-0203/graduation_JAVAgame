@@ -744,3 +744,21 @@ Java Bronze風の問題は、試験の出題領域を参考にしたオリジナ
 ### 3. 動作確認
 
 ブラウザーで「5問のゲームを始める」を押し、冒険の準備画面が消えて問題画面が表示されること、問題エリアまで自動で移動することを確認した。最初の問題は従来どおり、Enterキーまたは「問題開始」ボタンを押してから回答する。
+
+## STEP 15：Stage ResultとGame Resultを表示する
+
+### 1. 何を作ったか
+
+Stageの5問を終えたときに、そのStageの結果を表示する画面を追加した。正解数、Stageの得点、最大Combo、5問すべて正解したかを確認できる。次のStageがあるゲームでは、この結果画面から次のStageへ進む。
+
+最後のStageを終えたゲームでは、Stage ResultからGame Resultへ進む。Game Resultには、ゲーム全体の問題数・正解数・合計得点、完了Stage数、PerfectになったStage数を表示する。結果を確認したあと、タイトル（冒険の準備画面）に戻って次のゲームを始められる。
+
+### 2. Java APIと結果の決め方
+
+結果はブラウザー側で推測せず、Java APIが保存済みの記録から集計する。Stage Resultは、Stageがクリア済みの場合だけ取得できる。Game Resultは、ゲーム全体が完了した場合だけ取得できる。まだ遊んでいる途中で結果APIを呼び出した場合は、誤った結果を表示せずエラーを返す。
+
+READMEのAPI一覧にStage Result APIを加え、Game ResultとStage Resultの返却項目も記載した。
+
+### 3. 動作確認
+
+Javaのテストを28件実行し、すべて成功した。Stageを完了する前はStage／Gameの結果を取得できないこと、5問すべて正解したときにStage Resultが正解5問・500点・最大Combo 5・Perfectとなること、Game Resultが完了Stage 1・正解5問・合計500点・Perfect Stage 1回を返すことをAPIテストで確認した。ブラウザーでもStage Result、Game Result、次Stage／タイトルへの移動を確認する。

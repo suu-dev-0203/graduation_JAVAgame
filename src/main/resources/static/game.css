@@ -130,6 +130,19 @@ summary:focus-visible {
 	margin-top: 20px;
 }
 
+.result-panel {
+	margin-top: 20px;
+	line-height: 1.7;
+}
+
+.result-panel h2 {
+	font-size: clamp(1.5rem, 6vw, 2rem);
+}
+
+.result-panel .primary-button + .primary-button {
+	margin-left: 8px;
+}
+
 .game-status {
 	display: flex;
 	flex-wrap: wrap;
