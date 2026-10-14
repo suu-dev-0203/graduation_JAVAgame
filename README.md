@@ -202,7 +202,7 @@ MVPでは5問・10問・15問・20問から選択します。
 20問 = 4 Stage
 ```
 
-GameSessionはChapter、出題方法、5/10/15/20問の問題数を選択して開始します。開始StageはChapter内のStage 1です。各Stageの5問をクリアした後、Stage Result画面のボタンから次のStageへ進みます。必要なStage数が存在しない場合、そのGameSessionは開始できません。入門問題だけを選んだ場合は15問まで選択できます。
+GameSessionはChapter、出題方法、5/10/15/20問の問題数を選択して開始します。すべての出題方法で20問まで選べます。開始StageはChapter内のStage 1です。各Stageの5問をクリアした後、Stage Result画面のボタンから次のStageへ進みます。必要なStage数または問題数が存在しない場合、そのGameSessionは開始できません。
 
 Stageの解放条件は設けません。
 
@@ -1414,7 +1414,7 @@ Response：
 }
 ```
 
-`questionCount`は5・10・15・20を許可します。出題方法は`RANDOM`（全難易度からランダム）、`EASY`（入門）、`ADVANCED`（応用）、`BRONZE_STYLE`（Java Bronze風のオリジナル問題）です。入門問題は15問、他の出題方法は20問まで選べます。
+`questionCount`は5・10・15・20を許可します。出題方法は`RANDOM`（全難易度からランダム）、`EASY`（入門）、`ADVANCED`（応用）、`BRONZE_STYLE`（Java Bronze風のオリジナル問題）です。すべての出題方法で20問まで選べます。各Chapterには、どの出題方法でも20問以上を用意します。
 
 苦手特訓では`sessionType`に`WEAK_TRAINING`を指定し、`questionCount`に5・10・15・20のいずれかを設定します。通常のゲームでは`STANDARD`を指定します。苦手特訓でも、5問ごとにStage Resultを表示し、次Stageボタンを押して進みます。
 

@@ -88,7 +88,7 @@ async function loadChapters() {
 		questionCountSelect.disabled = false;
 		startButton.disabled = false;
 		message.textContent = "学習テーマを選んでゲームを始めてください。";
-		updateQuestionCountOptions();
+		updateQuestionCountDisplay();
 		await restoreSavedGame();
 	} catch (error) {
 		showError(error);
@@ -927,19 +927,9 @@ function difficultyLabel(difficulty) {
 	}[difficulty] || "Javaの問題";
 }
 
-function updateQuestionCountOptions() {
-	const isEasyMode = selectionModeSelect.value === "EASY";
-	// 入門の問題は15問までです。それ以外の出題方法では20問まで選べます。
-	const maximum = isEasyMode ? 15 : 20;
-	for (const option of questionCountSelect.options) {
-		option.disabled = Number(option.value) > maximum;
-	}
-	if (Number(questionCountSelect.value) > maximum) {
-		questionCountSelect.value = String(maximum);
-	}
-	questionCountHelp.textContent = isEasyMode
-		? "5問ずつStageを進みます。入門では5・10・15問から選べます。"
-		: "5問ずつStageを進みます。5・10・15・20問から選べます。";
+function updateQuestionCountDisplay() {
+	// Stageは5問ですが、ここではゲーム全体の問題数を選びます。
+	questionCountHelp.textContent = "5問ずつStageを進みます。どの出題方法でも5・10・15・20問から選べます。";
 	startButton.textContent = `${questionCountSelect.value}問のゲームを始める`;
 }
 
@@ -969,8 +959,8 @@ chapterProgressList.addEventListener("click", (event) => {
 		startGame("WEAK_TRAINING", button.dataset.trainingChapterId);
 	}
 });
-selectionModeSelect.addEventListener("change", updateQuestionCountOptions);
-questionCountSelect.addEventListener("change", updateQuestionCountOptions);
+selectionModeSelect.addEventListener("change", updateQuestionCountDisplay);
+questionCountSelect.addEventListener("change", updateQuestionCountDisplay);
 trainingQuestionCountSelect.addEventListener("change", updateTrainingButtonLabels);
 startQuestionButton.addEventListener("click", startCurrentQuestion);
 answerDetailedExplanationDetails.addEventListener("toggle", updateAnswerExplanationPause);

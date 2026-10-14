@@ -11,12 +11,12 @@ import org.junit.jupiter.api.Test;
 class OriginalQuestionBankTest {
 
 	@Test
-	void createsSeventeenChaptersWithFifteenEasyAndTwentyQuestionsAtEachHigherLevel() {
+	void createsSeventeenChaptersWithTwentyQuestionsAtEveryLevel() {
 		assertEquals(17, OriginalQuestionBank.chapters().size());
 
 		for (OriginalQuestionBank.ChapterSeed chapter : OriginalQuestionBank.chapters()) {
 			assertEquals(5, chapter.concepts().size());
-			assertEquals(15, OriginalQuestionBank.questionsFor(chapter, QuestionDifficulty.EASY).size());
+			assertEquals(20, OriginalQuestionBank.questionsFor(chapter, QuestionDifficulty.EASY).size());
 			assertEquals(20, OriginalQuestionBank.questionsFor(chapter, QuestionDifficulty.ADVANCED).size());
 			assertEquals(20, OriginalQuestionBank.questionsFor(chapter, QuestionDifficulty.BRONZE_STYLE).size());
 
@@ -31,7 +31,7 @@ class OriginalQuestionBankTest {
 					allPrompts.add(question.questionText());
 				}
 			}
-			assertEquals(55, allPrompts.size(), chapter.name());
+			assertEquals(60, allPrompts.size(), chapter.name());
 		}
 	}
 }

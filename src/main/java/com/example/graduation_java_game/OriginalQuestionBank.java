@@ -11,7 +11,8 @@ final class OriginalQuestionBank {
 	private static final List<String> EASY_FORMS = List.of(
 			"「%s」について、最も基本的で正しい説明はどれですか？",
 			"Javaを学び始めた人が「%s」で覚える内容として正しいものはどれですか？",
-			"次のうち、「%s」の使い方・役割を正しく説明しているものはどれですか？");
+			"次のうち、「%s」の使い方・役割を正しく説明しているものはどれですか？",
+			"「%s」の説明として、正しいものを選んでください。");
 
 	private static final List<String> ADVANCED_FORMS = List.of(
 			"次の要件をJavaで実現するとき、「%s」について正しい説明はどれですか？",
@@ -152,8 +153,9 @@ final class OriginalQuestionBank {
 			case ADVANCED -> ADVANCED_FORMS;
 			case BRONZE_STYLE -> BRONZE_FORMS;
 		};
-		int variationsPerConcept = difficulty == QuestionDifficulty.EASY ? 3 : 4;
-		List<BankQuestion> questions = new ArrayList<>(difficulty == QuestionDifficulty.EASY ? 15 : 20);
+		// 5つの内容に4種類の問い方を用意するので、1Chapter20問になります。
+		int variationsPerConcept = forms.size();
+		List<BankQuestion> questions = new ArrayList<>(chapter.concepts().size() * variationsPerConcept);
 		for (int conceptIndex = 0; conceptIndex < chapter.concepts().size(); conceptIndex++) {
 			ConceptSeed concept = chapter.concepts().get(conceptIndex);
 			for (int variation = 0; variation < variationsPerConcept; variation++) {
@@ -162,9 +164,7 @@ final class OriginalQuestionBank {
 						: concept.topic() + "（" + (difficulty == QuestionDifficulty.ADVANCED
 								? ADVANCED_CONTEXTS.get(variation)
 								: BRONZE_CONTEXTS.get(variation)) + "）";
-				String form = forms.get(difficulty == QuestionDifficulty.EASY
-						? variation
-						: variation);
+				String form = forms.get(variation);
 				String prompt = form.formatted(topic);
 				List<String> choices = List.of(
 						concept.answer(),

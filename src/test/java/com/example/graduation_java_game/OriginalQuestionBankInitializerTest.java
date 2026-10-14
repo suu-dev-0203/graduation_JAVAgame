@@ -27,7 +27,7 @@ class OriginalQuestionBankInitializerTest {
 	@Test
 	void demoProfileSeedsAllChaptersQuestionsAndStages() {
 		assertEquals(17, chapterRepository.count());
-		assertEquals(935, questionRepository.count());
+		assertEquals(1020, questionRepository.count());
 		assertEquals(68, stageDefinitionRepository.count());
 
 		for (Chapter chapter : chapterRepository.findAll()) {
@@ -38,7 +38,7 @@ class OriginalQuestionBankInitializerTest {
 					.collect(Collectors.groupingBy(
 							Function.identity(),
 							Collectors.counting()));
-			assertEquals(15L, counts.get(QuestionDifficulty.EASY), chapter.getName());
+			assertEquals(20L, counts.get(QuestionDifficulty.EASY), chapter.getName());
 			assertEquals(20L, counts.get(QuestionDifficulty.ADVANCED), chapter.getName());
 			assertEquals(20L, counts.get(QuestionDifficulty.BRONZE_STYLE), chapter.getName());
 		}
