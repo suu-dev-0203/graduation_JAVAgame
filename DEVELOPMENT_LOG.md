@@ -1116,3 +1116,30 @@ Javaファイルの一覧を短くしながら、画面に表示する内容とA
 ### 4. 確認結果と未確認事項
 
 自動テストは実行していない。PCに保存済みのMavenをオフラインで使ってコンパイルを試したが、Javaコンパイラーが保存済みの`spring-expression-7.0.9.jar`を読み込む段階で失敗した。原因の特定や外部からの再ダウンロードは行っていない。そのため、コンパイルとアプリの動作は未確認である。ソースコードの差分を読み、処理を移した呼び出し先と必要な依存関係を確認した。`git diff --check`で差分の空白エラーがないことを確認した。
+
+## STEP 29：Mavenのコンパイル時に出たアクセス拒否を調べる
+
+### 1. 原因の確認
+
+- エラーに表示された`spring-expression-7.0.9.jar`を読み取り専用で調べた。ZIPファイルとして正常に読めたため、壊れたファイルではない。
+- Mavenの詳しいエラーには、JavaコンパイラーがこのJARを閉じる処理で`AccessDeniedException`（Windowsからのアクセス拒否）になったと記録されていた。Javaソースの文法エラーを示す内容ではなかった。
+
+### 2. コンパイル方法と結果
+
+- `maven.compiler.fork=true`を指定し、Maven本体とは別のJavaコンパイラーで実行した。
+- Mavenをオフラインで起動したため、追加ライブラリや脆弱性データはダウンロードしていない。
+- Mavenは終了コード0で`BUILD SUCCESS`を返し、本番Javaソース30ファイルをコンパイルした。`GameSessionService.class`と`GameQuestionSelector.class`が生成されたことも確認した。
+- JavaコンパイラーはJARの終了処理でアクセス拒否の表示を出したが、Mavenのコンパイル結果は成功だった。
+- 自動テストは実行していない。
+
+### 3. 今後同じ確認を行う場合
+
+VS CodeのPowerShellターミナルで次のコマンドを実行すると、PCに保存済みのMavenとライブラリを使ってコンパイルできる。`-Dmaven.compiler.fork=true`は、コンパイラーをMavenとは別のプロセスで動かす指定である。`-o`はインターネットから取得しない指定である。
+
+```powershell
+$maven = Get-ChildItem -Path (Join-Path $env:USERPROFILE '.m2\wrapper\dists') -Recurse -Filter mvn.cmd | Select-Object -First 1 -ExpandProperty FullName
+$repoPath = Join-Path $env:USERPROFILE '.m2\repository'
+& $maven -o "-Dmaven.repo.local=$repoPath" '-Dmaven.compiler.fork=true' '-DskipTests' compile
+```
+
+この作業では`game.css`を変更していない。
