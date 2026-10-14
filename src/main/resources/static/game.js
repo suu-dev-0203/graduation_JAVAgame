@@ -2,6 +2,7 @@ const chapterSelect = document.querySelector("#chapter-select");
 const selectionModeSelect = document.querySelector("#selection-mode");
 const questionCountSelect = document.querySelector("#question-count");
 const startButton = document.querySelector("#start-button");
+const startPanel = document.querySelector(".start-panel");
 const startQuestionButton = document.querySelector("#start-question-button");
 const nextQuestionButton = document.querySelector("#next-question-button");
 const message = document.querySelector("#message");
@@ -83,6 +84,8 @@ async function startGame() {
 		const current = await getCurrentGame();
 		showQuestion(current);
 		message.textContent = "問題を読み込みました。Enterで問題を開始してください。";
+		startPanel.hidden = true;
+		gamePanel.scrollIntoView({ behavior: "smooth", block: "start" });
 	} catch (error) {
 		gameSessionId = null;
 		showError(error);
