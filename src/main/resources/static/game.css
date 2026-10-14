@@ -372,6 +372,85 @@ summary:focus-visible {
 	color: #a32735;
 }
 
+/* 問題画面の余白を小さくし、質問と回答結果を一画面で見やすくします。 */
+#game-panel {
+	padding: 18px clamp(14px, 3vw, 24px);
+}
+
+#game-panel .game-status {
+	gap: 8px;
+	padding-bottom: 8px;
+	font-size: 0.9rem;
+}
+
+#game-panel .question-heading {
+	padding-top: 10px;
+}
+
+#game-panel .question-heading h2 {
+	margin-bottom: 8px;
+	line-height: 1.4;
+}
+
+#game-panel .code-block {
+	padding: 10px;
+	font-size: 0.88rem;
+	line-height: 1.45;
+}
+
+#game-panel .choices-heading {
+	margin: 10px 0 6px;
+}
+
+#game-panel .choices {
+	gap: 6px;
+}
+
+#game-panel .choices li {
+	min-height: 0;
+}
+
+#game-panel .choice-button {
+	min-height: 40px;
+	grid-template-columns: 28px 1fr;
+	gap: 8px;
+	padding: 5px 9px;
+}
+
+#game-panel .choice-letter {
+	width: 26px;
+	height: 26px;
+}
+
+#game-panel .answer-result {
+	margin-top: 10px;
+	padding: 10px 12px;
+	line-height: 1.45;
+}
+
+#game-panel .answer-result p {
+	margin: 4px 0 8px;
+}
+
+#game-panel .answer-choices {
+	gap: 5px;
+	margin: 8px 0;
+}
+
+#game-panel .answer-choices li {
+	padding: 6px 9px;
+}
+
+#game-panel .answer-detailed-explanation {
+	margin: 8px 0;
+}
+
+#game-panel .game-note {
+	margin-top: 12px;
+	padding: 8px 10px;
+	font-size: 0.82rem;
+}
+
 @media (prefers-reduced-motion: no-preference) {
 	.countdown span {
 		animation: countdown-pop 0.25s ease-out;

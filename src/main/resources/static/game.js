@@ -155,6 +155,8 @@ function showQuestion(current) {
 	selectedChoiceIds = new Set();
 	questionContent.hidden = current.questionNumber === 1
 			&& questionState === "WAITING_TO_START";
+	choicesElement.hidden = false;
+	document.querySelector(".choices-heading").hidden = false;
 	startQuestionButton.textContent = "スタート";
 	document.querySelector("#question-progress").textContent =
 		`Stage ${current.currentStageNumber} / ${current.totalStageCount} · 問題 ${current.questionNumber} / ${current.totalQuestionsInStage}`;
@@ -430,6 +432,9 @@ function showAnswerResult(result) {
 	answerDetailedExplanation.textContent = result.detailedExplanation || "詳しい解説はありません。";
 	answerDetailedExplanationDetails.open = false;
 	answerResult.hidden = false;
+	// 結果欄に正解一覧を出すため、問題欄の選択肢は重ねて表示しません。
+	choicesElement.hidden = true;
+	document.querySelector(".choices-heading").hidden = true;
 	document.querySelector(".explanation").hidden = true;
 	startQuestionButton.hidden = true;
 	pauseButton.hidden = true;
@@ -439,12 +444,12 @@ function showAnswerResult(result) {
 		nextQuestionButton.hidden = false;
 		nextQuestionButton.textContent = "Stage結果を見る（自動で表示します）";
 		message.textContent = "Stage結果を表示しています。詳しい解説を読む場合は、下の項目を開いてください。";
-		answerDetailedExplanationDetails.querySelector("summary").focus();
+		answerDetailedExplanationDetails.querySelector("summary").focus({ preventScroll: true });
 	} else {
 		nextQuestionButton.hidden = false;
 		nextQuestionButton.textContent = "次の問題へ（自動で進みます）";
 		message.textContent = "回答結果を確認してください。詳しい解説を開くと自動進行を停止します。";
-		answerDetailedExplanationDetails.querySelector("summary").focus();
+		answerDetailedExplanationDetails.querySelector("summary").focus({ preventScroll: true });
 	}
 	clearAnswerAdvanceTimeout();
 	scheduleAnswerAdvance();
@@ -458,7 +463,7 @@ function scheduleAnswerAdvance() {
 	answerAdvanceTimeout = window.setTimeout(() => {
 		answerAdvanceTimeout = null;
 		showNextQuestion();
-	}, 2000);
+	}, 5000);
 }
 
 function updateAnswerExplanationPause() {
@@ -467,13 +472,13 @@ function updateAnswerExplanationPause() {
 	}
 	if (answerDetailedExplanationDetails.open) {
 		clearAnswerAdvanceTimeout();
-		message.textContent = "詳しい解説を表示中です。閉じると2秒後に次へ進みます。";
+		message.textContent = "詳しい解説を表示中です。閉じると5秒後に次へ進みます。";
 		nextQuestionButton.textContent = currentGame.questionNumber === currentGame.totalQuestionsInStage
 			? "Stage結果へ進む"
 			: "次の問題へ進む";
 		return;
 	}
-	message.textContent = "解説を閉じました。2秒後に次へ進みます。";
+	message.textContent = "解説を閉じました。5秒後に次へ進みます。";
 	nextQuestionButton.textContent = currentGame.questionNumber === currentGame.totalQuestionsInStage
 		? "Stage結果を見る（自動で表示します）"
 		: "次の問題へ（自動で進みます）";
