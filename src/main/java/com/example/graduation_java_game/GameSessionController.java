@@ -55,6 +55,14 @@ public class GameSessionController {
 	}
 
 	/**
+	 * 完了したゲームに含まれる回答履歴を返します。
+	 */
+	@GetMapping("/{gameSessionId}/review")
+	public ReviewResponse findReview(@PathVariable Long gameSessionId) {
+		return gameSessionService.findReview(gameSessionId);
+	}
+
+	/**
 	 * 一時停止中のゲームをABANDONEDとして終了します。
 	 */
 	@PostMapping("/{gameSessionId}/abandon")

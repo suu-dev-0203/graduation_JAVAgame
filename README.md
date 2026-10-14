@@ -1623,17 +1623,37 @@ Stage結果は正解数・Stageスコア・最大Combo・Perfect判定・次Stag
   "items": [
     {
       "stageQuestionId": 3001,
+      "stageNumber": 1,
+      "questionNumber": 1,
       "questionText": "...",
       "selectedChoiceIds": [12],
       "correctChoiceIds": [15],
       "correct": false,
       "timeout": false,
       "answerTimeMs": 8420,
-      "detailedExplanation": "..."
+      "detailedExplanation": "...",
+      "choices": [
+        {
+          "choiceId": 12,
+          "choiceText": "選択肢A",
+          "choiceOrder": 1,
+          "selected": true,
+          "correct": false
+        },
+        {
+          "choiceId": 15,
+          "choiceText": "選択肢B",
+          "choiceOrder": 2,
+          "selected": false,
+          "correct": true
+        }
+      ]
     }
   ]
 }
 ```
+
+Review APIはGameSessionが`COMPLETED`になった後だけ利用できます。`items`はStage番号、問題番号の順に並びます。各項目には問題文、選んだ選択肢ID、正解の選択肢ID、正誤・時間切れ、回答時間（ミリ秒）、詳しい解説を含みます。画面表示用の`choices`には選択肢の文章と、プレイヤーが選んだか・正解かの印も含めます。
 
 `ErrorResponse`：
 

@@ -18,4 +18,6 @@ public interface AnswerHistoryRepository extends JpaRepository<AnswerHistory, Lo
 			Long stageSessionId);
 
 	List<AnswerHistory> findByStageQuestion_Question_Chapter_ChapterId(Long chapterId);
+
+	List<AnswerHistory> findByGameSession_GameSessionId(Long gameSessionId);
 }

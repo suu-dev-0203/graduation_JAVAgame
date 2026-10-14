@@ -40,4 +40,8 @@ public class AnswerHistoryChoice {
 		this.answerHistory = answerHistory;
 		this.choice = choice;
 	}
+
+	public Choice getChoice() {
+		return choice;
+	}
 }

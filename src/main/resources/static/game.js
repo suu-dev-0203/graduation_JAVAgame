@@ -9,6 +9,9 @@ const nextQuestionButton = document.querySelector("#next-question-button");
 const nextStageButton = document.querySelector("#next-stage-button");
 const finishGameButton = document.querySelector("#finish-game-button");
 const returnHomeButton = document.querySelector("#return-home-button");
+const reviewButton = document.querySelector("#review-button");
+const reviewHomeButton = document.querySelector("#review-home-button");
+const backToGameResultButton = document.querySelector("#back-to-game-result-button");
 const pauseButton = document.querySelector("#pause-button");
 const resumeButton = document.querySelector("#resume-button");
 const abandonButton = document.querySelector("#abandon-button");
@@ -17,6 +20,8 @@ const gamePanel = document.querySelector("#game-panel");
 const stageResultPanel = document.querySelector("#stage-result-panel");
 const gameResultPanel = document.querySelector("#game-result-panel");
 const pausePanel = document.querySelector("#pause-panel");
+const reviewPanel = document.querySelector("#review-panel");
+const reviewItems = document.querySelector("#review-items");
 const choicesElement = document.querySelector("#choices");
 const answerResult = document.querySelector("#answer-result");
 const answerResultTitle = document.querySelector("#answer-result-title");
@@ -80,6 +85,7 @@ async function startGame() {
 	gamePanel.hidden = true;
 	stageResultPanel.hidden = true;
 	gameResultPanel.hidden = true;
+	reviewPanel.hidden = true;
 	message.classList.remove("error");
 	message.textContent = "ゲームの準備をしています...";
 
@@ -401,6 +407,7 @@ async function showGameResult() {
 			`クリアしたStage ${result.completedStageCount} / ${result.totalStageCount} · PERFECT ${result.perfectStageCount}回`;
 		stageResultPanel.hidden = true;
 		gameResultPanel.hidden = false;
+		reviewPanel.hidden = true;
 		gameResultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 		message.textContent = "ゲーム全体の結果です。おつかれさまでした。";
 	} catch (error) {
@@ -435,12 +442,73 @@ function returnToHome() {
 	currentGame = null;
 	questionState = "WAITING_TO_START";
 	gameResultPanel.hidden = true;
+	reviewPanel.hidden = true;
 	stageResultPanel.hidden = true;
 	pausePanel.hidden = true;
 	gamePanel.hidden = true;
 	startPanel.hidden = false;
 	message.textContent = "学習テーマを選んでゲームを始めてください。";
 	startPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function showReview() {
+	reviewButton.disabled = true;
+	try {
+		const review = await requestJson(`/api/game-sessions/${gameSessionId}/review`);
+		reviewItems.replaceChildren();
+		for (const item of review.items) {
+			const card = document.createElement("article");
+			const heading = document.createElement("h3");
+			const question = document.createElement("p");
+			const outcome = document.createElement("p");
+			const answerTime = document.createElement("p");
+			const choices = document.createElement("ul");
+			const explanation = document.createElement("p");
+			card.className = "review-item";
+			heading.textContent = `Stage ${item.stageNumber} · 問題 ${item.questionNumber}`;
+			question.className = "review-question";
+			question.textContent = item.questionText;
+			outcome.className = "review-answer";
+			outcome.textContent = item.timeout
+				? "結果：時間切れ"
+				: item.correct ? "結果：正解" : "結果：不正解";
+			answerTime.textContent = `回答時間：${(item.answerTimeMs / 1000).toFixed(1)}秒`;
+			choices.className = "review-choices";
+			for (const choice of item.choices) {
+				const entry = document.createElement("li");
+				const labels = [
+					choice.selected ? "あなたの回答" : "",
+					choice.correct ? "正解" : ""
+				].filter(Boolean);
+				entry.className = [
+					choice.correct ? "correct" : "",
+					choice.selected ? "selected" : ""
+				].filter(Boolean).join(" ");
+				entry.textContent =
+					`${String.fromCharCode(64 + choice.choiceOrder)}. ${choice.choiceText}`
+					+ (labels.length ? `（${labels.join("・")}）` : "");
+				choices.append(entry);
+			}
+			explanation.textContent = `詳しい解説：${item.detailedExplanation}`;
+			card.append(heading, question, outcome, answerTime, choices, explanation);
+			reviewItems.append(card);
+		}
+		gameResultPanel.hidden = true;
+		reviewPanel.hidden = false;
+		reviewPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+		message.textContent = `${review.items.length}問の解答履歴を表示しています。`;
+	} catch (error) {
+		showError(error);
+	} finally {
+		reviewButton.disabled = false;
+	}
+}
+
+function returnToGameResult() {
+	reviewPanel.hidden = true;
+	gameResultPanel.hidden = false;
+	gameResultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+	message.textContent = "Game Resultに戻りました。";
 }
 
 async function pauseCurrentGame() {
@@ -609,6 +677,9 @@ nextQuestionButton.addEventListener("click", showNextQuestion);
 nextStageButton.addEventListener("click", startNextStage);
 finishGameButton.addEventListener("click", showGameResult);
 returnHomeButton.addEventListener("click", returnToHome);
+reviewButton.addEventListener("click", showReview);
+reviewHomeButton.addEventListener("click", returnToHome);
+backToGameResultButton.addEventListener("click", returnToGameResult);
 choicesElement.addEventListener("click", (event) => {
 	if (!(event.target instanceof Element)) {
 		return;

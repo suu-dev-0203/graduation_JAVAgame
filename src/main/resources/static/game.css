@@ -163,6 +163,54 @@ summary:focus-visible {
 	margin-left: 8px;
 }
 
+.review-item {
+	margin: 20px 0;
+	padding: 18px;
+	border: 1px solid #e1e6f0;
+	border-radius: 14px;
+	background: #fbfcff;
+	line-height: 1.6;
+}
+
+.review-item h3 {
+	margin: 0 0 10px;
+	font-size: 1.1rem;
+}
+
+.review-question {
+	font-weight: 700;
+	overflow-wrap: anywhere;
+}
+
+.review-choices {
+	display: grid;
+	gap: 8px;
+	margin: 12px 0;
+	padding: 0;
+	list-style: none;
+}
+
+.review-choices li {
+	padding: 9px 12px;
+	border-radius: 9px;
+	background: #f0f2f8;
+	overflow-wrap: anywhere;
+}
+
+.review-choices li.correct {
+	background: #e5f5eb;
+	color: #145c37;
+}
+
+.review-choices li.selected:not(.correct) {
+	background: #fff0e8;
+	color: #8c3518;
+}
+
+.review-answer {
+	font-weight: 700;
+}
+
 .game-status {
 	display: flex;
 	flex-wrap: wrap;

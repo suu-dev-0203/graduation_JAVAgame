@@ -801,6 +801,9 @@ class GraduationJavaGameApplicationTests {
 				1))
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
+		mockMvc.perform(get("/api/game-sessions/{id}/review", startedGame.gameSessionId()))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
 
 		for (int index = 0; index < 5; index++) {
 			CurrentGameResponse currentGame = gameSessionService.findCurrent(startedGame.gameSessionId());
@@ -860,6 +863,19 @@ class GraduationJavaGameApplicationTests {
 				.andExpect(jsonPath("$.totalScore").value(500))
 				.andExpect(jsonPath("$.perfectStageCount").value(1))
 				.andExpect(jsonPath("$.status").value("COMPLETED"));
+		mockMvc.perform(get(
+				"/api/game-sessions/{gameSessionId}/review", startedGame.gameSessionId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.items", hasSize(5)))
+				.andExpect(jsonPath("$.items[0].stageNumber").value(1))
+				.andExpect(jsonPath("$.items[0].questionNumber").value(1))
+				.andExpect(jsonPath("$.items[0].correct").value(true))
+				.andExpect(jsonPath("$.items[0].selectedChoiceIds", hasSize(1)))
+				.andExpect(jsonPath("$.items[0].correctChoiceIds", hasSize(1)))
+				.andExpect(jsonPath("$.items[0].answerTimeMs").isNumber())
+				.andExpect(jsonPath("$.items[0].detailedExplanation").value("詳しい解説です。"))
+				.andExpect(jsonPath("$.items[0].choices", hasSize(2)))
+				.andExpect(jsonPath("$.items[4].questionNumber").value(5));
 		CurrentGameResponse completedQuestion =
 				gameSessionService.findCurrent(startedGame.gameSessionId());
 		assertTrue(completedQuestion.answerResult().correct());

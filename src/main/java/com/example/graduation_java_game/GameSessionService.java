@@ -31,6 +31,7 @@ public class GameSessionService {
 	private final StageSessionRepository stageSessionRepository;
 	private final StageQuestionRepository stageQuestionRepository;
 	private final AnswerHistoryRepository answerHistoryRepository;
+	private final AnswerHistoryChoiceRepository answerHistoryChoiceRepository;
 
 	public GameSessionService(
 			ChapterRepository chapterRepository,
@@ -40,7 +41,8 @@ public class GameSessionService {
 			GameSessionRepository gameSessionRepository,
 			StageSessionRepository stageSessionRepository,
 			StageQuestionRepository stageQuestionRepository,
-			AnswerHistoryRepository answerHistoryRepository) {
+			AnswerHistoryRepository answerHistoryRepository,
+			AnswerHistoryChoiceRepository answerHistoryChoiceRepository) {
 		this.chapterRepository = chapterRepository;
 		this.questionRepository = questionRepository;
 		this.choiceRepository = choiceRepository;
@@ -49,6 +51,7 @@ public class GameSessionService {
 		this.stageSessionRepository = stageSessionRepository;
 		this.stageQuestionRepository = stageQuestionRepository;
 		this.answerHistoryRepository = answerHistoryRepository;
+		this.answerHistoryChoiceRepository = answerHistoryChoiceRepository;
 	}
 
 	/**
@@ -551,6 +554,82 @@ public class GameSessionService {
 				gameSession.getScore(),
 				perfectStageCount,
 				gameSession.getStatus());
+	}
+
+	/**
+	 * 完了済みゲームの回答と正解を、出題順に並べて返します。
+	 */
+	@Transactional(readOnly = true)
+	public ReviewResponse findReview(Long gameSessionId) {
+		GameSession gameSession = gameSessionRepository.findById(gameSessionId)
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.NOT_FOUND,
+						"NOT_FOUND",
+						"指定されたGameSessionが見つかりません。"));
+		if (gameSession.getStatus() != GameSessionStatus.COMPLETED) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"INVALID_GAME_STATE",
+					"ゲーム全体を完了したあとに解答履歴を確認できます。");
+		}
+
+		List<AnswerHistory> histories = answerHistoryRepository
+				.findByGameSession_GameSessionId(gameSessionId);
+		if (histories.size() != gameSession.getQuestionCount()) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"INVALID_GAME_STATE",
+					"ゲームの回答履歴が不足しているため、復習結果を表示できません。");
+		}
+		List<ReviewResponse.Item> items = histories.stream()
+				.sorted(java.util.Comparator
+						.comparingInt((AnswerHistory history) -> history.getStageQuestion()
+								.getStageSession().getStageDefinition().getStageNumber())
+						.thenComparingInt(history -> history.getStageQuestion().getQuestionOrder()))
+				.map(this::toReviewItem)
+				.toList();
+		return new ReviewResponse(items);
+	}
+
+	private ReviewResponse.Item toReviewItem(AnswerHistory history) {
+		StageQuestion stageQuestion = history.getStageQuestion();
+		Question question = stageQuestion.getQuestion();
+		Set<Long> selectedChoiceIds = answerHistoryChoiceRepository
+				.findByAnswerHistory_AnswerHistoryId(history.getAnswerHistoryId())
+				.stream()
+				.map(answerHistoryChoice -> answerHistoryChoice.getChoice().getChoiceId())
+				.collect(Collectors.toSet());
+		List<ReviewResponse.ChoiceItem> choices = choiceRepository
+				.findByQuestion_QuestionIdOrderByChoiceOrder(question.getQuestionId())
+				.stream()
+				.map(choice -> new ReviewResponse.ChoiceItem(
+						choice.getChoiceId(),
+						choice.getChoiceText(),
+						choice.getChoiceOrder(),
+						selectedChoiceIds.contains(choice.getChoiceId()),
+						choice.isCorrect()))
+				.toList();
+		List<Long> selectedIds = choices.stream()
+				.filter(ReviewResponse.ChoiceItem::selected)
+				.map(ReviewResponse.ChoiceItem::choiceId)
+				.toList();
+		List<Long> correctIds = choices.stream()
+				.filter(ReviewResponse.ChoiceItem::correct)
+				.map(ReviewResponse.ChoiceItem::choiceId)
+				.toList();
+
+		return new ReviewResponse.Item(
+				stageQuestion.getStageQuestionId(),
+				stageQuestion.getStageSession().getStageDefinition().getStageNumber(),
+				stageQuestion.getQuestionOrder(),
+				question.getQuestionText(),
+				selectedIds,
+				correctIds,
+				history.isCorrect(),
+				history.isTimeout(),
+				history.getAnswerTimeMs(),
+				question.getDetailedExplanation(),
+				choices);
 	}
 
 	/**

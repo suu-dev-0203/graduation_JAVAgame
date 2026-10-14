@@ -108,7 +108,17 @@
 			<h2 id="game-result-title">ゲームクリア</h2>
 			<p id="game-result-summary"></p>
 			<p id="game-result-perfect"></p>
+			<button class="primary-button" id="review-button" type="button">解答履歴を見返す</button>
 			<button class="primary-button" id="return-home-button" type="button">タイトルへ戻る</button>
+		</section>
+
+		<section class="panel result-panel" id="review-panel" hidden aria-labelledby="review-title">
+			<p class="eyebrow">REVIEW</p>
+			<h2 id="review-title">解答履歴</h2>
+			<p>選んだ答えと正解を比べて、詳しい解説を確認しましょう。</p>
+			<div id="review-items"></div>
+			<button class="secondary-button" id="back-to-game-result-button" type="button">Game Resultへ戻る</button>
+			<button class="primary-button" id="review-home-button" type="button">タイトルへ戻る</button>
 		</section>
 
 		<footer>学習テーマ・問題・選択肢はゲームAPIから読み込みます。</footer>
