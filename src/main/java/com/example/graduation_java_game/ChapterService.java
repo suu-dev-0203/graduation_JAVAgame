@@ -4,6 +4,8 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.example.graduation_java_game.GameApiDtos.ChapterResponse;
+
 /**
  * Chapterに関する処理をまとめるServiceです。
  */

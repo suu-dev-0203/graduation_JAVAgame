@@ -4,6 +4,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.example.graduation_java_game.GameApiDtos.ErrorResponse;
+
 /**
  * ゲームAPIで発生した想定内のエラーを、決められたJSON形式に変換します。
  */

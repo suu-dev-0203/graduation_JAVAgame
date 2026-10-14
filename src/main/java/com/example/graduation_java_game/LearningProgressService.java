@@ -1,9 +1,5 @@
 package com.example.graduation_java_game;
 
-import com.example.graduation_java_game.LearningProgressDtos.ChapterProgressResponse;
-import com.example.graduation_java_game.LearningProgressDtos.MasteryStatusUpdateResponse;
-import com.example.graduation_java_game.LearningProgressDtos.TrainingRecordResponse;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -14,6 +10,10 @@ import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.example.graduation_java_game.LearningProgressDtos.ChapterProgressResponse;
+import com.example.graduation_java_game.LearningProgressDtos.MasteryStatusUpdateResponse;
+import com.example.graduation_java_game.LearningProgressDtos.TrainingRecordResponse;
 
 /** 問題の分類、Chapterごとの学習状況、苦手特訓の記録を管理します。 */
 @Service

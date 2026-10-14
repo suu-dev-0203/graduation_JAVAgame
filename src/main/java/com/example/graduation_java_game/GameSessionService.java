@@ -1,7 +1,7 @@
 package com.example.graduation_java_game;
 
-import java.time.Instant;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -14,6 +14,17 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.example.graduation_java_game.AnswerDtos.AnswerResponse;
+import com.example.graduation_java_game.GameApiDtos.AdvanceStageResponse;
+import com.example.graduation_java_game.GameApiDtos.CurrentGameResponse;
+import com.example.graduation_java_game.GameApiDtos.GameResultResponse;
+import com.example.graduation_java_game.GameApiDtos.GameSessionCreateRequest;
+import com.example.graduation_java_game.GameApiDtos.GameSessionCreateResponse;
+import com.example.graduation_java_game.GameApiDtos.GameSessionStatusResponse;
+import com.example.graduation_java_game.GameApiDtos.ReviewResponse;
+import com.example.graduation_java_game.GameApiDtos.StageResultResponse;
+import com.example.graduation_java_game.GameApiDtos.StartStageQuestionResponse;
 
 /**
  * ゲーム開始時に必要なデータを確認し、最初のGameSessionとStageSessionを作ります。

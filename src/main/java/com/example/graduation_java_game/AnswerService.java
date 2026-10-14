@@ -10,6 +10,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.graduation_java_game.AnswerDtos.AnswerRequest;
+import com.example.graduation_java_game.AnswerDtos.AnswerResponse;
+
 /**
  * 回答の状態・時間・正誤を判定し、ゲーム進行と回答履歴を更新します。
  */
