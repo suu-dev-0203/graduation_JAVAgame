@@ -142,6 +142,19 @@ public class AnswerService {
 								"次の問題が見つかりません。"));
 
 		String effectType = perfect ? "PERFECT" : timeout ? "TIME_UP" : correct ? "HIT" : "MISS";
+		Set<Long> selectedChoiceIds = selectedChoices.stream()
+				.map(Choice::getChoiceId)
+				.collect(java.util.stream.Collectors.toSet());
+		List<AnswerResponse.ChoiceResult> choiceResults = choiceRepository
+				.findByQuestion_QuestionIdOrderByChoiceOrder(question.getQuestionId())
+				.stream()
+				.map(choice -> new AnswerResponse.ChoiceResult(
+						choice.getChoiceId(),
+						choice.getChoiceText(),
+						choice.getChoiceOrder(),
+						selectedChoiceIds.contains(choice.getChoiceId()),
+						choice.isCorrect()))
+				.toList();
 		return new AnswerResponse(
 				correct,
 				timeout,
@@ -154,7 +167,10 @@ public class AnswerService {
 				maxCombo,
 				stageClear,
 				perfect,
-				nextStageQuestionId);
+				nextStageQuestionId,
+				choiceResults,
+				question.getShortExplanation(),
+				question.getDetailedExplanation());
 	}
 
 	private List<Choice> validateAndFindChoices(Question question, List<Long> selectedChoiceIds) {

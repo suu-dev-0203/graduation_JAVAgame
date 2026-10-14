@@ -75,7 +75,12 @@
 			<section class="answer-result" id="answer-result" hidden aria-live="polite">
 				<h3 id="answer-result-title"></h3>
 				<p id="answer-result-details"></p>
+				<ul class="review-choices answer-choices" id="answer-choices" aria-label="選択肢の正解と回答"></ul>
 				<p id="answer-explanation"></p>
+				<details class="answer-detailed-explanation" id="answer-detailed-explanation-details">
+					<summary>詳しい解説を見る（開いている間は自動進行を停止）</summary>
+					<p id="answer-detailed-explanation"></p>
+				</details>
 				<button class="primary-button" id="next-question-button" type="button" hidden>
 					次の問題へ
 				</button>
@@ -85,7 +90,7 @@
 				<p id="short-explanation"></p>
 			</details>
 			<p class="game-note">
-				各Stageの最初にEnterを押すと3・2・1の後に開始します。回答結果を2秒表示して次の問題へ進みます。単一選択はA～Gキーまたはクリック、複数選択は選択後にEnterで確定します。
+				各Stageの最初にEnterを押すと3・2・1の後に開始します。回答結果を2秒表示して次の問題へ進みます。詳しい解説を開いている間は自動進行を停止します。単一選択はA～Gキーまたはクリック、複数選択は選択後にEnterで確定します。
 			</p>
 		</section>
 

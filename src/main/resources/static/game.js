@@ -28,7 +28,10 @@ const choicesElement = document.querySelector("#choices");
 const answerResult = document.querySelector("#answer-result");
 const answerResultTitle = document.querySelector("#answer-result-title");
 const answerResultDetails = document.querySelector("#answer-result-details");
+const answerChoices = document.querySelector("#answer-choices");
 const answerExplanation = document.querySelector("#answer-explanation");
+const answerDetailedExplanationDetails = document.querySelector("#answer-detailed-explanation-details");
+const answerDetailedExplanation = document.querySelector("#answer-detailed-explanation");
 const timerStatus = document.querySelector("#timer-status");
 
 let gameSessionId = null;
@@ -380,7 +383,24 @@ function showAnswerResult(result) {
 	answerResultTitle.className = result.correct ? "correct-result" : "incorrect-result";
 	answerResultDetails.textContent =
 		`敵HP ${result.enemyHp} · Combo ${result.combo} · Score ${result.score} · ${result.effectType}`;
-	answerExplanation.textContent = currentGame.question.shortExplanation;
+	answerChoices.replaceChildren();
+	for (const choice of result.choices || []) {
+		const item = document.createElement("li");
+		const labels = [
+			choice.selected ? "あなたの回答" : "",
+			choice.correct ? "正解" : ""
+		].filter(Boolean);
+		item.className = [
+			choice.correct ? "correct" : "",
+			choice.selected ? "selected" : ""
+		].filter(Boolean).join(" ");
+		item.textContent = `${String.fromCharCode(64 + choice.choiceOrder)}. ${choice.choiceText}`
+				+ (labels.length ? `（${labels.join("・")}）` : "");
+		answerChoices.append(item);
+	}
+	answerExplanation.textContent = result.shortExplanation || currentGame.question.shortExplanation;
+	answerDetailedExplanation.textContent = result.detailedExplanation || "詳しい解説はありません。";
+	answerDetailedExplanationDetails.open = false;
 	answerResult.hidden = false;
 	document.querySelector(".explanation").hidden = true;
 	startQuestionButton.hidden = true;
@@ -390,19 +410,46 @@ function showAnswerResult(result) {
 		answerResultTitle.textContent = result.perfect ? "PERFECT！ Stage Clear" : "Stage Clear";
 		nextQuestionButton.hidden = false;
 		nextQuestionButton.textContent = "Stage結果を見る（自動で表示します）";
-		message.textContent = "Stage結果を表示しています...";
-		nextQuestionButton.focus();
+		message.textContent = "Stage結果を表示しています。詳しい解説を読む場合は、下の項目を開いてください。";
+		answerDetailedExplanationDetails.querySelector("summary").focus();
 	} else {
 		nextQuestionButton.hidden = false;
 		nextQuestionButton.textContent = "次の問題へ（自動で進みます）";
-		message.textContent = "回答結果を確認してください。2秒後に次の問題へ進みます。";
-		nextQuestionButton.focus();
+		message.textContent = "回答結果を確認してください。詳しい解説を開くと自動進行を停止します。";
+		answerDetailedExplanationDetails.querySelector("summary").focus();
 	}
 	clearAnswerAdvanceTimeout();
+	scheduleAnswerAdvance();
+}
+
+function scheduleAnswerAdvance() {
+	clearAnswerAdvanceTimeout();
+	if (questionState !== "RESULT" || answerDetailedExplanationDetails.open) {
+		return;
+	}
 	answerAdvanceTimeout = window.setTimeout(() => {
 		answerAdvanceTimeout = null;
 		showNextQuestion();
 	}, 2000);
+}
+
+function updateAnswerExplanationPause() {
+	if (questionState !== "RESULT") {
+		return;
+	}
+	if (answerDetailedExplanationDetails.open) {
+		clearAnswerAdvanceTimeout();
+		message.textContent = "詳しい解説を表示中です。閉じると2秒後に次へ進みます。";
+		nextQuestionButton.textContent = currentGame.questionNumber === currentGame.totalQuestionsInStage
+			? "Stage結果へ進む"
+			: "次の問題へ進む";
+		return;
+	}
+	message.textContent = "解説を閉じました。2秒後に次へ進みます。";
+	nextQuestionButton.textContent = currentGame.questionNumber === currentGame.totalQuestionsInStage
+		? "Stage結果を見る（自動で表示します）"
+		: "次の問題へ（自動で進みます）";
+	scheduleAnswerAdvance();
 }
 
 async function showNextQuestion() {
@@ -540,6 +587,7 @@ async function showReview() {
 					+ (labels.length ? `（${labels.join("・")}）` : "");
 				choices.append(entry);
 			}
+			explanation.className = "review-explanation";
 			explanation.textContent = `詳しい解説：${item.detailedExplanation}`;
 			card.append(heading, question, outcome, answerTime, choices, explanation);
 			reviewItems.append(card);
@@ -720,6 +768,7 @@ startButton.addEventListener("click", startGame);
 selectionModeSelect.addEventListener("change", updateQuestionCountOptions);
 questionCountSelect.addEventListener("change", updateQuestionCountOptions);
 startQuestionButton.addEventListener("click", startCurrentQuestion);
+answerDetailedExplanationDetails.addEventListener("toggle", updateAnswerExplanationPause);
 pauseButton.addEventListener("click", pauseCurrentGame);
 resumeButton.addEventListener("click", resumeCurrentGame);
 abandonButton.addEventListener("click", abandonCurrentGame);
@@ -741,6 +790,13 @@ choicesElement.addEventListener("click", (event) => {
 	}
 });
 document.addEventListener("keydown", (event) => {
+	if (event.target instanceof Element
+			&& event.target.closest("button, summary, input, textarea, select")) {
+		return;
+	}
+	if (questionState === "RESULT" && answerDetailedExplanationDetails.open) {
+		return;
+	}
 	if (!pausePanel.hidden) {
 		return;
 	}

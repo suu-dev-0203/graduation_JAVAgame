@@ -339,6 +339,31 @@ summary:focus-visible {
 	margin: 8px 0 14px;
 }
 
+.answer-choices {
+	margin-top: 12px;
+}
+
+.answer-choices li {
+	white-space: pre-wrap;
+}
+
+.answer-detailed-explanation {
+	margin: 14px 0;
+}
+
+.answer-detailed-explanation summary {
+	width: fit-content;
+	color: #394aa8;
+	cursor: pointer;
+	font-weight: 700;
+}
+
+.answer-detailed-explanation p,
+.review-explanation {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
 .answer-result .correct-result {
 	color: #197044;
 }

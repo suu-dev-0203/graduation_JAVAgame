@@ -593,7 +593,15 @@ class GraduationJavaGameApplicationTests {
 				.andExpect(jsonPath("$.maxCombo").value(1))
 				.andExpect(jsonPath("$.stageClear").value(false))
 				.andExpect(jsonPath("$.perfect").value(false))
-				.andExpect(jsonPath("$.nextStageQuestionId").isNumber());
+				.andExpect(jsonPath("$.nextStageQuestionId").isNumber())
+				.andExpect(jsonPath("$.choices", hasSize(2)))
+				.andExpect(jsonPath("$.choices[0].selected").value(false))
+				.andExpect(jsonPath("$.choices[0].correct").value(false))
+				.andExpect(jsonPath("$.choices[1].selected").value(true))
+				.andExpect(jsonPath("$.choices[1].correct").value(true))
+				.andExpect(jsonPath("$.choices[1].choiceText").value("正解"))
+				.andExpect(jsonPath("$.shortExplanation").value("短い解説です。"))
+				.andExpect(jsonPath("$.detailedExplanation").value("詳しい解説です。"));
 
 		mockMvc.perform(get("/api/game-sessions/{id}/current", startedGame.gameSessionId()))
 				.andExpect(status().isOk())
@@ -880,6 +888,11 @@ class GraduationJavaGameApplicationTests {
 				gameSessionService.findCurrent(startedGame.gameSessionId());
 		assertTrue(completedQuestion.answerResult().correct());
 		assertTrue(completedQuestion.answerResult().stageClear());
+		assertEquals(2, completedQuestion.answerResult().choices().size());
+		assertTrue(completedQuestion.answerResult().choices().stream()
+				.anyMatch(choice -> choice.correct() && choice.selected()));
+		assertEquals("短い解説です。", completedQuestion.answerResult().shortExplanation());
+		assertEquals("詳しい解説です。", completedQuestion.answerResult().detailedExplanation());
 	}
 
 	/** Pause中は時間を止め、Resume後も同じ問題から続き、終了状態を保存します。 */

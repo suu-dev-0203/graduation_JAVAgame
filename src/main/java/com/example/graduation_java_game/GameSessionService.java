@@ -438,6 +438,22 @@ public class GameSessionService {
 		String effectType = perfect
 				? "PERFECT"
 				: history.isTimeout() ? "TIME_UP" : history.isCorrect() ? "HIT" : "MISS";
+		Set<Long> selectedChoiceIds = answerHistoryChoiceRepository
+				.findByAnswerHistory_AnswerHistoryId(history.getAnswerHistoryId())
+				.stream()
+				.map(answerHistoryChoice -> answerHistoryChoice.getChoice().getChoiceId())
+				.collect(Collectors.toSet());
+		Question question = stageQuestion.getQuestion();
+		List<AnswerResponse.ChoiceResult> choiceResults = choiceRepository
+				.findByQuestion_QuestionIdOrderByChoiceOrder(question.getQuestionId())
+				.stream()
+				.map(choice -> new AnswerResponse.ChoiceResult(
+						choice.getChoiceId(),
+						choice.getChoiceText(),
+						choice.getChoiceOrder(),
+						selectedChoiceIds.contains(choice.getChoiceId()),
+						choice.isCorrect()))
+				.toList();
 		Long nextStageQuestionId = stageClear
 				? null
 				: stageQuestionRepository
@@ -458,7 +474,10 @@ public class GameSessionService {
 				maxCombo,
 				stageClear,
 				perfect,
-				nextStageQuestionId);
+				nextStageQuestionId,
+				choiceResults,
+				question.getShortExplanation(),
+				question.getDetailedExplanation());
 	}
 
 	/**

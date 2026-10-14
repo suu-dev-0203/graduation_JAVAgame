@@ -279,7 +279,8 @@ Stage側に別の制限時間は持たせません。
 6. JavaがstartedAtを記録
 7. 200 OKを返す
 8. JavaScriptが返却されたremainingTimeMsを基準にTimer表示を開始
-9. 回答後に結果を2秒表示し、2～5問目を続けて開始
+9. 回答後に正解選択肢と短い解説を表示
+10. 2秒後に次の問題へ進む。詳しい解説を開いている間は自動進行を止め、閉じた後に2秒の待ち時間を再開
 ```
 
 `WAITING_TO_START`ではTimerが未開始のため、`remainingTimeMs`は`null`で返却します。
@@ -1464,9 +1465,9 @@ Response：
 }
 ```
 
-現在の問題がすでに回答済みの場合は、`answerResult`にも保存済みの回答判定を含めます。Refresh後も回答を再送せず、正誤やStage Clear状態を画面に戻すために使用します。
+現在の問題がすでに回答済みの場合は、`answerResult`にも保存済みの回答判定・各選択肢の正誤と選択状態・短い解説・詳しい解説を含めます。Refresh後も回答を再送せず、回答結果を画面に戻すために使用します。
 
-`Choice.correct`はクライアントへ返しません。
+回答前の`CurrentGameResponse`には、選択肢が正解かどうかを含めません。`POST /api/answers`の回答後Responseには、正解確認に必要な範囲で選択肢ごとの正誤を含めます。
 
 ### POST /api/answers
 
@@ -1518,9 +1519,17 @@ Request：
   "maxCombo": 1,
   "stageClear": false,
   "perfect": false,
-  "nextStageQuestionId": 3002
+  "nextStageQuestionId": 3002,
+  "choices": [
+    { "choiceId": 11, "choiceText": "不正解", "choiceOrder": 1, "selected": false, "correct": false },
+    { "choiceId": 12, "choiceText": "正解", "choiceOrder": 2, "selected": true, "correct": true }
+  ],
+  "shortExplanation": "短い解説です。",
+  "detailedExplanation": "詳しい解説です。"
 }
 ```
+
+`choices`、`shortExplanation`、`detailedExplanation`は、回答を送信した後にだけ返します。正解選択肢を回答前に公開しないためです。画面では正解と自分の選択を表示し、「詳しい解説を見る」を開くと自動で次の問題へ進む処理を止めます。閉じると2秒後に次へ進みます。回答後にページを再読み込みした場合も、保存済みの回答結果に解説を含めて返します。
 
 不正解：
 
@@ -1699,7 +1708,9 @@ ANSWERING
 SUBMITTING
     ↓ POST /api/answers
 RESULT
-    ↓ 2秒後に次問を自動開始
+    ↓ 正解選択肢・短い解説を表示
+    ↓ 詳しい解説を開いている間は自動進行を停止
+    ↓ 解説を閉じて2秒後
 STARTING（2～5問目はカウントダウンなし）
     ↓ 5問目の結果を2秒表示
 STAGE_RESULT
@@ -1709,7 +1720,7 @@ STAGE_RESULT
 - `STARTING`：Stageの1問目はカウントダウン中。2～5問目は次の問題のStart APIを呼び出し中
 - `ANSWERING`：Timer表示中。単一選択はキー入力で送信、複数選択はEnterで送信
 - `SUBMITTING`：送信中。A～G・Enter・送信操作をすべてロック
-- `RESULT`：回答結果を2秒表示し、自動で次問題またはStage Resultへ進む
+- `RESULT`：正解選択肢と短い解説を表示する。詳しい解説を開いている間は自動進行を停止し、閉じてから2秒後に次問題またはStage Resultへ進む
 
 正誤・時間・HP・Combo・Score・Stage Clear・PerfectはJava側が正です。JavaScriptは入力・表示・Timer表示・演出だけを担当します。
 
@@ -2141,6 +2152,8 @@ AnswerResponse
 - stageScore
 - maxCombo
 - nextStageQuestionId
+- 回答後だけ返すchoices（選択肢・選択状態・正解状態）
+- 回答後だけ返すshortExplanation / detailedExplanation
 
 CurrentGameResponse
 - gameSessionId
@@ -2690,6 +2703,8 @@ AIを活用：問題案、解説案、エラー原因調査、設計確認、コ
 - Stage 1から順番に進み、Stage Resultのボタンで次のStageを開始する
 - Stageの1問目だけEnter後に3・2・1を表示する
 - 回答結果を2秒表示後、次の問題が自動で始まる
+- 詳しい解説を開くと自動進行が止まり、閉じると2秒後に進む
+- 回答前のAPIには正解選択肢や詳しい解説が含まれない
 - 5問目の後にStage Resultを表示し、次Stageはボタンを押した場合だけ始まる
 
 ### APIテスト
@@ -3025,6 +3040,9 @@ MVP完成後に追加します。
 
 ### 2026/10/14
 
+- 解答後の画面に正解選択肢・短い解説・詳しい解説を表示する仕様を追加
+- 詳しい解説を開いている間は次問への2秒自動進行を止め、閉じた後に待ち時間を再開する仕様を追加
+- 解答前のAPIには正解を含めず、解答後の回答APIと保存済み結果からだけ解説を返す方針を明記
 - ゲーム開始前にChapter・出題方法・問題数を選び、その内容でGameSessionを開始する仕様を明記
 - 問題数を5・10・15・20問とし、各5問のStageをStage 1から順番に進める仕様を明記
 - Stage Clear後はStage Result画面のボタンを押して次Stageを開始する仕様を明記
