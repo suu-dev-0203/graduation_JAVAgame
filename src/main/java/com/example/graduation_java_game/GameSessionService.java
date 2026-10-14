@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -70,12 +71,6 @@ public class GameSessionService {
 		GameSessionType sessionType = request.sessionType() == null
 				? GameSessionType.STANDARD
 				: request.sessionType();
-		if (sessionType == GameSessionType.WEAK_TRAINING && request.questionCount() != QUESTIONS_PER_STAGE) {
-			throw new GameApiException(
-					HttpStatus.BAD_REQUEST,
-					"INVALID_REQUEST",
-					"苦手特訓の問題数は5問です。");
-		}
 		QuestionSelectionMode selectionMode = sessionType == GameSessionType.WEAK_TRAINING
 				? QuestionSelectionMode.RANDOM
 				: request.selectionMode() == null
@@ -89,9 +84,7 @@ public class GameSessionService {
 						"指定されたChapterが見つかりません。"));
 
 		int questionCount = request.questionCount();
-		int totalStageCount = sessionType == GameSessionType.WEAK_TRAINING
-				? 1
-				: questionCount / QUESTIONS_PER_STAGE;
+		int totalStageCount = questionCount / QUESTIONS_PER_STAGE;
 		List<StageDefinition> stageDefinitions = findRequiredStageDefinitions(
 				chapter.getChapterId(), totalStageCount);
 		if (stageDefinitions.stream().anyMatch(stage -> stage.getMaxEnemyHp() != 5)) {
@@ -111,7 +104,7 @@ public class GameSessionService {
 						"NO_WEAK_QUESTIONS",
 						"この学習テーマには苦手・超苦手に分類された問題がありません。");
 			}
-			chapterQuestions = repeatWeakQuestionsToStageSize(weakQuestions);
+			chapterQuestions = selectWeakTrainingQuestionsForStage(weakQuestions, List.of());
 		} else {
 			List<Question> availableQuestions = findQuestionsForMode(chapter.getChapterId(), selectionMode);
 			if (availableQuestions.size() < questionCount) {
@@ -219,23 +212,35 @@ public class GameSessionService {
 					"次のStageはすでに作成されています。");
 		}
 
-		Set<Long> usedQuestionIds = stageQuestionRepository
-				.findByStageSession_GameSession_GameSessionId(gameSessionId)
-				.stream()
+		List<StageQuestion> allSessionQuestions = stageQuestionRepository
+				.findByStageSession_GameSession_GameSessionId(gameSessionId);
+		Set<Long> usedQuestionIds = allSessionQuestions.stream()
 				.map(stageQuestion -> stageQuestion.getQuestion().getQuestionId())
 				.collect(Collectors.toSet());
-		List<Question> availableQuestions = findQuestionsForMode(
-				gameSession.getChapter().getChapterId(),
-				gameSession.getSelectionMode());
-		List<Question> remainingQuestions = prioritizeQuestions(
-				gameSession.getChapter().getChapterId(),
-				availableQuestions,
-				usedQuestionIds);
-		if (remainingQuestions.size() < QUESTIONS_PER_STAGE) {
-			throw new GameApiException(
-					HttpStatus.CONFLICT,
-					"INSUFFICIENT_QUESTIONS",
-					"次のStageで使える未出題問題が5問ありません。");
+		List<Question> remainingQuestions;
+		if (gameSession.getSessionType() == GameSessionType.WEAK_TRAINING) {
+			List<Question> unplayedWeakQuestions = learningProgressService
+					.findWeakQuestionsForTraining(gameSession.getChapter().getChapterId())
+					.stream()
+					.filter(question -> !usedQuestionIds.contains(question.getQuestionId()))
+					.toList();
+			remainingQuestions = selectWeakTrainingQuestionsForStage(
+					unplayedWeakQuestions,
+					findDistinctQuestions(allSessionQuestions));
+		} else {
+			List<Question> availableQuestions = findQuestionsForMode(
+					gameSession.getChapter().getChapterId(),
+					gameSession.getSelectionMode());
+			remainingQuestions = prioritizeQuestions(
+					gameSession.getChapter().getChapterId(),
+					availableQuestions,
+					usedQuestionIds);
+			if (remainingQuestions.size() < QUESTIONS_PER_STAGE) {
+				throw new GameApiException(
+						HttpStatus.CONFLICT,
+						"INSUFFICIENT_QUESTIONS",
+						"次のStageで使える未出題問題が5問ありません。");
+			}
 		}
 
 		Instant startedAt = Instant.now();
@@ -833,15 +838,47 @@ public class GameSessionService {
 		return prioritized;
 	}
 
-	private List<Question> repeatWeakQuestionsToStageSize(List<Question> weakQuestions) {
-		List<Question> questions = new ArrayList<>(QUESTIONS_PER_STAGE);
-		while (questions.size() < QUESTIONS_PER_STAGE) {
-			List<Question> nextPass = new ArrayList<>(weakQuestions);
-			Collections.shuffle(nextPass);
-			int remaining = QUESTIONS_PER_STAGE - questions.size();
-			questions.addAll(nextPass.subList(0, Math.min(remaining, nextPass.size())));
+	/** 未出題の苦手問題を優先し、5問に足りない分は今回の特訓で出した問題から補います。 */
+	private List<Question> selectWeakTrainingQuestionsForStage(
+			List<Question> unplayedWeakQuestions,
+			List<Question> previouslySelectedQuestions) {
+		List<Question> shuffledWeakQuestions = new ArrayList<>(unplayedWeakQuestions);
+		Collections.shuffle(shuffledWeakQuestions);
+		int firstSelectionCount = Math.min(QUESTIONS_PER_STAGE, shuffledWeakQuestions.size());
+		List<Question> selectedQuestions = new ArrayList<>(
+				shuffledWeakQuestions.subList(0, firstSelectionCount));
+		if (selectedQuestions.size() == QUESTIONS_PER_STAGE) {
+			return selectedQuestions;
 		}
-		return questions;
+
+		List<Question> repeatCandidates = new ArrayList<>(previouslySelectedQuestions.isEmpty()
+				? unplayedWeakQuestions
+				: previouslySelectedQuestions);
+		if (repeatCandidates.isEmpty()) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"NO_WEAK_QUESTIONS",
+					"次のStageで使える苦手問題がありません。");
+		}
+		Collections.shuffle(repeatCandidates);
+		int repeatIndex = 0;
+		while (selectedQuestions.size() < QUESTIONS_PER_STAGE) {
+			selectedQuestions.add(repeatCandidates.get(repeatIndex % repeatCandidates.size()));
+			repeatIndex++;
+		}
+		return selectedQuestions;
+	}
+
+	private List<Question> findDistinctQuestions(List<StageQuestion> stageQuestions) {
+		Set<Long> questionIds = new HashSet<>();
+		List<Question> distinctQuestions = new ArrayList<>();
+		for (StageQuestion stageQuestion : stageQuestions) {
+			Question question = stageQuestion.getQuestion();
+			if (questionIds.add(question.getQuestionId())) {
+				distinctQuestions.add(question);
+			}
+		}
+		return distinctQuestions;
 	}
 
 	private boolean isLaterHistory(AnswerHistory candidate, AnswerHistory current) {

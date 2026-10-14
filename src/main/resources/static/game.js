@@ -27,6 +27,7 @@ const loadLearningProgressButton = document.querySelector("#load-learning-progre
 const learningProgressContent = document.querySelector("#learning-progress-content");
 const chapterProgressList = document.querySelector("#chapter-progress-list");
 const trainingRecordList = document.querySelector("#training-record-list");
+const trainingQuestionCountSelect = document.querySelector("#training-question-count");
 const countdown = document.querySelector("#countdown");
 const countdownValue = document.querySelector("#countdown-value");
 const questionContent = document.querySelector("#question-content");
@@ -115,7 +116,9 @@ async function startGame(sessionType = "STANDARD", chapterIdOverride = null) {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				chapterId: Number(chapterIdOverride ?? chapterSelect.value),
-				questionCount: sessionType === "WEAK_TRAINING" ? 5 : Number(questionCountSelect.value),
+				questionCount: sessionType === "WEAK_TRAINING"
+					? Number(trainingQuestionCountSelect.value)
+					: Number(questionCountSelect.value),
 				selectionMode: sessionType === "WEAK_TRAINING" ? "RANDOM" : selectionModeSelect.value,
 				sessionType
 			})
@@ -696,6 +699,8 @@ async function loadLearningProgress() {
 		renderChapterProgress(progress.chapters);
 		renderTrainingRecords(records.items);
 		learningProgressLoaded = true;
+		trainingQuestionCountSelect.disabled = false;
+		updateTrainingButtonLabels();
 		learningProgressContent.hidden = false;
 		loadLearningProgressButton.textContent = "学習状況を更新";
 		message.textContent = "学習状況と苦手特訓の記録を読み込みました。";
@@ -739,10 +744,18 @@ function renderChapterProgress(chapters) {
 		trainButton.className = "secondary-button";
 		trainButton.dataset.trainingChapterId = chapter.chapterId;
 		trainButton.dataset.weakQuestionCount = weakCount;
-		trainButton.textContent = `このChapterの苦手特訓を始める（${weakCount}問）`;
+		trainButton.textContent = "苦手特訓を始める（" + trainingQuestionCountSelect.value
+				+ "問・対象" + weakCount + "問）";
 		trainButton.disabled = weakCount === 0;
 		card.append(title, counts, weakList, trainButton);
 		chapterProgressList.append(card);
+	}
+}
+
+function updateTrainingButtonLabels() {
+	for (const button of chapterProgressList.querySelectorAll("button[data-training-chapter-id]")) {
+		button.textContent = "苦手特訓を始める（" + trainingQuestionCountSelect.value
+				+ "問・対象" + button.dataset.weakQuestionCount + "問）";
 	}
 }
 
@@ -951,6 +964,7 @@ chapterProgressList.addEventListener("click", (event) => {
 });
 selectionModeSelect.addEventListener("change", updateQuestionCountOptions);
 questionCountSelect.addEventListener("change", updateQuestionCountOptions);
+trainingQuestionCountSelect.addEventListener("change", updateTrainingButtonLabels);
 startQuestionButton.addEventListener("click", startCurrentQuestion);
 answerDetailedExplanationDetails.addEventListener("toggle", updateAnswerExplanationPause);
 pauseButton.addEventListener("click", pauseCurrentGame);

@@ -207,6 +207,83 @@ class GraduationJavaGameApplicationTests {
 				.andExpect(jsonPath("$.code").value("NO_WEAK_QUESTIONS"));
 	}
 
+	/** 回答で分類がOKへ変わっても、20問の苦手特訓を4 Stage最後まで進められることを確認します。 */
+	@Test
+	@Transactional
+	void weakTrainingCanAdvanceThroughFourStagesAfterMasteryChanges() throws Exception {
+		Chapter chapter = createChapterWithQuestions(5);
+		for (int stageNumber = 1; stageNumber <= 4; stageNumber++) {
+			createStageDefinition(chapter, stageNumber);
+		}
+		createChoicesForQuestions(chapter);
+		GameSessionCreateResponse ordinaryGame = gameSessionService.create(
+				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+		answerCurrentQuestion(ordinaryGame.gameSessionId(), false);
+		for (int questionCount : List.of(5, 10, 15)) {
+			mockMvc.perform(post("/api/game-sessions")
+					.contentType("application/json")
+					.content("""
+							{"chapterId": %d, "questionCount": %d, "sessionType": "WEAK_TRAINING"}
+							""".formatted(chapter.getChapterId(), questionCount)))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.questionCount").value(questionCount))
+					.andExpect(jsonPath("$.totalStageCount").value(questionCount / 5));
+		}
+
+		mockMvc.perform(post("/api/game-sessions")
+				.contentType("application/json")
+				.content("""
+						{"chapterId": %d, "questionCount": 20, "sessionType": "WEAK_TRAINING"}
+						""".formatted(chapter.getChapterId())))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.questionCount").value(20))
+				.andExpect(jsonPath("$.totalStageCount").value(4));
+
+		GameSession training = gameSessionRepository.findAll().stream()
+				.filter(candidate -> candidate.getSessionType() == GameSessionType.WEAK_TRAINING
+						&& candidate.getQuestionCount() == 20)
+				.findFirst()
+				.orElseThrow();
+		Long trainedQuestionId = null;
+		for (int stageNumber = 1; stageNumber <= 4; stageNumber++) {
+			StageSession currentStage = stageSessionRepository
+					.findByGameSession_GameSessionId(training.getGameSessionId())
+					.stream()
+					.filter(stage -> stage.getStatus() == StageSessionStatus.PLAYING)
+					.findFirst()
+					.orElseThrow();
+			assertEquals(stageNumber, currentStage.getStageDefinition().getStageNumber());
+
+			List<StageQuestion> stageQuestions = stageQuestionRepository
+					.findByStageSession_StageSessionIdOrderByQuestionOrder(
+							currentStage.getStageSessionId());
+			assertEquals(5, stageQuestions.size());
+			if (trainedQuestionId == null) {
+				trainedQuestionId = stageQuestions.get(0).getQuestion().getQuestionId();
+			}
+			Long expectedQuestionId = trainedQuestionId;
+			assertTrue(stageQuestions.stream().allMatch(stageQuestion ->
+					stageQuestion.getQuestion().getQuestionId().equals(expectedQuestionId)));
+
+			for (int questionNumber = 0; questionNumber < 5; questionNumber++) {
+				answerCurrentQuestion(training.getGameSessionId(), true);
+			}
+			if (stageNumber < 4) {
+				gameSessionService.advanceStage(training.getGameSessionId());
+			}
+		}
+
+		mockMvc.perform(get("/api/game-sessions/{id}/result", training.getGameSessionId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.questionCount").value(20))
+				.andExpect(jsonPath("$.totalCorrectCount").value(20));
+		mockMvc.perform(get("/api/learning-progress/training-records"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.items", hasSize(1)))
+				.andExpect(jsonPath("$.items[0].questionCount").value(20))
+				.andExpect(jsonPath("$.items[0].correctCount").value(20));
+	}
+
 	/** 問題と選択肢を保存し、選択肢が表示順に取り出せることを確認します。 */
 	@Test
 	@Transactional

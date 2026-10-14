@@ -206,7 +206,7 @@ GameSessionはChapter、出題方法、5/10/15/20問の問題数を選択して�
 
 Stageの解放条件は設けません。
 
-通常ゲームでは、同じGameSession内で同じQuestionを重複して選出しません。苦手特訓ではChapter内の対象問題が5問未満の場合、5問になるまで対象問題を繰り返し出題します。開始時には、通常ゲームで選んだ問題数を満たすQuestionがあるか確認します。
+通常ゲームでは、同じGameSession内で同じQuestionを重複して選出しません。苦手特訓では5・10・15・20問を選べ、各Stageを5問ずつ進めます。各Stageでは未出題の苦手問題を優先し、5問に足りない場合は今回の特訓ですでに出題した問題を繰り返します。正解により分類が`OK`へ変わった問題も、その特訓中に問題数が足りなければ再出題の候補に残ります。特訓の開始時には、対象となる苦手問題が1問以上あることを確認します。
 
 ## 9. 問題形式
 
@@ -1416,7 +1416,7 @@ Response：
 
 `questionCount`は5・10・15・20を許可します。出題方法は`RANDOM`（全難易度からランダム）、`EASY`（入門）、`ADVANCED`（応用）、`BRONZE_STYLE`（Java Bronze風のオリジナル問題）です。入門問題は15問、他の出題方法は20問まで選べます。
 
-苦手特訓では`sessionType`に`WEAK_TRAINING`を指定し、苦手特訓ボタンから5問で開始します。通常のゲームでは`STANDARD`を指定します。
+苦手特訓では`sessionType`に`WEAK_TRAINING`を指定し、`questionCount`に5・10・15・20のいずれかを設定します。通常のゲームでは`STANDARD`を指定します。苦手特訓でも、5問ごとにStage Resultを表示し、次Stageボタンを押して進みます。
 
 ### POST /api/stage-questions/{stageQuestionId}/start
 
@@ -1717,7 +1717,7 @@ Review APIはGameSessionが`COMPLETED`になった後だけ利用できます。
 
 回答時は正解なら`OK`、不正解または時間切れなら`WEAK`を保存します。回答履歴がない問題は`UNSEEN`として数えます。Review画面では、回答済み問題を`OK`、`ALMOST`、`WEAK`、`VERY_WEAK`に変更できます。画面ではそれぞれ「OK」「あと一歩」「苦手」「超苦手」と表示します。`UNSEEN`は回答から決まるため、手動では指定できません。
 
-苦手特訓は選んだChapterの`WEAK`と`VERY_WEAK`だけを対象に、5問のGameSessionとして開始します。対象が5問未満なら対象問題を繰り返します。分類や回答履歴は回答ごとに保存され、特訓記録一覧には完了した特訓だけが表示されます。
+苦手特訓は選んだChapterの`WEAK`と`VERY_WEAK`だけを対象に、5・10・15・20問のGameSessionとして開始します。1 Stageは5問です。次Stageでは、未出題の苦手問題を先に使い、5問に足りない分を今回の特訓ですでに出題した問題で補います。回答ごとに分類と回答履歴を保存するため、特訓中に正解して分類が`OK`へ変わった問題も、後のStageで問題が不足する場合は再出題されます。特訓記録一覧には完了した特訓だけが表示されます。
 
 この版ではアカウントや利用者ごとの分離を作らず、既存のDBにある学習記録を1人分として扱います。複数人が同じDBを共有すると記録も共有されます。
 
@@ -2143,7 +2143,7 @@ Perfectによる追加Scoreはありません。通常どおり正解1問につ�
 
 ### 35.1.12 Question選択アルゴリズム
 
-通常ゲームでは同一GameSession内の同じQuestionを再利用しません。苦手特訓だけは、対象の苦手問題が5問未満の場合に再利用します。
+通常ゲームでは同一GameSession内の同じQuestionを再利用しません。苦手特訓は5・10・15・20問を5問ずつStageに分け、各Stageで未出題の苦手問題を優先します。対象が5問未満の場合や、回答で対象の分類が変わった場合は、同じ特訓内ですでに選んだ問題を再利用します。
 
 問題をStage用に選ぶときは、まず現在GameSessionで既に使用したQuestionを除外します。その後、**全過去回答履歴のうちQuestionごとの最新AnswerHistory**を確認します。Questionごとの「最新AnswerHistory」は、`answeredAt DESC`、同値の場合は`answerHistoryId DESC`で1件を決定します。`answerHistoryId`の最大値だけでは最新判定しません。
 
@@ -2176,7 +2176,7 @@ Perfectによる追加Scoreはありません。通常どおり正解1問につ�
 5. UNSEEN → VERY_WEAK → WEAK → ALMOST → OKの順に取得
 6. 各グループ内をシャッフル
 7. 必要数5件を選択
-8. 通常ゲームで5件未満しか残らなければ409 INSUFFICIENT_QUESTIONS。苦手特訓は対象を5問まで繰り返す
+8. 通常ゲームで次Stage用の未出題問題が5件未満なら409 INSUFFICIENT_QUESTIONS。苦手特訓は未出題の苦手問題を優先し、足りない分を同じ特訓ですでに選んだ問題から補う
 9. questionOrder=1～5でStageQuestionを作成
 ```
 
@@ -2297,7 +2297,7 @@ UNIQUE(answerHistoryId, choiceId)             // AnswerHistoryChoice
 UNIQUE(gameSessionId, stageId)                 // StageSession
 ```
 
-通常ゲームでは同じGameSession内のQuestionを再利用しないようService側で選びます。苦手特訓では対象が5問未満の場合に再出題するため、`UNIQUE(stageSessionId, questionId)`は設けません。回答の重複は引き続き`UNIQUE(stageQuestionId)`で防ぎます。
+通常ゲームでは同じGameSession内のQuestionを再利用しないようService側で選びます。苦手特訓は問題を再出題する場合があるため、`UNIQUE(stageSessionId, questionId)`は設けません。回答の二重登録は引き続き`UNIQUE(stageQuestionId)`で防ぎます。
 
 ### 35.1.16 Repositoryの最小責務
 
@@ -2538,7 +2538,7 @@ READMEのクラス図と実装するEntityの項目を完全に一致させま�
 
 `stageQuestionId`, `stageSessionId`, `questionId`, `questionOrder`, `startedAt`, `answeredAt`, `pausedAt`, `totalPausedMs`
 
-`questionOrder`は**1～5**で、1 Stageあたり必ず5件です。通常ゲームでは同じQuestionを再利用しません。苦手特訓で対象問題が5問未満の場合は、同じQuestionを複数の`StageQuestion`から参照します。
+`questionOrder`は**1～5**で、1 Stageあたり必ず5件です。通常ゲームでは同じQuestionを再利用しません。苦手特訓では対象問題が少ない場合や、回答後に分類が変わった場合に、同じQuestionを複数の`StageQuestion`から参照します。
 
 ### AnswerHistory
 
@@ -2657,7 +2657,7 @@ flowchart LR
 4. **Stage進行**：Stage 1をGameSession開始時に作成し、以後はadvance-stageで5問ずつ作成。
 5. **Pause/Resume**：StageQuestionとStageSessionのPause時間を個別に累積。
 6. **二重実行**：UIロック + Service事前チェック + DB UNIQUE。
-7. **Question選択**：通常ゲームはUNSEEN → VERY_WEAK → WEAK → ALMOST → OKの順に選択。苦手特訓だけ対象が5問未満なら繰り返す。
+7. **Question選択**：通常ゲームはUNSEEN → VERY_WEAK → WEAK → ALMOST → OKの順に選択。苦手特訓は未出題の苦手問題を優先し、5問に足りない場合は同じ特訓で選択済みの問題を繰り返す。
 8. **Stage Clear**：5問回答完了でClear。敵HP0はClear条件ではない。
 9. **Perfect**：Stage 5/5のみ。追加点なし。
 10. **TIME UP**：回答API受信時にJava側で残り時間を再計算する。残り時間が0以下の場合はTIME UPとして処理し、時間が残っている状態で空配列が送信された場合は400 INVALID_ANSWER_COUNTとする。
@@ -3113,6 +3113,7 @@ MVP完成後に追加します。
 - Stage Clear後はStage Result画面のボタンを押して次Stageを開始する仕様を明記
 - Stageの個別選択画面を設けないことを明記
 - 入門問題は各Chapterの問題数に合わせて15問までとする制限を明記
+- 苦手特訓も5・10・15・20問から選べるようにし、5問ごとのStage進行と回答直後の分類更新に対応
 
 ### 2026/10/08
 

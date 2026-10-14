@@ -55,7 +55,16 @@
 			</button>
 			<div id="learning-progress-content" hidden>
 				<h3>Chapterごとの学習状況</h3>
-				<p>「苦手」または「超苦手」の問題を5問解きます。対象が5問未満の場合、同じ問題が繰り返し出ます。</p>
+				<p>「苦手」または「超苦手」の問題を選びます。5問は1 Stage、10問は2 Stage、15問は3 Stage、20問は4 Stageです。対象が足りない場合は、同じ特訓で出した問題も繰り返し出ます。</p>
+				<div class="form-row">
+					<label for="training-question-count">苦手特訓の問題数</label>
+					<select id="training-question-count" disabled>
+						<option value="5">5問</option>
+						<option value="10">10問</option>
+						<option value="15">15問</option>
+						<option value="20">20問</option>
+					</select>
+				</div>
 				<div id="chapter-progress-list"></div>
 				<h3>苦手特訓の記録</h3>
 				<div id="training-record-list"></div>

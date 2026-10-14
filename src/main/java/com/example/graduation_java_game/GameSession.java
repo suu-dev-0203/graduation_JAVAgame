@@ -32,7 +32,7 @@ public class GameSession {
 	@JoinColumn(name = "chapter_id", nullable = false)
 	private Chapter chapter;
 
-	/** プレイヤーが選んだ総問題数（5、10、20のいずれか）です。 */
+	/** プレイヤーが選んだ総問題数（5、10、15、20のいずれか）です。 */
 	@Column(nullable = false)
 	private int questionCount;
 
