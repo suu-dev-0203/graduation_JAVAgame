@@ -110,7 +110,7 @@ async function startGame() {
 		localStorage.setItem("gameSessionId", String(gameSessionId));
 		const current = await getCurrentGame();
 		showQuestion(current);
-		message.textContent = "Enterで3・2・1を始めます。その後は5問を続けて解きます。";
+		message.textContent = "「スタート」またはEnterキーで始められます。";
 		startPanel.hidden = true;
 		gamePanel.scrollIntoView({ behavior: "smooth", block: "start" });
 	} catch (error) {
@@ -135,9 +135,7 @@ function showQuestion(current) {
 	selectedChoiceIds = new Set();
 	questionContent.hidden = current.questionNumber === 1
 			&& questionState === "WAITING_TO_START";
-	startQuestionButton.textContent = current.questionNumber === 1
-			? "Enter またはクリックで3・2・1を開始"
-			: "クリックでこの問題を開始";
+	startQuestionButton.textContent = "スタート";
 	document.querySelector("#question-progress").textContent =
 		`Stage ${current.currentStageNumber} / ${current.totalStageCount} · 問題 ${current.questionNumber} / ${current.totalQuestionsInStage}`;
 	document.querySelector("#score-status").textContent = `スコア ${current.score}`;
@@ -240,9 +238,7 @@ async function startCurrentQuestion() {
 		questionState = "WAITING_TO_START";
 		startQuestionButton.hidden = false;
 		questionContent.hidden = currentGame.questionNumber === 1;
-		startQuestionButton.textContent = currentGame.questionNumber === 1
-				? "再試行：Enterまたはクリックで開始"
-			: "再試行：Enterまたはクリックでこの問題を開始";
+		startQuestionButton.textContent = "もう一度試す";
 		showError(error);
 		updateChoiceControls();
 	} finally {
@@ -536,7 +532,7 @@ async function startNextStage() {
 		const next = await getCurrentGame();
 		stageResultPanel.hidden = true;
 		showQuestion(next);
-		message.textContent = "次のStageです。Enterで3・2・1を始めてください。";
+		message.textContent = "次のStageです。「スタート」またはEnterキーで始められます。";
 		gamePanel.scrollIntoView({ behavior: "smooth", block: "start" });
 	} catch (error) {
 		showError(error);
