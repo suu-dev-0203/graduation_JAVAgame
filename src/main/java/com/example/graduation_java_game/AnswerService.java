@@ -87,6 +87,7 @@ public class AnswerService {
 					"開始済みで一時停止中でない問題にだけ回答できます。");
 		}
 
+		// 制限時間はブラウザーの申告を使わず、サーバーの開始時刻から計算します。
 		Instant answeredAt = Instant.now();
 		Question question = stageQuestion.getQuestion();
 		long remainingTimeMs = calculateRemainingTimeMs(stageQuestion, question, answeredAt);
@@ -94,6 +95,7 @@ public class AnswerService {
 		List<Choice> selectedChoices = timeout
 				? List.of()
 				: validateAndFindChoices(question, request.selectedChoiceIds());
+		// 受け取った選択肢がこの問題に属することを確認してから、Java側で正誤を判定します。
 		boolean correct = !timeout && hasExactCorrectSelection(question, selectedChoices);
 		long answerTimeMs = Math.max(
 				0,
@@ -119,6 +121,7 @@ public class AnswerService {
 		}
 		gameSessionRepository.save(gameSession);
 
+		// 回答履歴と現在の分類を同じ処理の中で保存し、結果が食い違わないようにします。
 		AnswerHistory answerHistory = answerHistoryRepository.save(new AnswerHistory(
 				gameSession,
 				stageSession,

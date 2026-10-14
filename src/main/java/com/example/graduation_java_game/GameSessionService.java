@@ -84,6 +84,7 @@ public class GameSessionService {
 						"指定されたChapterが見つかりません。"));
 
 		int questionCount = request.questionCount();
+		// Stageは5問ずつ進むため、選んだ問題数からStage数を求めます。
 		int totalStageCount = questionCount / QUESTIONS_PER_STAGE;
 		List<StageDefinition> stageDefinitions = findRequiredStageDefinitions(
 				chapter.getChapterId(), totalStageCount);
@@ -219,6 +220,7 @@ public class GameSessionService {
 				.collect(Collectors.toSet());
 		List<Question> remainingQuestions;
 		if (gameSession.getSessionType() == GameSessionType.WEAK_TRAINING) {
+			// 回答すると分類がすぐ変わるため、次Stageのたびに苦手問題を取り直します。
 			List<Question> unplayedWeakQuestions = learningProgressService
 					.findWeakQuestionsForTraining(gameSession.getChapter().getChapterId())
 					.stream()
@@ -823,6 +825,7 @@ public class GameSessionService {
 			}
 		}
 
+		// 未出題、超苦手、苦手、あと一歩、OKの順で出題候補を並べます。
 		Collections.shuffle(unanswered);
 		Collections.shuffle(veryWeak);
 		Collections.shuffle(weak);
@@ -842,6 +845,7 @@ public class GameSessionService {
 	private List<Question> selectWeakTrainingQuestionsForStage(
 			List<Question> unplayedWeakQuestions,
 			List<Question> previouslySelectedQuestions) {
+		// まだ出していない苦手問題を先に選び、足りない分だけ既出問題を使います。
 		List<Question> shuffledWeakQuestions = new ArrayList<>(unplayedWeakQuestions);
 		Collections.shuffle(shuffledWeakQuestions);
 		int firstSelectionCount = Math.min(QUESTIONS_PER_STAGE, shuffledWeakQuestions.size());

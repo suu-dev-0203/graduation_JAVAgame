@@ -1,5 +1,9 @@
 package com.example.graduation_java_game;
 
+import com.example.graduation_java_game.LearningProgressDtos.ChapterProgressResponse;
+import com.example.graduation_java_game.LearningProgressDtos.MasteryStatusUpdateResponse;
+import com.example.graduation_java_game.LearningProgressDtos.TrainingRecordResponse;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -76,17 +80,17 @@ public class LearningProgressService {
 				Long questionId = question.getQuestionId();
 				MasteryStatus status = resolveStatus(questionId, savedMastery, latestHistory);
 				AnswerHistory latestAnswer = latestHistory.get(questionId);
+				// 保存済みの分類を使い、未保存なら最新の回答から分類を決めます。
 				switch (status) {
 					case UNSEEN -> unseenCount++;
 					case OK -> okCount++;
 					case ALMOST -> almostCount++;
-					case WEAK -> {
-						weakCount++;
-						weakQuestions.add(toWeakQuestion(
-								question, status, savedMastery, latestAnswer, attemptCounts));
-					}
-					case VERY_WEAK -> {
-						veryWeakCount++;
+					case WEAK, VERY_WEAK -> {
+						if (status == MasteryStatus.WEAK) {
+							weakCount++;
+						} else {
+							veryWeakCount++;
+						}
 						weakQuestions.add(toWeakQuestion(
 								question, status, savedMastery, latestAnswer, attemptCounts));
 					}
@@ -196,6 +200,7 @@ public class LearningProgressService {
 			Long questionId,
 			Map<Long, QuestionMastery> savedMastery,
 			Map<Long, AnswerHistory> latestHistory) {
+		// 手動変更を含む現在の分類を最優先し、なければ回答履歴を使います。
 		QuestionMastery mastery = savedMastery.get(questionId);
 		if (mastery != null) {
 			return mastery.getStatus();
@@ -237,6 +242,7 @@ public class LearningProgressService {
 	}
 
 	private boolean isLaterHistory(AnswerHistory candidate, AnswerHistory current) {
+		// 同時刻に回答された場合も、後から保存された履歴を最新として扱います。
 		int answerTimeComparison = candidate.getStageQuestion().getAnsweredAt()
 				.compareTo(current.getStageQuestion().getAnsweredAt());
 		return answerTimeComparison > 0

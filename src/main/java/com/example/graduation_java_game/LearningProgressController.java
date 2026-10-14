@@ -1,5 +1,10 @@
 package com.example.graduation_java_game;
 
+import com.example.graduation_java_game.LearningProgressDtos.ChapterProgressResponse;
+import com.example.graduation_java_game.LearningProgressDtos.MasteryStatusUpdateRequest;
+import com.example.graduation_java_game.LearningProgressDtos.MasteryStatusUpdateResponse;
+import com.example.graduation_java_game.LearningProgressDtos.TrainingRecordResponse;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
