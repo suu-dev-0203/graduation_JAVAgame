@@ -1,4 +1,6 @@
 const chapterSelect = document.querySelector("#chapter-select");
+const selectionModeSelect = document.querySelector("#selection-mode");
+const questionCountSelect = document.querySelector("#question-count");
 const startButton = document.querySelector("#start-button");
 const startQuestionButton = document.querySelector("#start-question-button");
 const nextQuestionButton = document.querySelector("#next-question-button");
@@ -50,8 +52,11 @@ async function loadChapters() {
 		}
 
 		chapterSelect.disabled = false;
+		selectionModeSelect.disabled = false;
+		questionCountSelect.disabled = false;
 		startButton.disabled = false;
 		message.textContent = "学習テーマを選んでゲームを始めてください。";
+		updateQuestionCountOptions();
 	} catch (error) {
 		showError(error);
 	}
@@ -70,7 +75,8 @@ async function startGame() {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				chapterId: Number(chapterSelect.value),
-				questionCount: 5
+				questionCount: Number(questionCountSelect.value),
+				selectionMode: selectionModeSelect.value
 			})
 		});
 		gameSessionId = game.gameSessionId;
@@ -96,11 +102,11 @@ function showQuestion(current) {
 	questionState = current.questionState;
 	selectedChoiceIds = new Set();
 	document.querySelector("#question-progress").textContent =
-		`Stage 1 · 問題 ${current.questionNumber} / ${current.totalQuestionsInStage}`;
+		`Stage ${current.currentStageNumber} / ${current.totalStageCount} · 問題 ${current.questionNumber} / ${current.totalQuestionsInStage}`;
 	document.querySelector("#score-status").textContent = `スコア ${current.score}`;
 	document.querySelector("#enemy-status").textContent = `敵HP ${current.enemyHp}`;
 	document.querySelector("#combo-status").textContent = `Combo ${current.combo}`;
-	document.querySelector("#question-type").textContent = "Javaの問題";
+	document.querySelector("#question-type").textContent = difficultyLabel(current.difficulty);
 	document.querySelector("#question-title").textContent = current.question.questionText;
 
 	const codeBlock = document.querySelector("#code-block");
@@ -298,11 +304,19 @@ function showAnswerResult(result) {
 	startQuestionButton.hidden = true;
 
 	if (result.stageClear) {
+		const hasNextStage = currentGame.currentStageNumber < currentGame.totalStageCount;
 		answerResultTitle.textContent = result.perfect ? "PERFECT！ Stage Clear" : "Stage Clear";
-		nextQuestionButton.hidden = true;
-		message.textContent = "5問すべて回答しました。";
+		nextQuestionButton.hidden = !hasNextStage;
+		nextQuestionButton.textContent = "次のStageへ進む";
+		message.textContent = hasNextStage
+			? "Stageをクリアしました。次のStageへ進めます。"
+			: "すべてのStageをクリアしました。ゲーム終了です。";
+		if (hasNextStage) {
+			nextQuestionButton.focus();
+		}
 	} else {
 		nextQuestionButton.hidden = false;
+		nextQuestionButton.textContent = "次の問題へ";
 		message.textContent = "回答結果を確認し、次の問題へ進んでください。";
 		nextQuestionButton.focus();
 	}
@@ -314,14 +328,41 @@ async function showNextQuestion() {
 	}
 	nextQuestionButton.disabled = true;
 	try {
+		if (currentGame.questionNumber === currentGame.totalQuestionsInStage) {
+			await requestJson(
+				`/api/game-sessions/${gameSessionId}/advance-stage`,
+				{ method: "POST" }
+			);
+		}
 		const next = await getCurrentGame();
 		showQuestion(next);
-		message.textContent = "Enterで次の問題を開始してください。";
+		message.textContent = currentGame.questionNumber === 1
+			? "次のStageを開始しました。Enterで問題を開始してください。"
+			: "Enterで次の問題を開始してください。";
 	} catch (error) {
 		showError(error);
 	} finally {
 		nextQuestionButton.disabled = false;
 	}
+}
+
+function difficultyLabel(difficulty) {
+	return {
+		EASY: "入門問題",
+		ADVANCED: "応用問題",
+		BRONZE_STYLE: "Java Bronze風オリジナル問題"
+	}[difficulty] || "Javaの問題";
+}
+
+function updateQuestionCountOptions() {
+	const maximum = selectionModeSelect.value === "EASY" ? 15 : 20;
+	for (const option of questionCountSelect.options) {
+		option.disabled = Number(option.value) > maximum;
+	}
+	if (Number(questionCountSelect.value) > maximum) {
+		questionCountSelect.value = String(maximum);
+	}
+	startButton.textContent = `${questionCountSelect.value}問のゲームを始める`;
 }
 
 function showError(error) {
@@ -330,6 +371,8 @@ function showError(error) {
 }
 
 startButton.addEventListener("click", startGame);
+selectionModeSelect.addEventListener("change", updateQuestionCountOptions);
+questionCountSelect.addEventListener("change", updateQuestionCountOptions);
 startQuestionButton.addEventListener("click", startCurrentQuestion);
 nextQuestionButton.addEventListener("click", showNextQuestion);
 choicesElement.addEventListener("click", (event) => {

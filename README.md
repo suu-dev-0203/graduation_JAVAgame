@@ -161,9 +161,9 @@ StageNumber / Stageの選択 = 自由選択不可・Stage 1から自動進行
 
 Chapterは自由に選択できます。学習者は自分が学びたい分野を選んで開始します。
 
-Stageはプレイ中に自動で進みます。Chapter選択後に「5問・10問・20問」を選択する画面を設け、その選択内容でGameSessionを開始します。Stageを個別選択する画面は設けません。
+Stageはプレイ中に順番に進みます。Chapter・出題方法・「5問・10問・15問・20問」を選択する画面を設け、その選択内容でGameSessionを開始します。Stageを個別選択する画面は設けません。
 
-5問ならStage 1だけ、10問ならStage 1→Stage 2、20問ならStage 1→Stage 2→Stage 3→Stage 4と自動進行します。
+5問ならStage 1だけ、10問ならStage 1→Stage 2、15問ならStage 1→Stage 2→Stage 3、20問ならStage 1→Stage 2→Stage 3→Stage 4と進みます。Stageをクリアしたあと、ゲーム画面のボタンを押して次へ進みます。
 
 ## 6. 1 Stage = 5問
 
@@ -192,15 +192,16 @@ MVPでは1 Stageの敵HPを必ず5に固定します。
 
 ## 8. プレイ問題数
 
-MVPでは5問・10問・20問から選択します。
+MVPでは5問・10問・15問・20問から選択します。
 
 ```text
 5問  = 1 Stage
 10問 = 2 Stage
+15問 = 3 Stage
 20問 = 4 Stage
 ```
 
-GameSessionはChapterと5/10/20問の問題数を選択して開始します。開始StageはChapter内のStage 1です。10問・20問の場合は、同じChapter内で`stageNumber`が次のStageへ自動的に進みます。必要なStage数が存在しない場合、そのGameSessionは開始できません。
+GameSessionはChapter、出題方法、5/10/15/20問の問題数を選択して開始します。開始StageはChapter内のStage 1です。各Stageの5問をクリアした後、ゲーム画面から次のStageへ進みます。必要なStage数が存在しない場合、そのGameSessionは開始できません。入門問題だけを選んだ場合は15問まで選択できます。
 
 Stageの解放条件は設けません。
 
@@ -761,7 +762,7 @@ flowchart LR
 
     subgraph REQ[主要要求]
         R1[Chapterを選択する]
-        R2[Chapterを選択し、5・10・20問を選択する]
+        R2[Chapter・出題方法・5/10/15/20問を選択する]
         R3[5 / 10 / 20問で開始する]
         R4[問題に回答する]
         R5[正誤・時間結果を知る]
@@ -809,7 +810,7 @@ flowchart LR
 
     subgraph SYSTEM[Java Learning System]
         UC1([Chapterを選択する])
-        UC2([Chapterを選択し、5・10・20問を選択する])
+        UC2([Chapter・出題方法・5/10/15/20問を選択する])
         UC3([5 / 10 / 20問を開始する])
         UC4([問題に回答する])
         UC5([Pause / Resumeする])
@@ -1361,7 +1362,8 @@ Request：
 ```json
 {
   "chapterId": 1,
-  "questionCount": 10
+  "questionCount": 10,
+  "selectionMode": "RANDOM"
 }
 ```
 
@@ -1378,7 +1380,7 @@ Response：
 }
 ```
 
-`questionCount`は5・10・20だけを許可します。
+`questionCount`は5・10・15・20を許可します。出題方法は`RANDOM`（全難易度からランダム）、`EASY`（入門）、`ADVANCED`（応用）、`BRONZE_STYLE`（Java Bronze風のオリジナル問題）です。入門問題は15問、他の出題方法は20問まで選べます。
 
 ### POST /api/stage-questions/{stageQuestionId}/start
 
@@ -2519,7 +2521,7 @@ flowchart LR
 4. **Stage進行**：Stage 1をGameSession開始時に作成し、以後はadvance-stageで5問ずつ作成。
 5. **Pause/Resume**：StageQuestionとStageSessionのPause時間を個別に累積。
 6. **二重実行**：UIロック + Service事前チェック + DB UNIQUE。
-7. **Question選択**：UNANSWERED → REVIEW → CLEARED、同一GameSession内重複なし。
+7. **Question選択**：難易度選択で対象プールを絞った後、UNANSWERED → REVIEW → CLEAREDの順に選択。同一GameSession内重複なし。
 8. **Stage Clear**：5問回答完了でClear。敵HP0はClear条件ではない。
 9. **Perfect**：Stage 5/5のみ。追加点なし。
 10. **TIME UP**：回答API受信時にJava側で残り時間を再計算する。残り時間が0以下の場合はTIME UPとして処理し、時間が残っている状態で空配列が送信された場合は400 INVALID_ANSWER_COUNTとする。
@@ -2796,7 +2798,7 @@ MVPでは、**StageQuestion = 5、敵HP = 5**を固定します。MiniGameはTyp
 ### 実装前に迷わないための正規仕様
 
 ```text
-Chapter / 5・10・20問選択       = 自由
+Chapter / 出題方法 / 5・10・15・20問選択 = 自由
 StageQuestion   = 1～5の5件
 Enemy HP        = 5
 Combo           = Stage開始時0

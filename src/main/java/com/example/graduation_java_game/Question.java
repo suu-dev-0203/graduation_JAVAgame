@@ -35,6 +35,10 @@ public class Question {
 	@Column(nullable = false)
 	private QuestionType questionType;
 
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false)
+	private QuestionDifficulty difficulty;
+
 	@Column(nullable = false)
 	private String questionText;
 
@@ -66,8 +70,30 @@ public class Question {
 			int timeLimitSeconds,
 			String shortExplanation,
 			String detailedExplanation) {
+		this(
+				chapter,
+				questionType,
+				QuestionDifficulty.EASY,
+				questionText,
+				codeBlock,
+				timeLimitSeconds,
+				shortExplanation,
+				detailedExplanation);
+	}
+
+	/** 難易度を指定した問題を設定します。 */
+	public Question(
+			Chapter chapter,
+			QuestionType questionType,
+			QuestionDifficulty difficulty,
+			String questionText,
+			String codeBlock,
+			int timeLimitSeconds,
+			String shortExplanation,
+			String detailedExplanation) {
 		this.chapter = chapter;
 		this.questionType = questionType;
+		this.difficulty = difficulty;
 		this.questionText = questionText;
 		this.codeBlock = codeBlock;
 		this.timeLimitSeconds = timeLimitSeconds;
@@ -88,6 +114,10 @@ public class Question {
 	/** この問題の回答形式を返します。 */
 	public QuestionType getQuestionType() {
 		return questionType;
+	}
+
+	public QuestionDifficulty getDifficulty() {
+		return difficulty;
 	}
 
 	/** 出題文を返します。 */

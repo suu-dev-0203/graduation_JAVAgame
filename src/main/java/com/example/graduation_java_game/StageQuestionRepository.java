@@ -14,6 +14,8 @@ public interface StageQuestionRepository extends JpaRepository<StageQuestion, Lo
 	 */
 	List<StageQuestion> findByStageSession_StageSessionIdOrderByQuestionOrder(Long stageSessionId);
 
+	List<StageQuestion> findByStageSession_GameSession_GameSessionId(Long gameSessionId);
+
 	/**
 	 * Stage内の指定された出題順にあたる問題を1件取得します。
 	 */

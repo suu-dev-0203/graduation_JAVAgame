@@ -1,7 +1,9 @@
 package com.example.graduation_java_game;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +72,10 @@ class GraduationJavaGameApplicationTests {
 	/** ゲーム開始処理で最初のゲームデータを準備します。 */
 	@Autowired
 	private GameSessionService gameSessionService;
+
+	/** テストで正答しながらStageを進めます。 */
+	@Autowired
+	private AnswerService answerService;
 
 	/** Spring Bootが必要な設定を読み込み、起動できることを確認します。 */
 	@Test
@@ -214,7 +220,7 @@ class GraduationJavaGameApplicationTests {
 		assertEquals(0, foundStageSession.getTotalPausedMs());
 	}
 
-	/** 5・10・20問を受け付け、最初のStageの5問だけを作ることを確認します。 */
+	/** 5・10・15・20問を受け付け、最初のStageの5問だけを作ることを確認します。 */
 	@Test
 	@Transactional
 	void createGameSessionStartsFirstStageAndCreatesOnlyItsFiveQuestions() throws Exception {
@@ -224,7 +230,7 @@ class GraduationJavaGameApplicationTests {
 		}
 
 		// どの選択肢でもゲームを始められ、まだ最初のStageだけが作られます。
-		for (int questionCount : List.of(5, 10, 20)) {
+		for (int questionCount : List.of(5, 10, 15, 20)) {
 			mockMvc.perform(post("/api/game-sessions")
 					.contentType("application/json")
 					.content("""
@@ -240,7 +246,7 @@ class GraduationJavaGameApplicationTests {
 		}
 
 		var gameSessions = gameSessionRepository.findAll();
-		assertEquals(3, gameSessions.size());
+		assertEquals(4, gameSessions.size());
 		for (GameSession gameSession : gameSessions) {
 			var stageSessions = stageSessionRepository
 					.findByGameSession_GameSessionId(gameSession.getGameSessionId());
@@ -321,6 +327,140 @@ class GraduationJavaGameApplicationTests {
 				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
 
 		assertEquals(0, gameSessionRepository.count());
+	}
+
+	/** 選択した難易度を保ち、未回答のStage進行を拒否し、15問を最後まで遊べることを確認します。 */
+	@Test
+	@Transactional
+	void selectedDifficultyGameAdvancesThroughThreeStagesWithoutRepeatingQuestions() throws Exception {
+		Chapter chapter = chapterRepository.save(
+				new Chapter("難易度とStage進行", "ゲーム進行の統合テストです。"));
+		for (int index = 0; index < 15; index++) {
+			saveTestQuestion(chapter, QuestionDifficulty.EASY, index);
+		}
+		for (int index = 0; index < 20; index++) {
+			saveTestQuestion(chapter, QuestionDifficulty.ADVANCED, index + 15);
+			saveTestQuestion(chapter, QuestionDifficulty.BRONZE_STYLE, index + 35);
+		}
+		for (int stageNumber = 1; stageNumber <= 4; stageNumber++) {
+			createStageDefinition(chapter, stageNumber);
+		}
+		createChoicesForQuestions(chapter);
+
+		GameSessionCreateResponse createdGame = gameSessionService.create(
+				new GameSessionCreateRequest(
+						chapter.getChapterId(), 15, QuestionSelectionMode.EASY));
+		mockMvc.perform(post(
+				"/api/game-sessions/{id}/advance-stage", createdGame.gameSessionId()))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
+
+		answerCurrentStage(createdGame.gameSessionId());
+		mockMvc.perform(post(
+				"/api/game-sessions/{id}/advance-stage", createdGame.gameSessionId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.currentStageNumber").value(2));
+		assertEquals(2, stageSessionRepository
+				.findByGameSession_GameSessionId(createdGame.gameSessionId())
+				.size());
+		mockMvc.perform(post(
+				"/api/game-sessions/{id}/advance-stage", createdGame.gameSessionId()))
+				.andExpect(status().isConflict());
+
+		answerCurrentStage(createdGame.gameSessionId());
+		mockMvc.perform(post(
+				"/api/game-sessions/{id}/advance-stage", createdGame.gameSessionId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.currentStageNumber").value(3));
+
+		answerCurrentStage(createdGame.gameSessionId());
+		assertEquals(
+				GameSessionStatus.COMPLETED,
+				gameSessionRepository.findById(createdGame.gameSessionId()).orElseThrow().getStatus());
+		List<StageQuestion> usedQuestions = stageQuestionRepository
+				.findByStageSession_GameSession_GameSessionId(createdGame.gameSessionId());
+		Set<Long> uniqueQuestionIds = new HashSet<>();
+		for (StageQuestion stageQuestion : usedQuestions) {
+			assertEquals(QuestionDifficulty.EASY, stageQuestion.getQuestion().getDifficulty());
+			uniqueQuestionIds.add(stageQuestion.getQuestion().getQuestionId());
+		}
+		assertEquals(15, usedQuestions.size());
+		assertEquals(15, uniqueQuestionIds.size());
+
+		// RANDOMは一つの難易度15問に限定されず、20問ゲームも作れます。
+		GameSessionCreateResponse randomGame = gameSessionService.create(
+				new GameSessionCreateRequest(
+						chapter.getChapterId(), 20, QuestionSelectionMode.RANDOM));
+		assertEquals(20, randomGame.questionCount());
+		for (QuestionSelectionMode mode : List.of(
+				QuestionSelectionMode.ADVANCED,
+				QuestionSelectionMode.BRONZE_STYLE)) {
+			GameSessionCreateResponse selectedGame = gameSessionService.create(
+					new GameSessionCreateRequest(chapter.getChapterId(), 20, mode));
+			assertEquals(
+					mode.difficultyOrNull(),
+					gameSessionService.findCurrent(selectedGame.gameSessionId()).difficulty());
+		}
+
+		mockMvc.perform(post(
+				"/api/game-sessions/{id}/advance-stage", createdGame.gameSessionId()))
+				.andExpect(status().isConflict());
+	}
+
+	/** 新しい問題を優先し、間違えた問題を正解済み問題より先に再出題することを確認します。 */
+	@Test
+	@Transactional
+	void questionSelectionPrioritizesUnansweredThenReviewQuestions() {
+		Chapter chapter = chapterRepository.save(
+				new Chapter("回答履歴による出題", "優先順位の統合テストです。"));
+		for (int index = 0; index < 15; index++) {
+			saveTestQuestion(chapter, QuestionDifficulty.EASY, index);
+		}
+		for (int stageNumber = 1; stageNumber <= 3; stageNumber++) {
+			createStageDefinition(chapter, stageNumber);
+		}
+		createChoicesForQuestions(chapter);
+
+		GameSessionCreateResponse previousGame = gameSessionService.create(
+				new GameSessionCreateRequest(
+						chapter.getChapterId(), 15, QuestionSelectionMode.EASY));
+		answerCurrentStage(previousGame.gameSessionId());
+		gameSessionService.advanceStage(previousGame.gameSessionId());
+		answerCurrentStage(previousGame.gameSessionId());
+		gameSessionService.advanceStage(previousGame.gameSessionId());
+		answerCurrentQuestion(previousGame.gameSessionId(), false);
+		answerCurrentQuestion(previousGame.gameSessionId(), true);
+
+		List<AnswerHistory> previousAnswers = answerHistoryRepository.findAll();
+		Set<Long> answeredQuestionIds = new HashSet<>();
+		Long reviewQuestionId = null;
+		for (AnswerHistory history : previousAnswers) {
+			Long questionId = history.getStageQuestion().getQuestion().getQuestionId();
+			answeredQuestionIds.add(questionId);
+			if (!history.isCorrect() || history.isTimeout()) {
+				reviewQuestionId = questionId;
+			}
+		}
+		Set<Long> unansweredQuestionIds = new HashSet<>();
+		for (Question question : questionRepository.findByChapter_ChapterId(chapter.getChapterId())) {
+			if (!answeredQuestionIds.contains(question.getQuestionId())) {
+				unansweredQuestionIds.add(question.getQuestionId());
+			}
+		}
+		assertEquals(3, unansweredQuestionIds.size());
+		assertTrue(reviewQuestionId != null);
+
+		GameSessionCreateResponse nextGame = gameSessionService.create(
+				new GameSessionCreateRequest(
+						chapter.getChapterId(), 5, QuestionSelectionMode.EASY));
+		Set<Long> selectedQuestionIds = new HashSet<>();
+		for (StageQuestion stageQuestion : stageQuestionRepository
+				.findByStageSession_GameSession_GameSessionId(nextGame.gameSessionId())) {
+			selectedQuestionIds.add(stageQuestion.getQuestion().getQuestionId());
+		}
+		assertEquals(5, selectedQuestionIds.size());
+		assertTrue(selectedQuestionIds.containsAll(unansweredQuestionIds));
+		assertTrue(selectedQuestionIds.contains(reviewQuestionId));
 	}
 
 	/** 現在の問題と選択肢を返し、Timer未開始と正解非公開を確認します。 */
@@ -697,6 +837,44 @@ class GraduationJavaGameApplicationTests {
 					"詳しい解説です。"));
 		}
 		return chapter;
+	}
+
+	private void saveTestQuestion(
+			Chapter chapter,
+			QuestionDifficulty difficulty,
+			int index) {
+		questionRepository.save(new Question(
+				chapter,
+				QuestionType.SINGLE_A_E,
+				difficulty,
+				"テスト問題 " + index,
+				null,
+				20,
+				"短い解説です。",
+				"詳しい解説です。"));
+	}
+
+	private void answerCurrentStage(Long gameSessionId) {
+		for (int index = 0; index < 5; index++) {
+			CurrentGameResponse currentGame = gameSessionService.findCurrent(gameSessionId);
+			assertEquals(QuestionDifficulty.EASY, currentGame.difficulty());
+			answerCurrentQuestion(gameSessionId, true);
+		}
+	}
+
+	private void answerCurrentQuestion(Long gameSessionId, boolean correct) {
+		CurrentGameResponse currentGame = gameSessionService.findCurrent(gameSessionId);
+		Long selectedChoiceId = choiceRepository
+					.findByQuestion_QuestionIdOrderByChoiceOrder(currentGame.question().questionId())
+					.stream()
+					.filter(choice -> choice.isCorrect() == correct)
+					.findFirst()
+					.orElseThrow()
+					.getChoiceId();
+		gameSessionService.startQuestion(currentGame.stageQuestionId());
+		answerService.submit(new AnswerRequest(
+				currentGame.stageQuestionId(),
+				List.of(selectedChoiceId)));
 	}
 
 	/** テスト用のChapterに、MVPルールに合ったStage設定を1件作ります。 */

@@ -13,4 +13,6 @@ public interface AnswerHistoryRepository extends JpaRepository<AnswerHistory, Lo
 
 	List<AnswerHistory> findByStageSession_StageSessionIdOrderByStageQuestion_QuestionOrder(
 			Long stageSessionId);
+
+	List<AnswerHistory> findByStageQuestion_Question_Chapter_ChapterId(Long chapterId);
 }

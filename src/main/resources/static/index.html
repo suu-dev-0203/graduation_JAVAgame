@@ -22,6 +22,24 @@
 					<option>学習テーマを読み込み中...</option>
 				</select>
 			</div>
+			<div class="form-row">
+				<label for="selection-mode">出題方法</label>
+				<select id="selection-mode" disabled>
+					<option value="RANDOM">難易度おまかせ（ランダム）</option>
+					<option value="EASY">入門（簡単）</option>
+					<option value="ADVANCED">応用（難しい）</option>
+					<option value="BRONZE_STYLE">Java Bronze風（オリジナル問題）</option>
+				</select>
+			</div>
+			<div class="form-row">
+				<label for="question-count">問題数</label>
+				<select id="question-count" disabled>
+					<option value="5">5問</option>
+					<option value="10">10問</option>
+					<option value="15">15問</option>
+					<option value="20">20問</option>
+				</select>
+			</div>
 			<button class="primary-button" id="start-button" type="button" disabled>
 				5問のゲームを始める
 			</button>

@@ -74,4 +74,8 @@ public class AnswerHistory {
 	public boolean isCorrect() {
 		return correct;
 	}
+
+	public boolean isTimeout() {
+		return timeout;
+	}
 }

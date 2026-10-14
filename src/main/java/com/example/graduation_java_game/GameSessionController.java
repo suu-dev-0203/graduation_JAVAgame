@@ -1,8 +1,8 @@
 package com.example.graduation_java_game;
 
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,5 +34,13 @@ public class GameSessionController {
 	@GetMapping("/{gameSessionId}/current")
 	public CurrentGameResponse findCurrent(@PathVariable Long gameSessionId) {
 		return gameSessionService.findCurrent(gameSessionId);
+	}
+
+	/**
+	 * Stage Clear後、次のStageが残っているゲームを進めます。
+	 */
+	@PostMapping("/{gameSessionId}/advance-stage")
+	public AdvanceStageResponse advanceStage(@PathVariable Long gameSessionId) {
+		return gameSessionService.advanceStage(gameSessionId);
 	}
 }

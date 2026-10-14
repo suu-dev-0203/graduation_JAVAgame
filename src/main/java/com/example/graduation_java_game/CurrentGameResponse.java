@@ -5,6 +5,9 @@ package com.example.graduation_java_game;
  *
  * @param gameSessionId ゲーム全体のID
  * @param stageSessionId 現在のStage進行記録のID
+ * @param currentStageNumber 現在のStage番号
+ * @param totalStageCount ゲーム全体のStage数
+ * @param difficulty 現在の問題の難易度
  * @param stageQuestionId 現在出題する問題記録のID
  * @param questionState 現在の問題状態
  * @param questionNumber Stage内での問題番号
@@ -24,6 +27,9 @@ package com.example.graduation_java_game;
 public record CurrentGameResponse(
 		Long gameSessionId,
 		Long stageSessionId,
+		int currentStageNumber,
+		int totalStageCount,
+		QuestionDifficulty difficulty,
 		Long stageQuestionId,
 		String questionState,
 		int questionNumber,

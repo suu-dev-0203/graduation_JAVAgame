@@ -4,7 +4,11 @@ import java.time.Instant;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -17,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class GameSessionService {
 
 	private static final int QUESTIONS_PER_STAGE = 5;
-	private static final List<Integer> ALLOWED_QUESTION_COUNTS = List.of(5, 10, 20);
+	private static final List<Integer> ALLOWED_QUESTION_COUNTS = List.of(5, 10, 15, 20);
 
 	private final ChapterRepository chapterRepository;
 	private final QuestionRepository questionRepository;
@@ -26,6 +30,7 @@ public class GameSessionService {
 	private final GameSessionRepository gameSessionRepository;
 	private final StageSessionRepository stageSessionRepository;
 	private final StageQuestionRepository stageQuestionRepository;
+	private final AnswerHistoryRepository answerHistoryRepository;
 
 	public GameSessionService(
 			ChapterRepository chapterRepository,
@@ -34,7 +39,8 @@ public class GameSessionService {
 			StageDefinitionRepository stageDefinitionRepository,
 			GameSessionRepository gameSessionRepository,
 			StageSessionRepository stageSessionRepository,
-			StageQuestionRepository stageQuestionRepository) {
+			StageQuestionRepository stageQuestionRepository,
+			AnswerHistoryRepository answerHistoryRepository) {
 		this.chapterRepository = chapterRepository;
 		this.questionRepository = questionRepository;
 		this.choiceRepository = choiceRepository;
@@ -42,6 +48,7 @@ public class GameSessionService {
 		this.gameSessionRepository = gameSessionRepository;
 		this.stageSessionRepository = stageSessionRepository;
 		this.stageQuestionRepository = stageQuestionRepository;
+		this.answerHistoryRepository = answerHistoryRepository;
 	}
 
 	/**
@@ -51,6 +58,9 @@ public class GameSessionService {
 	@Transactional
 	public GameSessionCreateResponse create(GameSessionCreateRequest request) {
 		validateRequest(request);
+		QuestionSelectionMode selectionMode = request.selectionMode() == null
+				? QuestionSelectionMode.RANDOM
+				: request.selectionMode();
 
 		Chapter chapter = chapterRepository.findById(request.chapterId())
 				.orElseThrow(() -> new GameApiException(
@@ -69,18 +79,21 @@ public class GameSessionService {
 					"MVPのStage設定では敵HPを5にしてください。");
 		}
 
-		List<Question> chapterQuestions = questionRepository.findByChapter_ChapterId(chapter.getChapterId());
-		if (chapterQuestions.size() < questionCount) {
+		List<Question> availableQuestions = findQuestionsForMode(chapter.getChapterId(), selectionMode);
+		if (availableQuestions.size() < questionCount) {
 			throw new GameApiException(
 					HttpStatus.CONFLICT,
 					"INSUFFICIENT_QUESTIONS",
-					"選択した問題数を遊ぶための問題がChapterに足りません。");
+					"選択した難易度に必要な問題がありません。問題数または難易度を変更してください。");
 		}
+		List<Question> chapterQuestions = prioritizeQuestions(
+				chapter.getChapterId(), availableQuestions, Set.of());
 
 		Instant startedAt = Instant.now();
 		GameSession gameSession = gameSessionRepository.save(new GameSession(
 				chapter,
 				questionCount,
+				selectionMode,
 				totalStageCount,
 				1,
 				0,
@@ -103,7 +116,6 @@ public class GameSessionService {
 				0));
 
 		// 最初のStageで使う5問だけを選び、後のStageの問題はまだ作りません。
-		Collections.shuffle(chapterQuestions);
 		List<StageQuestion> stageQuestions = new ArrayList<>(QUESTIONS_PER_STAGE);
 		for (int index = 0; index < QUESTIONS_PER_STAGE; index++) {
 			stageQuestions.add(new StageQuestion(stageSession, chapterQuestions.get(index), index + 1));
@@ -117,6 +129,106 @@ public class GameSessionService {
 				totalStageCount,
 				1,
 				GameSessionStatus.PLAYING);
+	}
+
+	/**
+	 * Stage Clear済みのゲームに、同じ難易度の未使用問題で次Stageを作成します。
+	 */
+	@Transactional
+	public AdvanceStageResponse advanceStage(Long gameSessionId) {
+		GameSession gameSession = gameSessionRepository.findById(gameSessionId)
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.NOT_FOUND,
+						"NOT_FOUND",
+						"指定されたGameSessionが見つかりません。"));
+		if (gameSession.getStatus() != GameSessionStatus.PLAYING
+				|| gameSession.getCurrentStageNumber() >= gameSession.getTotalStageCount()) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"INVALID_GAME_STATE",
+					"次のStageが残っているプレイ中のゲームだけ進行できます。");
+		}
+
+		List<StageSession> stageSessions = stageSessionRepository
+				.findByGameSession_GameSessionId(gameSessionId);
+		StageSession currentStage = stageSessions.stream()
+				.filter(stage -> stage.getStageDefinition().getStageNumber()
+						== gameSession.getCurrentStageNumber())
+				.findFirst()
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.CONFLICT,
+						"INVALID_GAME_STATE",
+						"現在のStage記録が見つかりません。"));
+		if (currentStage.getStatus() != StageSessionStatus.CLEARED) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"INVALID_GAME_STATE",
+					"現在のStageをクリアしてから次へ進んでください。");
+		}
+
+		int nextStageNumber = gameSession.getCurrentStageNumber() + 1;
+		StageDefinition nextStageDefinition = stageDefinitionRepository
+				.findByChapter_ChapterIdAndStageNumber(
+						gameSession.getChapter().getChapterId(), nextStageNumber)
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.CONFLICT,
+						"INVALID_GAME_STATE",
+						"次のStage設定が見つかりません。"));
+		if (stageSessionRepository.existsByGameSession_GameSessionIdAndStageDefinition_StageId(
+				gameSessionId, nextStageDefinition.getStageId())) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"INVALID_GAME_STATE",
+					"次のStageはすでに作成されています。");
+		}
+
+		Set<Long> usedQuestionIds = stageQuestionRepository
+				.findByStageSession_GameSession_GameSessionId(gameSessionId)
+				.stream()
+				.map(stageQuestion -> stageQuestion.getQuestion().getQuestionId())
+				.collect(Collectors.toSet());
+		List<Question> availableQuestions = findQuestionsForMode(
+				gameSession.getChapter().getChapterId(),
+				gameSession.getSelectionMode());
+		List<Question> remainingQuestions = prioritizeQuestions(
+				gameSession.getChapter().getChapterId(),
+				availableQuestions,
+				usedQuestionIds);
+		if (remainingQuestions.size() < QUESTIONS_PER_STAGE) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"INSUFFICIENT_QUESTIONS",
+					"次のStageで使える未出題問題が5問ありません。");
+		}
+
+		Instant startedAt = Instant.now();
+		StageSession nextStage = stageSessionRepository.save(new StageSession(
+				gameSession,
+				nextStageDefinition,
+				1,
+				0,
+				nextStageDefinition.getMaxEnemyHp(),
+				0,
+				StageSessionStatus.PLAYING,
+				startedAt,
+				null,
+				null,
+				0));
+		List<StageQuestion> nextQuestions = new ArrayList<>(QUESTIONS_PER_STAGE);
+		for (int index = 0; index < QUESTIONS_PER_STAGE; index++) {
+			nextQuestions.add(new StageQuestion(
+					nextStage, remainingQuestions.get(index), index + 1));
+		}
+		stageQuestionRepository.saveAll(nextQuestions);
+		gameSession.advanceToStage(nextStageNumber);
+		gameSessionRepository.save(gameSession);
+
+		return new AdvanceStageResponse(
+				gameSessionId,
+				nextStage.getStageSessionId(),
+				nextStageNumber,
+				gameSession.getTotalStageCount(),
+				gameSession.getStatus());
 	}
 
 	/**
@@ -169,6 +281,9 @@ public class GameSessionService {
 		return new CurrentGameResponse(
 				gameSession.getGameSessionId(),
 				stageSession.getStageSessionId(),
+				gameSession.getCurrentStageNumber(),
+				gameSession.getTotalStageCount(),
+				question.getDifficulty(),
 				stageQuestion.getStageQuestionId(),
 				questionState,
 				stageQuestion.getQuestionOrder(),
@@ -262,8 +377,67 @@ public class GameSessionService {
 			throw new GameApiException(
 					HttpStatus.BAD_REQUEST,
 					"INVALID_REQUEST",
-					"questionCountは5、10、20のいずれかを指定してください。");
+					"questionCountは5、10、15、20のいずれかを指定してください。");
 		}
+	}
+
+	private List<Question> findQuestionsForMode(Long chapterId, QuestionSelectionMode mode) {
+		List<Question> questions = questionRepository.findByChapter_ChapterId(chapterId);
+		QuestionDifficulty selectedDifficulty = mode.difficultyOrNull();
+		return selectedDifficulty == null
+				? questions
+				: questions.stream()
+						.filter(question -> question.getDifficulty() == selectedDifficulty)
+						.toList();
+	}
+
+	private List<Question> prioritizeQuestions(
+			Long chapterId,
+			List<Question> questions,
+			Set<Long> excludedQuestionIds) {
+		Map<Long, AnswerHistory> latestHistoryByQuestion = new HashMap<>();
+		for (AnswerHistory history : answerHistoryRepository
+				.findByStageQuestion_Question_Chapter_ChapterId(chapterId)) {
+			Long questionId = history.getStageQuestion().getQuestion().getQuestionId();
+			AnswerHistory currentLatest = latestHistoryByQuestion.get(questionId);
+			if (currentLatest == null || isLaterHistory(history, currentLatest)) {
+				latestHistoryByQuestion.put(questionId, history);
+			}
+		}
+
+		List<Question> unanswered = new ArrayList<>();
+		List<Question> review = new ArrayList<>();
+		List<Question> cleared = new ArrayList<>();
+		for (Question question : questions) {
+			if (excludedQuestionIds.contains(question.getQuestionId())) {
+				continue;
+			}
+			AnswerHistory latestHistory = latestHistoryByQuestion.get(question.getQuestionId());
+			if (latestHistory == null) {
+				unanswered.add(question);
+			} else if (!latestHistory.isCorrect() || latestHistory.isTimeout()) {
+				review.add(question);
+			} else {
+				cleared.add(question);
+			}
+		}
+
+		Collections.shuffle(unanswered);
+		Collections.shuffle(review);
+		Collections.shuffle(cleared);
+		List<Question> prioritized = new ArrayList<>(unanswered.size() + review.size() + cleared.size());
+		prioritized.addAll(unanswered);
+		prioritized.addAll(review);
+		prioritized.addAll(cleared);
+		return prioritized;
+	}
+
+	private boolean isLaterHistory(AnswerHistory candidate, AnswerHistory current) {
+		int answerTimeComparison = candidate.getStageQuestion().getAnsweredAt()
+				.compareTo(current.getStageQuestion().getAnsweredAt());
+		return answerTimeComparison > 0
+				|| (answerTimeComparison == 0
+						&& candidate.getAnswerHistoryId() > current.getAnswerHistoryId());
 	}
 
 	/** 選んだ問題数を最後まで遊べるだけのStage設定がChapterにあるか確認します。 */

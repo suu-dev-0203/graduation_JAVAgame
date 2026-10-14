@@ -36,6 +36,11 @@ public class GameSession {
 	@Column(nullable = false)
 	private int questionCount;
 
+	/** このゲームで選んだ出題方法です。 */
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false)
+	private QuestionSelectionMode selectionMode;
+
 	/** 選んだ問題数を5問ずつに分けたStageの数です。 */
 	@Column(nullable = false)
 	private int totalStageCount;
@@ -73,8 +78,31 @@ public class GameSession {
 			GameSessionStatus status,
 			Instant startedAt,
 			Instant endedAt) {
+		this(
+				chapter,
+				questionCount,
+				QuestionSelectionMode.RANDOM,
+				totalStageCount,
+				currentStageNumber,
+				score,
+				status,
+				startedAt,
+				endedAt);
+	}
+
+	public GameSession(
+			Chapter chapter,
+			int questionCount,
+			QuestionSelectionMode selectionMode,
+			int totalStageCount,
+			int currentStageNumber,
+			int score,
+			GameSessionStatus status,
+			Instant startedAt,
+			Instant endedAt) {
 		this.chapter = chapter;
 		this.questionCount = questionCount;
+		this.selectionMode = selectionMode;
 		this.totalStageCount = totalStageCount;
 		this.currentStageNumber = currentStageNumber;
 		this.score = score;
@@ -98,6 +126,10 @@ public class GameSession {
 		return questionCount;
 	}
 
+	public QuestionSelectionMode getSelectionMode() {
+		return selectionMode;
+	}
+
 	/** ゲーム全体のStage数を返します。 */
 	public int getTotalStageCount() {
 		return totalStageCount;
@@ -106,6 +138,16 @@ public class GameSession {
 	/** 現在進行中のStage番号を返します。 */
 	public int getCurrentStageNumber() {
 		return currentStageNumber;
+	}
+
+	/** 次の連番Stageへ進みます。 */
+	public void advanceToStage(int nextStageNumber) {
+		if (status != GameSessionStatus.PLAYING
+				|| nextStageNumber != currentStageNumber + 1
+				|| nextStageNumber > totalStageCount) {
+			throw new IllegalStateException("プレイ中のゲームを次のStageへ進められません。");
+		}
+		currentStageNumber = nextStageNumber;
 	}
 
 	/** ここまでに獲得したゲーム全体の得点を返します。 */
