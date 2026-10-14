@@ -144,7 +144,7 @@ flowchart TD
 - **StageDefinition**：キャラクター・敵・フィールド・MiniGameなどのStage設定
 - **StageQuestion**：今回のStageで実際に使う5問を固定したデータ
 
-Stageはゲーム中に自動進行します。Stageを個別に選択したり、Stageを自由選択したりする方式はMVPでは採用しません。
+StageはGameSession内でStage 1から順番に進みます。Stageを個別に選択する画面は設けません。Stageをクリアした後は、Stage Result画面のボタンを押して次のStageを開始します。
 
 Stageを開始すると、Question Poolから5問を選び、`StageQuestion`として1～5問目の順番を固定します。
 
@@ -154,7 +154,8 @@ Stageを開始すると、Question Poolから5問を選び、`StageQuestion`と�
 1 Stage = 5問
 敵HP = 5
 StageQuestion = 必ず5件
-StageNumber / Stageの選択 = 自由選択不可・Stage 1から自動進行
+StageNumber / Stageの選択 = 個別選択不可・Stage 1から順番に進行
+次Stageの開始 = Stage Clear後に画面のボタンを押す
 ```
 
 ## 5. Chapterの進め方
@@ -163,7 +164,7 @@ Chapterは自由に選択できます。学習者は自分が学びたい分野�
 
 Stageはプレイ中に順番に進みます。Chapter・出題方法・「5問・10問・15問・20問」を選択する画面を設け、その選択内容でGameSessionを開始します。Stageを個別選択する画面は設けません。
 
-5問ならStage 1だけ、10問ならStage 1→Stage 2、15問ならStage 1→Stage 2→Stage 3、20問ならStage 1→Stage 2→Stage 3→Stage 4と進みます。Stageをクリアしたあと、ゲーム画面のボタンを押して次へ進みます。
+5問ならStage 1だけ、10問ならStage 1→Stage 2、15問ならStage 1→Stage 2→Stage 3、20問ならStage 1→Stage 2→Stage 3→Stage 4と進みます。Stageをクリアしたあと、Stage Result画面のボタンを押して次へ進みます。
 
 ## 6. 1 Stage = 5問
 
@@ -201,7 +202,7 @@ MVPでは5問・10問・15問・20問から選択します。
 20問 = 4 Stage
 ```
 
-GameSessionはChapter、出題方法、5/10/15/20問の問題数を選択して開始します。開始StageはChapter内のStage 1です。各Stageの5問をクリアした後、ゲーム画面から次のStageへ進みます。必要なStage数が存在しない場合、そのGameSessionは開始できません。入門問題だけを選んだ場合は15問まで選択できます。
+GameSessionはChapter、出題方法、5/10/15/20問の問題数を選択して開始します。開始StageはChapter内のStage 1です。各Stageの5問をクリアした後、Stage Result画面のボタンから次のStageへ進みます。必要なStage数が存在しない場合、そのGameSessionは開始できません。入門問題だけを選んだ場合は15問まで選択できます。
 
 Stageの解放条件は設けません。
 
@@ -426,7 +427,7 @@ Perfect
 Stage Clear
 ```
 
-10問・20問プレイの場合は、PerfectになったStageの数をGame Resultに表示します。
+10問・15問・20問プレイの場合は、PerfectになったStageの数をGame Resultに表示します。
 
 派手な必殺技演出はMVP完成後の追加機能とし、MVPではPerfect専用エフェクトまでを基本とします。
 
@@ -466,7 +467,8 @@ fieldKey            = CASTLE
 ```mermaid
 flowchart TD
     HOME[HOME / タイトル] --> CH[Chapter選択]
-    CH --> COUNT[5 / 10 / 20問選択]
+    CH --> MODE[出題方法を選択]
+    MODE --> COUNT[5 / 10 / 15 / 20問を選択]
     COUNT --> START[GameSession開始]
     START --> GAME[Game]
 
@@ -476,7 +478,7 @@ flowchart TD
     ABANDON --> HOME
 
     GAME -->|5問終了| SR[Stage Result]
-    SR -->|残りStageあり| NEXT[次のStage開始]
+    SR -->|次のStageへ進むボタン| NEXT[次のStage開始]
     NEXT --> GAME
     SR -->|最終Stage| GR[Game Result]
     GR --> REVIEW[Review]
@@ -484,9 +486,9 @@ flowchart TD
     REVIEW --> CH
 ```
 
-10問・20問ではStage Resultを挟みながら次のStageへ進み、すべてのStageが終了したらGame Resultへ進みます。
+10問・15問・20問では、Stage Result画面の「次のStageへ進む」ボタンを押すと次のStageが始まります。5問ではStage 1の結果後にGame Resultへ進み、すべてのStageが終了した場合もGame Resultへ進みます。
 
-Stageは自由選択ではありません。1つのGameSession内ではStage 1から始まり、2～4 Stageが必要な場合は`stageNumber + 1`で自動進行します。
+Stageは自由選択できません。1つのGameSession内ではStage 1から始まり、Stage Clear後にStage Result画面のボタンを押すたび、必要に応じて次の番号のStageへ進みます。
 
 ## 22. 画面一覧・一時停止・Refresh復元
 
@@ -763,7 +765,7 @@ flowchart LR
     subgraph REQ[主要要求]
         R1[Chapterを選択する]
         R2[Chapter・出題方法・5/10/15/20問を選択する]
-        R3[5 / 10 / 20問で開始する]
+        R3[5 / 10 / 15 / 20問で開始する]
         R4[問題に回答する]
         R5[正誤・時間結果を知る]
         R6[HP / Combo / Scoreを見る]
@@ -811,7 +813,7 @@ flowchart LR
     subgraph SYSTEM[Java Learning System]
         UC1([Chapterを選択する])
         UC2([Chapter・出題方法・5/10/15/20問を選択する])
-        UC3([5 / 10 / 20問を開始する])
+        UC3([5 / 10 / 15 / 20問を開始する])
         UC4([問題に回答する])
         UC5([Pause / Resumeする])
         UC6([Stage Resultを見る])
@@ -999,9 +1001,9 @@ sequenceDiagram
 
 `5問目回答 → 正誤判定 → 履歴保存 → 5問終了 → Perfect判定 → Stage Clear → Stage Result`
 
-### 10問 / 20問
+### 10問 / 15問 / 20問
 
-Stage Result後、まだGameSession内のStageが残っていれば次のStageを開始します。すべて終了したらGame Resultへ進みます。
+Stage Resultのボタンを押した後、まだGameSession内のStageが残っていれば次のStageを開始します。すべて終了したらGame Resultへ進みます。
 
 ## 33. クラス図
 
@@ -2342,7 +2344,7 @@ existsByStageQuestion_StageQuestionId(Long stageQuestionId)
 
 | ルール | 要求 | 設計 | API | 実装 |
 |---|---:|---:|---:|---:|
-| Stageは自動進行 | ○ | ○ | ○ | 確認 |
+| Stageは順番に進行し、Stage Resultのボタンで次へ進む | ○ | ○ | ○ | 確認 |
 | 1 Stage = 5問 | ○ | ○ | ○ | 確認 |
 | StageQuestion = 5件 | ○ | ○ | ○ | 確認 |
 | 敵HP = 5 | ○ | ○ | ○ | 確認 |
@@ -2670,9 +2672,11 @@ AIを活用：問題案、解説案、エラー原因調査、設計確認、コ
 - Resume：Pause時間を除外して再開
 - Refresh：現在状態を復元
 - Home：GameSession / StageSessionをABANDONED
+- 5問：1 Stage完了
 - 10問：2 Stage完了
+- 15問：3 Stage完了
 - 20問：4 Stage完了
-- Stage 1から自動進行する
+- Stage 1から順番に進み、Stage Resultのボタンで次のStageを開始する
 
 ### APIテスト
 
@@ -2686,8 +2690,8 @@ AIを活用：問題案、解説案、エラー原因調査、設計確認、コ
 ### Must
 
 - Chapter選択
-- 5 / 10 / 20問の選択
-- Stage 1からの自動進行
+- 5 / 10 / 15 / 20問の選択
+- Stage 1から順番に進み、Stage Clear後はボタンで次へ進む
 - 1 Stage 5問
 - 敵HP5
 - 問題表示
@@ -2741,11 +2745,11 @@ flowchart LR
 ```text
 Chapter選択
 ↓
-5 / 10 / 20問を選択
+Chapter・出題方法・5 / 10 / 15 / 20問を選択
 ↓
 GameSession開始
 ↓
-Stage 1から自動進行
+Stage 1から順番にプレイ
 ↓
 StageQuestionを5問作成
 ↓
@@ -2761,7 +2765,7 @@ JavaScript GameEffect
 ↓
 Stage Result
 ↓
-次Stage（10 / 20問の場合）
+Stage Clear後にボタンで次Stageへ（10 / 15 / 20問の場合）
 ↓
 Game Result
 ↓
@@ -2799,8 +2803,8 @@ MVPでは、**StageQuestion = 5、敵HP = 5**を固定します。MiniGameはTyp
 - `POST /api/answers`
 - タイマーとJava側時間判定
 - HP / Combo / Score
-- Stage自動進行
-- 5 / 10 / 20問のGameSession
+- Stageを順番に進める処理と、Stage Result画面の次Stageボタン
+- 5 / 10 / 15 / 20問のGameSession
 - 問題を最後まで実際に動かすこと
 
 ### その後
@@ -2825,7 +2829,7 @@ MVPでは、**StageQuestion = 5、敵HP = 5**を固定します。MiniGameはTyp
 
 ### 最終12項目チェック
 
-- [x] Stageは自動進行
+- [x] Stage 1から順番に進み、Stage Result画面のボタンで次へ進む
 - [x] MVPはStageQuestion = 5
 - [x] MVPは敵HP = 5
 - [x] playerCharacterKey / enemyKey / fieldKeyで管理
@@ -2833,7 +2837,7 @@ MVPでは、**StageQuestion = 5、敵HP = 5**を固定します。MiniGameはTyp
 - [x] GameEffectはJavaScript側
 - [x] Pause時間を`pausedAt` / `totalPausedMs`で管理
 - [x] Stage ResultとGame Resultを分離
-- [x] 10 / 20問はStageを複数回進行
+- [x] 10 / 15 / 20問はStageを複数回進行
 - [x] ComboはStage開始で0
 - [x] PerfectはStage単位
 - [x] QuestionTypeをEnum化
@@ -2887,7 +2891,7 @@ GameEffect      = JavaScript
 
 次に、
 
-> 正解するとキャラクターが攻撃し、敵のHPが減ります。1 Stageは5問で、5問すべて正解するとPerfectになります。Stageは自由選択せず、Stage 1から自動進行します。
+> 正解するとキャラクターが攻撃し、敵のHPが減ります。1 Stageは5問で、5問すべて正解するとPerfectになります。StageはStage 1から順番に進み、Stage Clear後に画面のボタンを押すと次のStageが始まります。
 
 と説明します。
 
@@ -3005,6 +3009,14 @@ MVP完成後に追加します。
 
 ## 64. README更新履歴
 
+### 2026/10/14
+
+- ゲーム開始前にChapter・出題方法・問題数を選び、その内容でGameSessionを開始する仕様を明記
+- 問題数を5・10・15・20問とし、各5問のStageをStage 1から順番に進める仕様を明記
+- Stage Clear後はStage Result画面のボタンを押して次Stageを開始する仕様を明記
+- Stageの個別選択画面を設けないことを明記
+- 入門問題は各Chapterの問題数に合わせて15問までとする制限を明記
+
 ### 2026/10/08
 
 - Stage自動進行を正式仕様化
@@ -3113,7 +3125,7 @@ JavaScript実装
 
 特に以下を1つでも別ルールにしないことを最終チェックとします。
 
-- StageはGameSession開始後に自動進行
+- StageはStage 1から順番に進み、Stage Clear後はボタンで次へ進む
 - 1 Stage = 5問
 - StageQuestion = 5件
 - 敵HP = 5
