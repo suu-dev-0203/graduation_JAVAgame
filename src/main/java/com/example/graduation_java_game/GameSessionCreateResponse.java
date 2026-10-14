@@ -9,6 +9,7 @@ package com.example.graduation_java_game;
  * @param totalStageCount このゲームで進むStageの合計数
  * @param currentStageNumber 最初に開始するStage番号
  * @param status ゲーム全体の状態
+ * @param sessionType 通常ゲームか苦手特訓か
  */
 public record GameSessionCreateResponse(
 		Long gameSessionId,
@@ -16,5 +17,6 @@ public record GameSessionCreateResponse(
 		int questionCount,
 		int totalStageCount,
 		int currentStageNumber,
-		GameSessionStatus status) {
+		GameSessionStatus status,
+		GameSessionType sessionType) {
 }

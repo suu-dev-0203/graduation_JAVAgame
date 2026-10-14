@@ -206,7 +206,7 @@ GameSessionはChapter、出題方法、5/10/15/20問の問題数を選択して�
 
 Stageの解放条件は設けません。
 
-同じGameSession内では、同じQuestionを重複して選出しません。したがって開始時に、必要な問題数以上のQuestionがQuestion Poolに存在することを確認します。
+通常ゲームでは、同じGameSession内で同じQuestionを重複して選出しません。苦手特訓ではChapter内の対象問題が5問未満の場合、5問になるまで対象問題を繰り返し出題します。開始時には、通常ゲームで選んだ問題数を満たすQuestionがあるか確認します。
 
 ## 9. 問題形式
 
@@ -675,7 +675,7 @@ flowchart TD
     AH --> AHC[AnswerHistoryChoice]
     AHC --> CH
 
-    Q -. 将来拡張 .-> QP[QuestionProgress]
+    Q --> QM[QuestionMastery]
 ```
 
 ### 実装上の重要な関係
@@ -701,7 +701,7 @@ flowchart LR
 
 `AnswerHistoryChoice`は実際に選択したChoiceを記録します。
 
-`QuestionProgress`はMVP外の将来拡張です。
+`QuestionMastery`はQuestionごとに1件作り、現在の分類と更新日時を保存します。過去の回答内容は`AnswerHistory`に残します。
 
 ## 25. システム全体像
 
@@ -920,6 +920,8 @@ sequenceDiagram
     participant GR as GameSessionRepository
     participant HR as AnswerHistoryRepository
     participant HCR as AnswerHistoryChoiceRepository
+    participant LPS as LearningProgressService
+    participant QMR as QuestionMasteryRepository
     participant JS as GameEffect(JavaScript)
 
     User->>UI: A～G / Enter
@@ -935,6 +937,8 @@ sequenceDiagram
     AS->>GR: GameSession更新
     AS->>HR: AnswerHistory保存
     AS->>HCR: AnswerHistoryChoice保存
+    AS->>LPS: 回答をもとに現在分類を更新
+    LPS->>QMR: QuestionMastery保存
     AS-->>AC: AnswerResponse
     AC-->>UI: JSON Response
     UI->>JS: correct / timeout / HP / Combo / Score
@@ -1136,6 +1140,14 @@ classDiagram
     class AnswerHistoryChoiceRepository {
         +save()
     }
+    class LearningProgressService {
+        +recordAnswer()
+        +updateStatus()
+    }
+    class QuestionMasteryRepository {
+        +findByQuestionId()
+        +save()
+    }
     class QuestionType {
         <<enumeration>>
         SINGLE_A_E
@@ -1189,35 +1201,39 @@ classDiagram
     AnswerService --> GameSessionRepository
     AnswerService --> AnswerHistoryRepository
     AnswerService --> AnswerHistoryChoiceRepository
+    AnswerService --> LearningProgressService
+    LearningProgressService --> QuestionMasteryRepository
 ```
 
-`QuestionProgress`はMVPのクラス図・Entity・Repositoryには含めません。将来の学習進捗機能で追加します。
+`QuestionMastery`はMVPで実装します。Questionごとに現在の分類と更新日時を1件保存します。アカウントは設けず、既存のDBを1人分の記録として扱います。
 
 ## 33.1 Javaクラス名
 
 ### Controller
 
-`ChapterController`, `GameSessionController`, `AnswerController`, `ResultController`, `ReviewController`
+`ChapterController`, `GameSessionController`, `AnswerController`, `LearningProgressController`
 
 ### Service
 
-`ChapterService`, `GameSessionService`, `AnswerService`, `ResultService`, `ReviewService`
+`ChapterService`, `GameSessionService`, `AnswerService`, `LearningProgressService`
 
 ### Repository（MVP）
 
-`ChapterRepository`, `QuestionRepository`, `ChoiceRepository`, `StageDefinitionRepository`, `GameSessionRepository`, `StageSessionRepository`, `StageQuestionRepository`, `AnswerHistoryRepository`, `AnswerHistoryChoiceRepository`
+`ChapterRepository`, `QuestionRepository`, `ChoiceRepository`, `StageDefinitionRepository`, `GameSessionRepository`, `StageSessionRepository`, `StageQuestionRepository`, `AnswerHistoryRepository`, `AnswerHistoryChoiceRepository`, `QuestionMasteryRepository`
 
 ### Entity（MVP）
 
-`Chapter`, `Question`, `Choice`, `StageDefinition`, `GameSession`, `StageSession`, `StageQuestion`, `AnswerHistory`, `AnswerHistoryChoice`
+`Chapter`, `Question`, `Choice`, `StageDefinition`, `GameSession`, `StageSession`, `StageQuestion`, `AnswerHistory`, `AnswerHistoryChoice`, `QuestionMastery`
 
 ### Enum（MVP）
 
-`QuestionType`, `MiniGameType`, `GameSessionStatus`, `StageSessionStatus`
+`QuestionType`, `MiniGameType`, `GameSessionStatus`, `GameSessionType`, `StageSessionStatus`, `MasteryStatus`
 
-### 将来拡張
+### 学習状況・苦手特訓
 
-`QuestionProgress`はMVPでは実装しません。学習進捗機能を追加するときにEntity・Repository・Serviceを追加します。
+`QuestionMastery`, `LearningProgressService`, `LearningProgressController`, `QuestionMasteryRepository`を追加します。分類は`UNSEEN`, `OK`, `ALMOST`, `WEAK`, `VERY_WEAK`です。`UNSEEN`は回答履歴がない場合に集計時に決め、DBには保存しません。
+
+`GameSessionType`は`STANDARD`と`WEAK_TRAINING`を持ちます。完了した`WEAK_TRAINING`のGameSessionとAnswerHistoryから、特訓の回数・正解数・スコアを表示します。
 
 ## 33.2 回答処理の詳細クラス図
 
@@ -1379,7 +1395,8 @@ Request：
 {
   "chapterId": 1,
   "questionCount": 10,
-  "selectionMode": "RANDOM"
+  "selectionMode": "RANDOM",
+  "sessionType": "STANDARD"
 }
 ```
 
@@ -1392,11 +1409,14 @@ Response：
   "questionCount": 10,
   "totalStageCount": 2,
   "currentStageNumber": 1,
-  "status": "PLAYING"
+  "status": "PLAYING",
+  "sessionType": "STANDARD"
 }
 ```
 
 `questionCount`は5・10・15・20を許可します。出題方法は`RANDOM`（全難易度からランダム）、`EASY`（入門）、`ADVANCED`（応用）、`BRONZE_STYLE`（Java Bronze風のオリジナル問題）です。入門問題は15問、他の出題方法は20問まで選べます。
+
+苦手特訓では`sessionType`に`WEAK_TRAINING`を指定し、苦手特訓ボタンから5問で開始します。通常のゲームでは`STANDARD`を指定します。
 
 ### POST /api/stage-questions/{stageQuestionId}/start
 
@@ -1609,7 +1629,8 @@ Game Result画面は、結果を確認するエリアとReviewへ進むための
   "totalCorrectCount": 15,
   "totalScore": 1500,
   "perfectStageCount": 2,
-  "status": "COMPLETED"
+  "status": "COMPLETED",
+  "sessionType": "STANDARD"
 }
 ```
 
@@ -1644,9 +1665,11 @@ Stage結果は正解数・Stageスコア・最大Combo・Perfect判定・次Stag
   "items": [
     {
       "stageQuestionId": 3001,
+      "questionId": 401,
       "stageNumber": 1,
       "questionNumber": 1,
       "questionText": "...",
+      "masteryStatus": "WEAK",
       "selectedChoiceIds": [12],
       "correctChoiceIds": [15],
       "correct": false,
@@ -1676,6 +1699,28 @@ Stage結果は正解数・Stageスコア・最大Combo・Perfect判定・次Stag
 
 Review APIはGameSessionが`COMPLETED`になった後だけ利用できます。`items`はStage番号、問題番号の順に並びます。各項目には問題文、選んだ選択肢ID、正解の選択肢ID、正誤・時間切れ、回答時間（ミリ秒）、詳しい解説を含みます。画面表示用の`choices`には選択肢の文章と、プレイヤーが選んだか・正解かの印も含めます。
 
+### 学習状況・苦手特訓API
+
+| Method | URL | 役割 |
+|---|---|---|
+| `GET` | `/api/learning-progress/chapters` | Chapterごとの分類数と苦手問題を返す |
+| `GET` | `/api/learning-progress/training-records` | 完了した苦手特訓の記録を返す |
+| `PUT` | `/api/learning-progress/questions/{questionId}` | 回答済み問題の分類を変更する |
+
+分類変更のRequest例：
+
+```json
+{
+  "status": "VERY_WEAK"
+}
+```
+
+回答時は正解なら`OK`、不正解または時間切れなら`WEAK`を保存します。回答履歴がない問題は`UNSEEN`として数えます。Review画面では、回答済み問題を`OK`、`ALMOST`、`WEAK`、`VERY_WEAK`に変更できます。画面ではそれぞれ「OK」「あと一歩」「苦手」「超苦手」と表示します。`UNSEEN`は回答から決まるため、手動では指定できません。
+
+苦手特訓は選んだChapterの`WEAK`と`VERY_WEAK`だけを対象に、5問のGameSessionとして開始します。対象が5問未満なら対象問題を繰り返します。分類や回答履歴は回答ごとに保存され、特訓記録一覧には完了した特訓だけが表示されます。
+
+この版ではアカウントや利用者ごとの分離を作らず、既存のDBにある学習記録を1人分として扱います。複数人が同じDBを共有すると記録も共有されます。
+
 `ErrorResponse`：
 
 ```json
@@ -1690,9 +1735,9 @@ Review APIはGameSessionが`COMPLETED`になった後だけ利用できます。
 | Status | 意味 | 例 |
 |---|---|---|
 | `200 OK` | 正常処理 | 回答、Pause、Resume、Result取得など |
-| `400 Bad Request` | リクエスト不正 | 必須項目不足、無効なquestionCount |
+| `400 Bad Request` | リクエスト不正 | 必須項目不足、無効なquestionCountや分類 |
 | `404 Not Found` | 対象なし | StageQuestionが存在しない |
-| `409 Conflict` | 状態不整合 | すでに回答済み、PAUSED中に回答など |
+| `409 Conflict` | 状態不整合 | すでに回答済み、PAUSED中に回答、回答前の分類変更、苦手特訓対象なしなど |
 
 ## 35.1 実装固定仕様（AIコーディング用 Source of Truth）
 
@@ -1865,7 +1910,7 @@ AnswerHistoryChoice
 - choiceId（JPAではChoiceへの@ManyToOne）
 ```
 
-`QuestionProgress`はMVPでは作成しません。`actionPattern`もMVP仕様から削除し、実装しません。
+`QuestionMastery`は現在の理解度分類を保存するMVPのEntityです。`actionPattern`は実装しません。
 
 ### 35.1.5 時間管理の正規ルール
 
@@ -1990,7 +2035,7 @@ Pause／Resume処理はサーバー側で管理します。画面側の状態表
 12. GameSessionを更新
 13. AnswerHistoryを保存
 14. AnswerHistoryChoiceを保存
-15. 5問目ならStage Clear / Perfectを確定
+15. 正解はOK、不正解・時間切れはWEAKにQuestionMasteryを更新
 16. AnswerResponseを返す
 ```
 
@@ -2028,6 +2073,7 @@ StageSession更新
 → GameSession更新
 → AnswerHistory保存
 → AnswerHistoryChoice保存
+→ QuestionMastery更新
 ```
 
 途中で失敗した場合はトランザクション全体をロールバックします。
@@ -2097,23 +2143,27 @@ Perfectによる追加Scoreはありません。通常どおり正解1問につ�
 
 ### 35.1.12 Question選択アルゴリズム
 
-同一GameSession内では同じQuestionを再利用しません。
+通常ゲームでは同一GameSession内の同じQuestionを再利用しません。苦手特訓だけは、対象の苦手問題が5問未満の場合に再利用します。
 
 問題をStage用に選ぶときは、まず現在GameSessionで既に使用したQuestionを除外します。その後、**全過去回答履歴のうちQuestionごとの最新AnswerHistory**を確認します。Questionごとの「最新AnswerHistory」は、`answeredAt DESC`、同値の場合は`answerHistoryId DESC`で1件を決定します。`answerHistoryId`の最大値だけでは最新判定しません。
 
 優先順位：
 
 ```text
-1. UNANSWERED
+1. UNSEEN
    AnswerHistoryが1件もない
 
-2. REVIEW
-   最新AnswerHistoryが
-   correct=false または timeout=true
+2. VERY_WEAK
+   QuestionMasteryの分類が「超苦手」
 
-3. CLEARED
-   最新AnswerHistoryが
-   correct=true かつ timeout=false
+3. WEAK
+   QuestionMasteryの分類が「苦手」
+
+4. ALMOST
+   QuestionMasteryの分類が「あと一歩」
+
+5. OK
+   QuestionMasteryの分類が「OK」
 ```
 
 選択手順：
@@ -2122,13 +2172,15 @@ Perfectによる追加Scoreはありません。通常どおり正解1問につ�
 1. Chapter内のQuestionを取得
 2. 現在GameSessionですでに使用したQuestionを除外
 3. Questionごとの最新AnswerHistoryを確認
-4. UNANSWERED / REVIEW / CLEAREDへ分類
-5. UNANSWERED → REVIEW → CLEAREDの順に取得
+4. UNSEEN / VERY_WEAK / WEAK / ALMOST / OKへ分類
+5. UNSEEN → VERY_WEAK → WEAK → ALMOST → OKの順に取得
 6. 各グループ内をシャッフル
 7. 必要数5件を選択
-8. 5件未満しか残らなければ409 INSUFFICIENT_QUESTIONS
+8. 通常ゲームで5件未満しか残らなければ409 INSUFFICIENT_QUESTIONS。苦手特訓は対象を5問まで繰り返す
 9. questionOrder=1～5でStageQuestionを作成
 ```
+
+`QuestionMastery`がまだない既存データは、最新AnswerHistoryを使って仮の分類を決めます。正解は`OK`、不正解または時間切れは`WEAK`として扱います。
 
 ### 35.1.13 API / DTOの命名固定
 
@@ -2240,13 +2292,12 @@ PERFECT
 
 ```text
 UNIQUE(stageSessionId, questionOrder)
-UNIQUE(stageSessionId, questionId)
 UNIQUE(stageQuestionId)                       // AnswerHistory
 UNIQUE(answerHistoryId, choiceId)             // AnswerHistoryChoice
 UNIQUE(gameSessionId, stageId)                 // StageSession
 ```
 
-同一GameSession内のQuestion再利用禁止はService側で制御します。
+通常ゲームでは同じGameSession内のQuestionを再利用しないようService側で選びます。苦手特訓では対象が5問未満の場合に再出題するため、`UNIQUE(stageSessionId, questionId)`は設けません。回答の重複は引き続き`UNIQUE(stageQuestionId)`で防ぎます。
 
 ### 35.1.16 Repositoryの最小責務
 
@@ -2390,6 +2441,7 @@ existsByStageQuestion_StageQuestionId(Long stageQuestionId)
 | 回答履歴保存 | ○ | ○ | ○ | 確認 |
 | StageQuestionで5問固定 | ○ | ○ | ○ | 確認 |
 | AnswerHistoryChoice保存 | ○ | ○ | ○ | 確認 |
+| QuestionMasteryを回答と同時に更新 | ○ | ○ | ○ | 確認 |
 | miniGameTypeで統一 | ○ | ○ | ○ | 確認 |
 | playerCharacterKey等で管理 | ○ | ○ | ○ | 確認 |
 | GameEffectはJavaScript | ○ | ○ | ○ | 確認 |
@@ -2400,7 +2452,7 @@ existsByStageQuestion_StageQuestionId(Long stageQuestionId)
 | Submit中は入力ロック | ○ | ○ | ○ | 確認 |
 | DB重複制約あり | ○ | ○ | ○ | 確認 |
 | Answer処理は@Transactional | ○ | ○ | ○ | 確認 |
-| QuestionProgressはMVP外 | ○ | ○ | ○ | 確認 |
+| QuestionMasteryで現在分類を保存 | ○ | ○ | ○ | 確認 |
 
 ## 37. 回答処理の共通ルール
 
@@ -2414,9 +2466,10 @@ flowchart LR
     F --> G[GameSession更新]
     G --> H[AnswerHistory保存]
     H --> I[AnswerHistoryChoice保存]
-    I --> J[AnswerResponse返却]
-    J --> K[JavaScript GameEffect]
-    K --> L[次のStageQuestion]
+    I --> J[QuestionMastery更新]
+    J --> K[AnswerResponse返却]
+    K --> L[JavaScript GameEffect]
+    L --> M[次のStageQuestion]
 ```
 
 すべての更新は`AnswerService`のトランザクション内で処理します。
@@ -2449,7 +2502,7 @@ flowchart TD
 
 ### トランザクション
 
-`StageSession更新 → GameSession更新 → AnswerHistory保存 → AnswerHistoryChoice保存`を1つの`@Transactional`処理として扱います。
+`StageSession更新 → GameSession更新 → AnswerHistory保存 → AnswerHistoryChoice保存 → QuestionMastery更新`を1つの`@Transactional`処理として扱います。
 
 ## 39. データモデル
 
@@ -2473,7 +2526,7 @@ READMEのクラス図と実装するEntityの項目を完全に一致させま�
 
 ### GameSession
 
-`gameSessionId`, `chapterId`, `questionCount`, `totalStageCount`, `currentStageNumber`, `score`, `status`, `startedAt`, `endedAt`
+`gameSessionId`, `chapterId`, `questionCount`, `selectionMode`, `sessionType`, `totalStageCount`, `currentStageNumber`, `score`, `status`, `startedAt`, `endedAt`
 
 ### StageSession
 
@@ -2485,7 +2538,7 @@ READMEのクラス図と実装するEntityの項目を完全に一致させま�
 
 `stageQuestionId`, `stageSessionId`, `questionId`, `questionOrder`, `startedAt`, `answeredAt`, `pausedAt`, `totalPausedMs`
 
-`questionOrder`は**1～5**で、1 Stageあたり必ず5件です。
+`questionOrder`は**1～5**で、1 Stageあたり必ず5件です。通常ゲームでは同じQuestionを再利用しません。苦手特訓で対象問題が5問未満の場合は、同じQuestionを複数の`StageQuestion`から参照します。
 
 ### AnswerHistory
 
@@ -2510,30 +2563,30 @@ AnswerHistory
 
 複数選択問題を含め、実際に選ばれたChoiceを保存します。
 
-### QuestionProgress
+### QuestionMastery
 
-MVPでは実装しません。将来拡張です。
+`questionMasteryId`, `questionId`, `status`, `updatedAt`。Questionごとに1件だけ保存します。回答履歴そのものは別Entityの`AnswerHistory`に記録します。
 
-## 40. QuestionProgressとAnswerHistory
+## 40. QuestionMasteryとAnswerHistory
 
-MVPでは`AnswerHistory`だけを使って復習します。
+回答ごとの記録と、問題ごとの現在の分類を別々に保存します。
 
 - **AnswerHistory**：過去に何を回答したか
-- **QuestionProgress**：その問題をどの程度習得しているか。将来実装
+- **QuestionMastery**：現在の分類が何か。回答で自動更新され、Review画面から変更できる
 
-この2つを分離し、MVPのデータ構造を複雑にしません。
+この2つを分けることで、過去の回答を残しながら、現在の分類を更新できます。
 
 ## 41. 学習状態
 
-`QuestionProgress`はMVPでは使用しません。
+| 保存値 | 画面表示 | 意味 |
+|---|---|---|
+| `UNSEEN` | 未出題 | 回答履歴がない。DBには保存しない |
+| `OK` | OK | 現在の分類が理解済み |
+| `ALMOST` | あと一歩 | Review画面で手動設定 |
+| `WEAK` | 苦手 | 不正解・時間切れ時に自動設定 |
+| `VERY_WEAK` | 超苦手 | Review画面で手動設定 |
 
-将来追加する場合は、例えば以下を利用できます。
-
-```text
-UNSEEN → REVIEW → CLEAR → MASTERED
-```
-
-MASTEREDになる条件は、学習進捗機能を実装する段階で決定します。
+回答時は正解なら`OK`、不正解や時間切れなら`WEAK`に更新します。Review画面では、回答済み問題を4つの保存可能な分類から選び直せます。苦手特訓は`WEAK`と`VERY_WEAK`を対象にします。
 
 ## 42. 設計上の基本ルール
 
@@ -2604,11 +2657,11 @@ flowchart LR
 4. **Stage進行**：Stage 1をGameSession開始時に作成し、以後はadvance-stageで5問ずつ作成。
 5. **Pause/Resume**：StageQuestionとStageSessionのPause時間を個別に累積。
 6. **二重実行**：UIロック + Service事前チェック + DB UNIQUE。
-7. **Question選択**：難易度選択で対象プールを絞った後、UNANSWERED → REVIEW → CLEAREDの順に選択。同一GameSession内重複なし。
+7. **Question選択**：通常ゲームはUNSEEN → VERY_WEAK → WEAK → ALMOST → OKの順に選択。苦手特訓だけ対象が5問未満なら繰り返す。
 8. **Stage Clear**：5問回答完了でClear。敵HP0はClear条件ではない。
 9. **Perfect**：Stage 5/5のみ。追加点なし。
 10. **TIME UP**：回答API受信時にJava側で残り時間を再計算する。残り時間が0以下の場合はTIME UPとして処理し、時間が残っている状態で空配列が送信された場合は400 INVALID_ANSWER_COUNTとする。
-11. **Entity固定**：MVP 9 Entity。`QuestionProgress` / `actionPattern`は実装しない。
+11. **Entity固定**：MVP 10 Entity。`QuestionMastery`で現在分類を保存し、`actionPattern`は実装しない。
 12. **状態**：`WAITING_TO_START → ANSWERING → SUBMITTING → RESULT`を固定。
 
 ## 45. 開発手順
@@ -3039,7 +3092,7 @@ GameEffect
 - より派手なエフェクト
 - キャラクター成長
 - ランキング
-- QuestionProgressによる学習進捗
+- 苦手分野・分類・特訓記録（実装済み）
 
 MVP完成後に追加します。
 
@@ -3047,6 +3100,11 @@ MVP完成後に追加します。
 
 ### 2026/10/14
 
+- 問題ごとに現在の理解度分類を保存し、Review画面から分類を変更できる仕様を追加
+- Chapterごとの苦手問題一覧と、苦手問題だけを5問出す特訓を追加
+- 特訓対象が5問未満なら問題を繰り返し、完了した特訓の日時・正解数・スコアを記録する仕様を追加
+- アカウントは設けず、学習履歴と分類は現在のDBを使う1人利用として扱うことを明記
+- 苦手特訓で同じ問題を繰り返すため、Stage内のQuestion重複禁止を通常ゲーム側のルールに変更
 - 解答後の画面に正解選択肢・短い解説・詳しい解説を表示する仕様を追加
 - 詳しい解説を開いている間は次問への2秒自動進行を止め、閉じた後に待ち時間を再開する仕様を追加
 - 解答前のAPIには正解を含めず、解答後の回答APIと保存済み結果からだけ解説を返す方針を明記
@@ -3106,7 +3164,7 @@ MVP完成後に追加します。
   GameSession        1回のプレイ全体
   StageSession       現在のStage状態
   AnswerHistory      過去の回答記録
-  QuestionProgress   問題ごとの学習状態
+  QuestionMastery    問題ごとの現在の分類
   API                画面とJavaをつなぐ窓口
   Controller         リクエスト受付
   Service            ゲームルール処理

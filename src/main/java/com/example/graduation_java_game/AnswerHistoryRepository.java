@@ -12,6 +12,8 @@ public interface AnswerHistoryRepository extends JpaRepository<AnswerHistory, Lo
 
 	boolean existsByStageQuestion_StageQuestionId(Long stageQuestionId);
 
+	boolean existsByStageQuestion_Question_QuestionId(Long questionId);
+
 	Optional<AnswerHistory> findByStageQuestion_StageQuestionId(Long stageQuestionId);
 
 	List<AnswerHistory> findByStageSession_StageSessionIdOrderByStageQuestion_QuestionOrder(

@@ -9,9 +9,11 @@ public record ReviewResponse(List<Item> items) {
 
 	public record Item(
 			Long stageQuestionId,
+			Long questionId,
 			int stageNumber,
 			int questionNumber,
 			String questionText,
+			MasteryStatus masteryStatus,
 			List<Long> selectedChoiceIds,
 			List<Long> correctChoiceIds,
 			boolean correct,

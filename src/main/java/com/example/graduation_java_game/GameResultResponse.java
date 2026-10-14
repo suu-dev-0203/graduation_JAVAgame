@@ -11,5 +11,6 @@ public record GameResultResponse(
 		int totalCorrectCount,
 		int totalScore,
 		int perfectStageCount,
-		GameSessionStatus status) {
+		GameSessionStatus status,
+		GameSessionType sessionType) {
 }

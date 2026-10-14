@@ -5,6 +5,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>JAVA学習ゲーム</title>
 	<link rel="stylesheet" href="/game.css">
+	<link rel="stylesheet" href="/learning-progress.css">
 </head>
 <body>
 	<main class="page">
@@ -44,6 +45,21 @@
 			<button class="primary-button" id="start-button" type="button" disabled>
 				5問のゲームを始める
 			</button>
+		</section>
+
+		<section class="panel learning-progress-panel" id="learning-progress-panel" aria-labelledby="learning-progress-title">
+			<h2 id="learning-progress-title">学習状況・苦手特訓</h2>
+			<p>問題の分類、Chapterごとの苦手問題、苦手特訓の記録を確認できます。</p>
+			<button class="secondary-button" id="load-learning-progress-button" type="button">
+				学習状況を表示
+			</button>
+			<div id="learning-progress-content" hidden>
+				<h3>Chapterごとの学習状況</h3>
+				<p>「苦手」または「超苦手」の問題を5問解きます。対象が5問未満の場合、同じ問題が繰り返し出ます。</p>
+				<div id="chapter-progress-list"></div>
+				<h3>苦手特訓の記録</h3>
+				<div id="training-record-list"></div>
+			</div>
 		</section>
 
 		<p class="notice" id="message" role="status" aria-live="polite">

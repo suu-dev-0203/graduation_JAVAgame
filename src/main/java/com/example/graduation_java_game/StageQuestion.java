@@ -21,10 +21,7 @@ import jakarta.persistence.UniqueConstraint;
 @Table(name = "stage_questions", uniqueConstraints = {
 		@UniqueConstraint(
 				name = "uk_stage_question_order",
-				columnNames = { "stage_session_id", "question_order" }),
-		@UniqueConstraint(
-				name = "uk_stage_question_question",
-				columnNames = { "stage_session_id", "question_id" })
+				columnNames = { "stage_session_id", "question_order" })
 })
 public class StageQuestion {
 

@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -104,6 +105,106 @@ class GraduationJavaGameApplicationTests {
 				.andExpect(jsonPath("$[0].chapterId").isNumber())
 				.andExpect(jsonPath("$[0].name").value("Java Bronze 基礎"))
 				.andExpect(jsonPath("$[0].description").value("基本文法を学びます。"));
+	}
+
+	/** 回答時の自動分類と、Review用APIから分類を変更できることを確認します。 */
+	@Test
+	@Transactional
+	void answerIsClassifiedAndCanBeChangedFromWeakToAlmost() throws Exception {
+		Chapter chapter = createChapterWithQuestions(5);
+		createStageDefinition(chapter, 1);
+		createChoicesForQuestions(chapter);
+		GameSessionCreateResponse game = gameSessionService.create(
+				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+
+		CurrentGameResponse current = gameSessionService.findCurrent(game.gameSessionId());
+		answerCurrentQuestion(game.gameSessionId(), false);
+
+		mockMvc.perform(get("/api/learning-progress/chapters"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.chapters[0].chapterName").value(chapter.getName()))
+				.andExpect(jsonPath("$.chapters[0].unseenCount").value(4))
+				.andExpect(jsonPath("$.chapters[0].weakCount").value(1))
+				.andExpect(jsonPath("$.chapters[0].weakQuestions[0].questionId")
+						.value(current.question().questionId()))
+				.andExpect(jsonPath("$.chapters[0].weakQuestions[0].status").value("WEAK"))
+				.andExpect(jsonPath("$.chapters[0].weakQuestions[0].attemptCount").value(1));
+
+		mockMvc.perform(put("/api/learning-progress/questions/{questionId}",
+				current.question().questionId())
+				.contentType("application/json")
+				.content("""
+						{"status":"ALMOST"}
+						"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("ALMOST"));
+		mockMvc.perform(get("/api/learning-progress/chapters"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.chapters[0].almostCount").value(1))
+				.andExpect(jsonPath("$.chapters[0].weakCount").value(0))
+				.andExpect(jsonPath("$.chapters[0].unseenCount").value(4));
+		mockMvc.perform(put("/api/learning-progress/questions/{questionId}",
+				current.question().questionId())
+				.contentType("application/json")
+				.content("""
+						{"status":"UNSEEN"}
+						"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_MASTERY_STATUS"));
+	}
+
+	/** 苦手特訓が苦手問題を使い、完了した結果を特訓履歴として保存することを確認します。 */
+	@Test
+	@Transactional
+	void weakTrainingRepeatsAvailableQuestionAndSavesCompletedRecord() throws Exception {
+		Chapter chapter = createChapterWithQuestions(5);
+		createStageDefinition(chapter, 1);
+		createChoicesForQuestions(chapter);
+		GameSessionCreateResponse ordinaryGame = gameSessionService.create(
+				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+		answerCurrentQuestion(ordinaryGame.gameSessionId(), false);
+
+		mockMvc.perform(post("/api/game-sessions")
+				.contentType("application/json")
+				.content("""
+						{"chapterId": %d, "questionCount": 5, "sessionType": "WEAK_TRAINING"}
+						""".formatted(chapter.getChapterId())))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.questionCount").value(5))
+				.andExpect(jsonPath("$.totalStageCount").value(1));
+
+		GameSession training = gameSessionRepository.findAll().stream()
+				.filter(candidate -> candidate.getSessionType() == GameSessionType.WEAK_TRAINING)
+				.findFirst()
+				.orElseThrow();
+		List<StageQuestion> trainingQuestions = stageQuestionRepository
+				.findByStageSession_StageSessionIdOrderByQuestionOrder(
+						stageSessionRepository.findByGameSession_GameSessionId(
+								training.getGameSessionId()).get(0).getStageSessionId());
+		assertEquals(5, trainingQuestions.size());
+		Long selectedQuestionId = trainingQuestions.get(0).getQuestion().getQuestionId();
+		assertTrue(trainingQuestions.stream().allMatch(
+				stageQuestion -> stageQuestion.getQuestion().getQuestionId().equals(selectedQuestionId)));
+
+		for (int index = 0; index < 5; index++) {
+			answerCurrentQuestion(training.getGameSessionId(), true);
+		}
+		mockMvc.perform(get("/api/game-sessions/{id}/result", training.getGameSessionId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.sessionType").value("WEAK_TRAINING"));
+		mockMvc.perform(get("/api/learning-progress/training-records"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.items", hasSize(1)))
+				.andExpect(jsonPath("$.items[0].chapterName").value(chapter.getName()))
+				.andExpect(jsonPath("$.items[0].questionCount").value(5))
+				.andExpect(jsonPath("$.items[0].correctCount").value(5));
+		mockMvc.perform(post("/api/game-sessions")
+				.contentType("application/json")
+				.content("""
+						{"chapterId": %d, "questionCount": 5, "sessionType": "WEAK_TRAINING"}
+						""".formatted(chapter.getChapterId())))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("NO_WEAK_QUESTIONS"));
 	}
 
 	/** 問題と選択肢を保存し、選択肢が表示順に取り出せることを確認します。 */
@@ -872,11 +973,16 @@ class GraduationJavaGameApplicationTests {
 				.andExpect(jsonPath("$.perfectStageCount").value(1))
 				.andExpect(jsonPath("$.status").value("COMPLETED"));
 		mockMvc.perform(get(
+				"/api/game-sessions/{gameSessionId}/result", startedGame.gameSessionId()))
+				.andExpect(jsonPath("$.sessionType").value("STANDARD"));
+		mockMvc.perform(get(
 				"/api/game-sessions/{gameSessionId}/review", startedGame.gameSessionId()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.items", hasSize(5)))
 				.andExpect(jsonPath("$.items[0].stageNumber").value(1))
 				.andExpect(jsonPath("$.items[0].questionNumber").value(1))
+				.andExpect(jsonPath("$.items[0].questionId").isNumber())
+				.andExpect(jsonPath("$.items[0].masteryStatus").value("OK"))
 				.andExpect(jsonPath("$.items[0].correct").value(true))
 				.andExpect(jsonPath("$.items[0].selectedChoiceIds", hasSize(1)))
 				.andExpect(jsonPath("$.items[0].correctChoiceIds", hasSize(1)))

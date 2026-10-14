@@ -24,18 +24,21 @@ public class AnswerService {
 	private final GameSessionRepository gameSessionRepository;
 	private final AnswerHistoryRepository answerHistoryRepository;
 	private final AnswerHistoryChoiceRepository answerHistoryChoiceRepository;
+	private final LearningProgressService learningProgressService;
 
 	public AnswerService(
 			StageQuestionRepository stageQuestionRepository,
 			ChoiceRepository choiceRepository,
 			GameSessionRepository gameSessionRepository,
 			AnswerHistoryRepository answerHistoryRepository,
-			AnswerHistoryChoiceRepository answerHistoryChoiceRepository) {
+			AnswerHistoryChoiceRepository answerHistoryChoiceRepository,
+			LearningProgressService learningProgressService) {
 		this.stageQuestionRepository = stageQuestionRepository;
 		this.choiceRepository = choiceRepository;
 		this.gameSessionRepository = gameSessionRepository;
 		this.answerHistoryRepository = answerHistoryRepository;
 		this.answerHistoryChoiceRepository = answerHistoryChoiceRepository;
+		this.learningProgressService = learningProgressService;
 	}
 
 	/**
@@ -126,6 +129,7 @@ public class AnswerService {
 		answerHistoryChoiceRepository.saveAll(selectedChoices.stream()
 				.map(choice -> new AnswerHistoryChoice(answerHistory, choice))
 				.toList());
+		learningProgressService.recordAnswer(question, correct, answeredAt);
 
 		int maxCombo = calculateMaxCombo(stageSession.getStageSessionId());
 		int stageCorrectCount = stageSession.getCorrectCount();

@@ -22,6 +22,11 @@ const gameResultPanel = document.querySelector("#game-result-panel");
 const pausePanel = document.querySelector("#pause-panel");
 const reviewPanel = document.querySelector("#review-panel");
 const reviewItems = document.querySelector("#review-items");
+const learningProgressPanel = document.querySelector("#learning-progress-panel");
+const loadLearningProgressButton = document.querySelector("#load-learning-progress-button");
+const learningProgressContent = document.querySelector("#learning-progress-content");
+const chapterProgressList = document.querySelector("#chapter-progress-list");
+const trainingRecordList = document.querySelector("#training-record-list");
 const countdown = document.querySelector("#countdown");
 const countdownValue = document.querySelector("#countdown-value");
 const questionContent = document.querySelector("#question-content");
@@ -42,6 +47,8 @@ let selectedChoiceIds = new Set();
 let timerInterval = null;
 let timerDeadline = null;
 let answerAdvanceTimeout = null;
+let learningProgressLoaded = false;
+let gameStartInProgress = false;
 
 async function requestJson(url, options = {}) {
 	const response = await fetch(url, options);
@@ -86,7 +93,13 @@ async function loadChapters() {
 	}
 }
 
-async function startGame() {
+async function startGame(sessionType = "STANDARD", chapterIdOverride = null) {
+	if (gameStartInProgress) {
+		return;
+	}
+	gameStartInProgress = true;
+	const trainingButtons = chapterProgressList.querySelectorAll("button[data-training-chapter-id]");
+	trainingButtons.forEach((button) => { button.disabled = true; });
 	stopTimer();
 	startButton.disabled = true;
 	gamePanel.hidden = true;
@@ -101,9 +114,10 @@ async function startGame() {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				chapterId: Number(chapterSelect.value),
-				questionCount: Number(questionCountSelect.value),
-				selectionMode: selectionModeSelect.value
+				chapterId: Number(chapterIdOverride ?? chapterSelect.value),
+				questionCount: sessionType === "WEAK_TRAINING" ? 5 : Number(questionCountSelect.value),
+				selectionMode: sessionType === "WEAK_TRAINING" ? "RANDOM" : selectionModeSelect.value,
+				sessionType
 			})
 		});
 		gameSessionId = game.gameSessionId;
@@ -112,12 +126,17 @@ async function startGame() {
 		showQuestion(current);
 		message.textContent = "「スタート」またはEnterキーで始められます。";
 		startPanel.hidden = true;
+		learningProgressPanel.hidden = true;
 		gamePanel.scrollIntoView({ behavior: "smooth", block: "start" });
 	} catch (error) {
 		gameSessionId = null;
 		showError(error);
 	} finally {
+		gameStartInProgress = false;
 		startButton.disabled = chapterSelect.disabled;
+		trainingButtons.forEach((button) => {
+			button.disabled = Number(button.dataset.weakQuestionCount) === 0;
+		});
 	}
 }
 
@@ -178,6 +197,7 @@ function showQuestion(current) {
 	startQuestionButton.disabled = questionState !== "WAITING_TO_START";
 	timerStatus.textContent = "開始前";
 	gamePanel.hidden = false;
+	learningProgressPanel.hidden = true;
 	updateChoiceControls();
 
 	pauseButton.hidden = questionState !== "ANSWERING"
@@ -506,6 +526,10 @@ async function showGameResult() {
 	finishGameButton.disabled = true;
 	try {
 		const result = await requestJson(`/api/game-sessions/${gameSessionId}/result`);
+		const isWeakTraining = result.sessionType === "WEAK_TRAINING";
+		document.querySelector("#game-result-title").textContent = isWeakTraining
+			? "苦手特訓の結果"
+			: "ゲームクリア";
 		document.querySelector("#game-result-summary").textContent =
 			`${result.questionCount}問中 ${result.totalCorrectCount}問正解 · 合計スコア ${result.totalScore}`;
 		document.querySelector("#game-result-perfect").textContent =
@@ -514,7 +538,9 @@ async function showGameResult() {
 		gameResultPanel.hidden = false;
 		reviewPanel.hidden = true;
 		gameResultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-		message.textContent = "ゲーム全体の結果です。おつかれさまでした。";
+		message.textContent = isWeakTraining
+			? "苦手特訓を完了しました。結果は学習状況に保存されています。"
+			: "ゲーム全体の結果です。おつかれさまでした。";
 	} catch (error) {
 		showError(error);
 	} finally {
@@ -552,7 +578,11 @@ function returnToHome() {
 	pausePanel.hidden = true;
 	gamePanel.hidden = true;
 	startPanel.hidden = false;
+	learningProgressPanel.hidden = false;
 	message.textContent = "学習テーマを選んでゲームを始めてください。";
+	if (learningProgressLoaded) {
+		loadLearningProgress();
+	}
 	startPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -569,7 +599,10 @@ async function showReview() {
 			const answerTime = document.createElement("p");
 			const choices = document.createElement("ul");
 			const explanation = document.createElement("p");
+			const masteryLabel = document.createElement("label");
+			const masterySelect = document.createElement("select");
 			card.className = "review-item";
+			card.dataset.questionId = item.questionId;
 			heading.textContent = `Stage ${item.stageNumber} · 問題 ${item.questionNumber}`;
 			question.className = "review-question";
 			question.textContent = item.questionText;
@@ -596,7 +629,20 @@ async function showReview() {
 			}
 			explanation.className = "review-explanation";
 			explanation.textContent = `詳しい解説：${item.detailedExplanation}`;
-			card.append(heading, question, outcome, answerTime, choices, explanation);
+			masteryLabel.className = "mastery-control";
+			masteryLabel.textContent = "この問題の分類：";
+			masterySelect.className = "mastery-select";
+			masterySelect.dataset.masteryQuestionId = item.questionId;
+			for (const [value, label] of Object.entries(MASTERY_STATUS_LABELS)) {
+				const option = document.createElement("option");
+				option.value = value;
+				option.textContent = label;
+				masterySelect.append(option);
+			}
+			masterySelect.value = item.masteryStatus;
+			masterySelect.dataset.previousStatus = item.masteryStatus;
+			masteryLabel.append(masterySelect);
+			card.append(heading, question, outcome, answerTime, choices, explanation, masteryLabel);
 			reviewItems.append(card);
 		}
 		gameResultPanel.hidden = true;
@@ -608,6 +654,116 @@ async function showReview() {
 	} finally {
 		reviewButton.disabled = false;
 	}
+}
+
+const MASTERY_STATUS_LABELS = {
+	OK: "OK",
+	ALMOST: "あと一歩",
+	WEAK: "苦手",
+	VERY_WEAK: "超苦手"
+};
+
+async function updateMasteryStatus(questionId, status, selectElement) {
+	const previousStatus = selectElement.dataset.previousStatus || selectElement.value;
+	selectElement.disabled = true;
+	try {
+		const result = await requestJson(`/api/learning-progress/questions/${questionId}`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ status })
+		});
+		selectElement.value = result.status;
+		selectElement.dataset.previousStatus = result.status;
+		message.textContent = `問題の分類を「${MASTERY_STATUS_LABELS[result.status]}」に変更しました。`;
+		if (learningProgressLoaded) {
+			await loadLearningProgress();
+		}
+	} catch (error) {
+		selectElement.value = previousStatus;
+		showError(error);
+	} finally {
+		selectElement.disabled = false;
+	}
+}
+
+async function loadLearningProgress() {
+	loadLearningProgressButton.disabled = true;
+	try {
+		const [progress, records] = await Promise.all([
+			requestJson("/api/learning-progress/chapters"),
+			requestJson("/api/learning-progress/training-records")
+		]);
+		renderChapterProgress(progress.chapters);
+		renderTrainingRecords(records.items);
+		learningProgressLoaded = true;
+		learningProgressContent.hidden = false;
+		loadLearningProgressButton.textContent = "学習状況を更新";
+		message.textContent = "学習状況と苦手特訓の記録を読み込みました。";
+	} catch (error) {
+		showError(error);
+	} finally {
+		loadLearningProgressButton.disabled = false;
+	}
+}
+
+function renderChapterProgress(chapters) {
+	chapterProgressList.replaceChildren();
+	if (chapters.length === 0) {
+		chapterProgressList.textContent = "学習テーマが登録されていません。";
+		return;
+	}
+
+	for (const chapter of chapters) {
+		const card = document.createElement("article");
+		const title = document.createElement("h4");
+		const counts = document.createElement("p");
+		const weakList = document.createElement("ul");
+		const trainButton = document.createElement("button");
+		const weakCount = chapter.weakCount + chapter.veryWeakCount;
+		card.className = "chapter-progress-card";
+		title.textContent = chapter.chapterName;
+		counts.className = "mastery-counts";
+		counts.textContent = `未出題 ${chapter.unseenCount}問 · OK ${chapter.okCount}問 · あと一歩 ${chapter.almostCount}問 · 苦手 ${chapter.weakCount}問 · 超苦手 ${chapter.veryWeakCount}問`;
+		weakList.className = "weak-question-list";
+		for (const question of chapter.weakQuestions) {
+			const item = document.createElement("li");
+			item.textContent = `「${question.questionText}」：${MASTERY_STATUS_LABELS[question.status]}（回答 ${question.attemptCount}回）`;
+			weakList.append(item);
+		}
+		if (chapter.weakQuestions.length === 0) {
+			const item = document.createElement("li");
+			item.textContent = "特訓対象の問題はありません。";
+			weakList.append(item);
+		}
+		trainButton.type = "button";
+		trainButton.className = "secondary-button";
+		trainButton.dataset.trainingChapterId = chapter.chapterId;
+		trainButton.dataset.weakQuestionCount = weakCount;
+		trainButton.textContent = `このChapterの苦手特訓を始める（${weakCount}問）`;
+		trainButton.disabled = weakCount === 0;
+		card.append(title, counts, weakList, trainButton);
+		chapterProgressList.append(card);
+	}
+}
+
+function renderTrainingRecords(items) {
+	trainingRecordList.replaceChildren();
+	if (items.length === 0) {
+		trainingRecordList.textContent = "完了した苦手特訓はまだありません。";
+		return;
+	}
+
+	const list = document.createElement("ul");
+	list.className = "training-record-list";
+	for (const record of items) {
+		const item = document.createElement("li");
+		const completedAt = record.endedAt
+			? new Date(record.endedAt).toLocaleString("ja-JP")
+			: "日時不明";
+		item.textContent = `${completedAt} · ${record.chapterName} · ${record.correctCount}/${record.questionCount}問正解 · スコア ${record.score}`;
+		list.append(item);
+	}
+	trainingRecordList.append(list);
 }
 
 function returnToGameResult() {
@@ -728,6 +884,7 @@ async function restoreSavedGame(forceResume = false) {
 
 		resumeSavedButton.hidden = true;
 		startPanel.hidden = true;
+		learningProgressPanel.hidden = true;
 		showQuestion(current);
 		if (paused) {
 			gamePanel.hidden = true;
@@ -771,7 +928,27 @@ function showError(error) {
 	message.textContent = error.message;
 }
 
-startButton.addEventListener("click", startGame);
+startButton.addEventListener("click", () => startGame());
+loadLearningProgressButton.addEventListener("click", loadLearningProgress);
+reviewItems.addEventListener("change", (event) => {
+	if (!(event.target instanceof HTMLSelectElement)
+			|| !event.target.matches("[data-mastery-question-id]")) {
+		return;
+	}
+	updateMasteryStatus(
+		event.target.dataset.masteryQuestionId,
+		event.target.value,
+		event.target);
+});
+chapterProgressList.addEventListener("click", (event) => {
+	if (!(event.target instanceof Element)) {
+		return;
+	}
+	const button = event.target.closest("button[data-training-chapter-id]");
+	if (button && !button.disabled) {
+		startGame("WEAK_TRAINING", button.dataset.trainingChapterId);
+	}
+});
 selectionModeSelect.addEventListener("change", updateQuestionCountOptions);
 questionCountSelect.addEventListener("change", updateQuestionCountOptions);
 startQuestionButton.addEventListener("click", startCurrentQuestion);

@@ -1,0 +1,65 @@
+.learning-progress-panel h3 {
+	margin-top: 28px;
+}
+
+.chapter-progress-card {
+	margin-top: 14px;
+	padding: 18px;
+	border: 1px solid #dfe5f0;
+	border-radius: 14px;
+	background: #fbfcff;
+}
+
+.chapter-progress-card h4 {
+	margin: 0 0 8px;
+	font-size: 1.05rem;
+}
+
+.mastery-counts {
+	color: #52617d;
+	line-height: 1.7;
+}
+
+.weak-question-list,
+.training-record-list {
+	padding-left: 22px;
+	line-height: 1.8;
+}
+
+.chapter-progress-card .secondary-button {
+	margin-top: 8px;
+}
+
+.chapter-progress-card button:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.mastery-control {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-top: 18px;
+	font-weight: 700;
+}
+
+.mastery-select {
+	min-height: 40px;
+	padding: 6px 10px;
+	border: 1px solid #cbd4e4;
+	border-radius: 8px;
+	background: #fff;
+	color: inherit;
+	font: inherit;
+}
+
+@media (max-width: 640px) {
+	.mastery-control {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.mastery-select {
+		width: 100%;
+	}
+}

@@ -32,6 +32,8 @@ public class GameSessionService {
 	private final StageQuestionRepository stageQuestionRepository;
 	private final AnswerHistoryRepository answerHistoryRepository;
 	private final AnswerHistoryChoiceRepository answerHistoryChoiceRepository;
+	private final QuestionMasteryRepository questionMasteryRepository;
+	private final LearningProgressService learningProgressService;
 
 	public GameSessionService(
 			ChapterRepository chapterRepository,
@@ -42,7 +44,9 @@ public class GameSessionService {
 			StageSessionRepository stageSessionRepository,
 			StageQuestionRepository stageQuestionRepository,
 			AnswerHistoryRepository answerHistoryRepository,
-			AnswerHistoryChoiceRepository answerHistoryChoiceRepository) {
+			AnswerHistoryChoiceRepository answerHistoryChoiceRepository,
+			QuestionMasteryRepository questionMasteryRepository,
+			LearningProgressService learningProgressService) {
 		this.chapterRepository = chapterRepository;
 		this.questionRepository = questionRepository;
 		this.choiceRepository = choiceRepository;
@@ -52,6 +56,8 @@ public class GameSessionService {
 		this.stageQuestionRepository = stageQuestionRepository;
 		this.answerHistoryRepository = answerHistoryRepository;
 		this.answerHistoryChoiceRepository = answerHistoryChoiceRepository;
+		this.questionMasteryRepository = questionMasteryRepository;
+		this.learningProgressService = learningProgressService;
 	}
 
 	/**
@@ -61,7 +67,18 @@ public class GameSessionService {
 	@Transactional
 	public GameSessionCreateResponse create(GameSessionCreateRequest request) {
 		validateRequest(request);
-		QuestionSelectionMode selectionMode = request.selectionMode() == null
+		GameSessionType sessionType = request.sessionType() == null
+				? GameSessionType.STANDARD
+				: request.sessionType();
+		if (sessionType == GameSessionType.WEAK_TRAINING && request.questionCount() != QUESTIONS_PER_STAGE) {
+			throw new GameApiException(
+					HttpStatus.BAD_REQUEST,
+					"INVALID_REQUEST",
+					"苦手特訓の問題数は5問です。");
+		}
+		QuestionSelectionMode selectionMode = sessionType == GameSessionType.WEAK_TRAINING
+				? QuestionSelectionMode.RANDOM
+				: request.selectionMode() == null
 				? QuestionSelectionMode.RANDOM
 				: request.selectionMode();
 
@@ -72,7 +89,9 @@ public class GameSessionService {
 						"指定されたChapterが見つかりません。"));
 
 		int questionCount = request.questionCount();
-		int totalStageCount = questionCount / QUESTIONS_PER_STAGE;
+		int totalStageCount = sessionType == GameSessionType.WEAK_TRAINING
+				? 1
+				: questionCount / QUESTIONS_PER_STAGE;
 		List<StageDefinition> stageDefinitions = findRequiredStageDefinitions(
 				chapter.getChapterId(), totalStageCount);
 		if (stageDefinitions.stream().anyMatch(stage -> stage.getMaxEnemyHp() != 5)) {
@@ -82,21 +101,35 @@ public class GameSessionService {
 					"MVPのStage設定では敵HPを5にしてください。");
 		}
 
-		List<Question> availableQuestions = findQuestionsForMode(chapter.getChapterId(), selectionMode);
-		if (availableQuestions.size() < questionCount) {
-			throw new GameApiException(
-					HttpStatus.CONFLICT,
-					"INSUFFICIENT_QUESTIONS",
-					"選択した難易度に必要な問題がありません。問題数または難易度を変更してください。");
+		List<Question> chapterQuestions;
+		if (sessionType == GameSessionType.WEAK_TRAINING) {
+			List<Question> weakQuestions = learningProgressService
+					.findWeakQuestionsForTraining(chapter.getChapterId());
+			if (weakQuestions.isEmpty()) {
+				throw new GameApiException(
+						HttpStatus.CONFLICT,
+						"NO_WEAK_QUESTIONS",
+						"この学習テーマには苦手・超苦手に分類された問題がありません。");
+			}
+			chapterQuestions = repeatWeakQuestionsToStageSize(weakQuestions);
+		} else {
+			List<Question> availableQuestions = findQuestionsForMode(chapter.getChapterId(), selectionMode);
+			if (availableQuestions.size() < questionCount) {
+				throw new GameApiException(
+						HttpStatus.CONFLICT,
+						"INSUFFICIENT_QUESTIONS",
+						"選択した難易度に必要な問題がありません。問題数または難易度を変更してください。");
+			}
+			chapterQuestions = prioritizeQuestions(
+					chapter.getChapterId(), availableQuestions, Set.of());
 		}
-		List<Question> chapterQuestions = prioritizeQuestions(
-				chapter.getChapterId(), availableQuestions, Set.of());
 
 		Instant startedAt = Instant.now();
 		GameSession gameSession = gameSessionRepository.save(new GameSession(
 				chapter,
 				questionCount,
 				selectionMode,
+				sessionType,
 				totalStageCount,
 				1,
 				0,
@@ -131,7 +164,8 @@ public class GameSessionService {
 				questionCount,
 				totalStageCount,
 				1,
-				GameSessionStatus.PLAYING);
+				GameSessionStatus.PLAYING,
+				sessionType);
 	}
 
 	/**
@@ -572,7 +606,8 @@ public class GameSessionService {
 				totalCorrectCount,
 				gameSession.getScore(),
 				perfectStageCount,
-				gameSession.getStatus());
+				gameSession.getStatus(),
+				gameSession.getSessionType());
 	}
 
 	/**
@@ -639,9 +674,13 @@ public class GameSessionService {
 
 		return new ReviewResponse.Item(
 				stageQuestion.getStageQuestionId(),
+				question.getQuestionId(),
 				stageQuestion.getStageSession().getStageDefinition().getStageNumber(),
 				stageQuestion.getQuestionOrder(),
 				question.getQuestionText(),
+				questionMasteryRepository.findByQuestion_QuestionId(question.getQuestionId())
+						.map(QuestionMastery::getStatus)
+						.orElse(history.isCorrect() ? MasteryStatus.OK : MasteryStatus.WEAK),
 				selectedIds,
 				correctIds,
 				history.isCorrect(),
@@ -748,31 +787,61 @@ public class GameSessionService {
 			}
 		}
 
+		Map<Long, QuestionMastery> savedMastery = new HashMap<>();
+		for (QuestionMastery mastery : questionMasteryRepository
+				.findByQuestion_Chapter_ChapterId(chapterId)) {
+			savedMastery.put(mastery.getQuestion().getQuestionId(), mastery);
+		}
+
 		List<Question> unanswered = new ArrayList<>();
-		List<Question> review = new ArrayList<>();
+		List<Question> veryWeak = new ArrayList<>();
+		List<Question> weak = new ArrayList<>();
+		List<Question> almost = new ArrayList<>();
 		List<Question> cleared = new ArrayList<>();
 		for (Question question : questions) {
 			if (excludedQuestionIds.contains(question.getQuestionId())) {
 				continue;
 			}
 			AnswerHistory latestHistory = latestHistoryByQuestion.get(question.getQuestionId());
-			if (latestHistory == null) {
-				unanswered.add(question);
-			} else if (!latestHistory.isCorrect() || latestHistory.isTimeout()) {
-				review.add(question);
-			} else {
-				cleared.add(question);
+			QuestionMastery mastery = savedMastery.get(question.getQuestionId());
+			MasteryStatus status = mastery != null
+					? mastery.getStatus()
+					: latestHistory == null
+						? MasteryStatus.UNSEEN
+						: latestHistory.isCorrect() ? MasteryStatus.OK : MasteryStatus.WEAK;
+			switch (status) {
+				case UNSEEN -> unanswered.add(question);
+				case VERY_WEAK -> veryWeak.add(question);
+				case WEAK -> weak.add(question);
+				case ALMOST -> almost.add(question);
+				case OK -> cleared.add(question);
 			}
 		}
 
 		Collections.shuffle(unanswered);
-		Collections.shuffle(review);
+		Collections.shuffle(veryWeak);
+		Collections.shuffle(weak);
+		Collections.shuffle(almost);
 		Collections.shuffle(cleared);
-		List<Question> prioritized = new ArrayList<>(unanswered.size() + review.size() + cleared.size());
+		List<Question> prioritized = new ArrayList<>(
+				unanswered.size() + veryWeak.size() + weak.size() + almost.size() + cleared.size());
 		prioritized.addAll(unanswered);
-		prioritized.addAll(review);
+		prioritized.addAll(veryWeak);
+		prioritized.addAll(weak);
+		prioritized.addAll(almost);
 		prioritized.addAll(cleared);
 		return prioritized;
+	}
+
+	private List<Question> repeatWeakQuestionsToStageSize(List<Question> weakQuestions) {
+		List<Question> questions = new ArrayList<>(QUESTIONS_PER_STAGE);
+		while (questions.size() < QUESTIONS_PER_STAGE) {
+			List<Question> nextPass = new ArrayList<>(weakQuestions);
+			Collections.shuffle(nextPass);
+			int remaining = QUESTIONS_PER_STAGE - questions.size();
+			questions.addAll(nextPass.subList(0, Math.min(remaining, nextPass.size())));
+		}
+		return questions;
 	}
 
 	private boolean isLaterHistory(AnswerHistory candidate, AnswerHistory current) {

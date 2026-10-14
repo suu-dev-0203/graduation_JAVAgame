@@ -41,6 +41,10 @@ public class GameSession {
 	@Column(nullable = false)
 	private QuestionSelectionMode selectionMode;
 
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false)
+	private GameSessionType sessionType;
+
 	/** 選んだ問題数を5問ずつに分けたStageの数です。 */
 	@Column(nullable = false)
 	private int totalStageCount;
@@ -100,9 +104,34 @@ public class GameSession {
 			GameSessionStatus status,
 			Instant startedAt,
 			Instant endedAt) {
+		this(
+				chapter,
+				questionCount,
+				selectionMode,
+				GameSessionType.STANDARD,
+				totalStageCount,
+				currentStageNumber,
+				score,
+				status,
+				startedAt,
+				endedAt);
+	}
+
+	public GameSession(
+			Chapter chapter,
+			int questionCount,
+			QuestionSelectionMode selectionMode,
+			GameSessionType sessionType,
+			int totalStageCount,
+			int currentStageNumber,
+			int score,
+			GameSessionStatus status,
+			Instant startedAt,
+			Instant endedAt) {
 		this.chapter = chapter;
 		this.questionCount = questionCount;
 		this.selectionMode = selectionMode;
+		this.sessionType = sessionType;
 		this.totalStageCount = totalStageCount;
 		this.currentStageNumber = currentStageNumber;
 		this.score = score;
@@ -128,6 +157,10 @@ public class GameSession {
 
 	public QuestionSelectionMode getSelectionMode() {
 		return selectionMode;
+	}
+
+	public GameSessionType getSessionType() {
+		return sessionType;
 	}
 
 	/** ゲーム全体のStage数を返します。 */
