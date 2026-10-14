@@ -79,6 +79,120 @@ http://localhost:8081
 
 デモ用データは`demo`プロファイルで起動したときだけ登録される。通常プロファイルのデータベースには登録されない。JavaのソースコードやAPIの仕様はREADMEと各STEPを参照する。
 
+## 貼り付けた起動ログの読み方：IT未経験者向け
+
+ここでは、VS CodeやJavaを使ったことがない人にも分かるように、今回貼り付けたターミナル表示を説明する。ターミナルは、文字でコンピューターへ指示を出し、その実行結果を読む画面である。表示のすべてが入力したコマンドではなく、`PS ...>`の後にある文字が入力内容で、その次から下に出る行は実行結果である。
+
+### 1. 最初に入力した行
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE="demo"
+```
+
+これは「このPowerShell画面でアプリを起動するときは、デモ用の設定を使う」という指定である。`demo`を有効にすると、画面確認用のサンプル問題が登録される。この指定は現在のターミナルに対するもので、ターミナルを閉じて新しく開いた場合は、もう一度設定する。
+
+### 2. 最初の起動方法と、その結果
+
+貼り付けた記録では、次の長いコマンドを試している。
+
+```powershell
+java "-Dspring.profiles.active=demo" -cp "target/classes;target/test-classes" org.springframework.boot.loader.launch.JarLauncher 2>$null; if (-not $?) { ./mvnw.cmd spring-boot:run }
+```
+
+このコマンドは、まず`java`から直接アプリを起動しようとし、失敗した場合は`mvnw.cmd`で起動し直す、という内容である。`2>$null`は最初のJava起動で出るエラー表示を捨てる指定なので、初心者には失敗原因が分かりにくい。通常はこの複雑な行を使わず、上記の「ターミナルでゲームを起動する」にあるMaven Wrapperの手順を使う。
+
+貼り付けログでは最初の方法が成功しなかったため、後半の`./mvnw.cmd spring-boot:run`が実行された。ログに次の表示がある。
+
+```text
+Tomcat initialized with port 8080 (http)
+```
+
+`Tomcat`はブラウザーからのアクセスを受け取るWebサーバー機能で、この表示は「8080番ポートを使って起動準備をしている」という意味である。ポートは、同じコンピューター上でアプリの通信先を区別する番号である。一般的にこのアプリは8080番を使うが、同じ番号は同時に別のアプリが使えない。
+
+今回のログでは8080番がすでに使用中だったため、次のエラーで起動が止まった。
+
+```text
+Web server failed to start. Port 8080 was already in use.
+APPLICATION FAILED TO START
+BUILD FAILURE
+```
+
+これは「Javaのゲーム機能が壊れている」という意味ではない。アプリが通信を受け付ける番号を確保できず、Webサーバーを起動できなかったという意味である。最後の`BUILD FAILURE`は、Mavenが起動処理の失敗を報告した結果であり、直接の原因はその少し上にある`Port 8080 was already in use`である。ログからは8080番を使っていた別プロセスが何のアプリかまでは分からないため、正体を確認せずに終了させない。
+
+途中にある次の表示は警告である。
+
+```text
+spring.jpa.open-in-view is enabled by default
+```
+
+`WARN`は注意を促す表示だが、今回アプリが起動できなかった直接の理由ではない。実際に起動を止めた原因は8080番ポートの競合である。起動ログに警告が見えても、その後に起動成功の表示があれば、警告と起動結果は分けて判断する。
+
+### 3. 8081番ポートに変更して起動した行
+
+次に、同じターミナルで次のコマンドを入力した。
+
+```powershell
+./mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081"
+```
+
+`mvnw.cmd`はプロジェクトに含まれるMaven Wrapperで、ビルドや起動に必要なMavenをプロジェクトの設定に合わせて実行するためのファイルである。`spring-boot:run`はSpring Bootアプリを起動する指示で、`--server.port=8081`は「今回はWebサーバーに8081番を使わせる」という追加設定である。先に設定した`demo`は同じターミナル内で有効なままなので、サンプル問題も読み込まれる。
+
+### 4. 2回目のログから分かる成功のサイン
+
+2回目のログには次の表示がある。
+
+```text
+The following 1 profile is active: "demo"
+Tomcat initialized with port 8081 (http)
+Tomcat started on port 8081 (http) with context path '/'
+Started GraduationJavaGameApplication
+```
+
+それぞれ次の意味である。
+
+- `profile is active: "demo"`：デモ用設定が選ばれている。
+- `Tomcat initialized with port 8081`：8081番を使う準備をしている。
+- `Tomcat started on port 8081`：Webサーバーが8081番で起動した。
+- `Started GraduationJavaGameApplication`：ゲームアプリの起動処理が完了した。
+
+この成功ログが出たあとに、ブラウザーで`http://localhost:8081`を開く。`localhost`は「自分のコンピューター」を指し、最後の`8081`は接続先のポート番号である。ブラウザーの番号を8080のままにすると、起動したアプリとは別の通信先を見てしまうため、画面とAPIの通信が合わない。
+
+### 5. 途中のINFOログは何をしているか
+
+起動に成功したときも、アプリは画面を表示する前にいくつかの準備を行う。次のような行は準備中の進行状況であり、通常はエラーではない。
+
+- `[INFO] Scanning for projects...`：Mavenがプロジェクトの設定を探している。
+- `[INFO] Building graduation-java-game ...`：このゲームプロジェクトを起動できるように準備している。
+- `Nothing to compile - all classes are up to date.`：前回からJavaコードに変更がなく、再コンパイルが不要だった。
+- `Found 9 JPA repository interfaces.`：データベースを読み書きする窓口を9個見つけた。
+- `HikariPool ... Starting`、`Start completed`：アプリからデータベースへ接続する準備をしている。
+- `jdbc:h2:mem:...`：今回の起動で使うH2の一時的なメモリ内データベースを示す。`mem`はメモリ上という意味で、今回のようなデモ起動を終了すると内容は保持されない。
+- `Hibernate ORM core version ...`：JavaのEntityとデータベースの読み書きをつなぐHibernateのバージョンを表示している。
+- `Adding welcome page: ... static/index.html`：ブラウザーでアプリのトップページを開いたときに表示するHTMLを見つけた。
+
+このような準備ログが順番に表示され、最後に`Started GraduationJavaGameApplication`が出れば、アプリ起動は成功である。すべてのINFO行を暗記する必要はない。最初はポート番号と最後の起動成功行に注目すればよい。
+
+### 6. このログから判断できること
+
+1. 最初の起動は8080番を使おうとしたが、既に使用中だったため失敗した。
+2. 同じターミナルから起動ポートを8081番に変えて、アプリの起動に成功した。
+3. ブラウザーも`http://localhost:8081`に合わせたことで、画面から回答APIへ通信できた。
+4. ブラウザーでゲームの2問目が表示され、スコア100・敵HP 4・Combo 1になったため、回答結果の反映まで確認できた。
+
+### 7. 用語の簡単な説明
+
+| 用語 | この記録での意味 |
+| --- | --- |
+| ターミナル / PowerShell | コマンドを文字で入力し、実行結果を読む画面 |
+| コマンド | コンピューターへ実行させる指示 |
+| Spring Boot | このJavaゲームのWebアプリを起動する仕組み |
+| Maven Wrapper (`mvnw.cmd`) | プロジェクト用のビルド・起動ツールを呼び出すファイル |
+| Tomcat | ブラウザーからのWebアクセスを受け付けるサーバー機能 |
+| ポート | 同じコンピューター上の通信先を区別する番号 |
+| `INFO` / `WARN` / `ERROR` | 通常情報 / 注意 / エラーを示すログの目印 |
+| `BUILD FAILURE` | 起動やビルドの処理が最後まで成功しなかったという報告 |
+| PID | 実行中のプログラムを識別する番号。今回の貼り付けだけでは8080番を使っていたプログラムの正体は分からない |
+
 ### 開発の道順
 
 | STEP | 何を作ったか | できるようになったこと |
