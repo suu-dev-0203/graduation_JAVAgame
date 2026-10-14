@@ -202,7 +202,7 @@ MVPでは5問・10問・15問・20問から選択します。
 20問 = 4 Stage
 ```
 
-GameSessionはChapter、出題方法、5/10/15/20問の問題数を選択して開始します。すべての出題方法で20問まで選べます。開始StageはChapter内のStage 1です。各Stageの5問をクリアした後、Stage Result画面のボタンから次のStageへ進みます。必要なStage数または問題数が存在しない場合、そのGameSessionは開始できません。
+開始画面でChapterと出題方法を選び、「5問のゲームを始める」などの問題数ボタンを押すと、その問題数でGameSessionが始まります。すべての出題方法で20問まで選べます。開始StageはChapter内のStage 1です。各Stageの5問をクリアした後、Stage Result画面のボタンから次のStageへ進みます。必要なStage数または問題数が存在しない場合、そのGameSessionは開始できません。
 
 Stageの解放条件は設けません。
 

@@ -33,19 +33,25 @@
 				</select>
 			</div>
 			<div class="form-row">
-				<label for="question-count">ゲーム全体の問題数</label>
-				<select id="question-count" aria-describedby="question-count-help" disabled>
-					<option value="5">5問</option>
-					<option value="10">10問</option>
-					<option value="15">15問</option>
-					<option value="20">20問</option>
-				</select>
-				<p id="question-count-help">5問ずつStageを進みます。どの出題方法でも5・10・15・20問から選べます。</p>
+				<p><strong id="question-count-title">ゲーム全体の問題数</strong></p>
+				<p id="question-count-help">5問ずつStageを進みます。始めたい問題数のボタンを押してください。</p>
+				<div class="form-row" id="start-game-buttons" role="group"
+					aria-labelledby="question-count-title" aria-describedby="question-count-help">
+					<button class="primary-button" type="button" data-start-question-count="5" disabled>
+						5問のゲームを始める
+					</button>
+					<button class="primary-button" type="button" data-start-question-count="10" disabled>
+						10問のゲームを始める
+					</button>
+					<button class="primary-button" type="button" data-start-question-count="15" disabled>
+						15問のゲームを始める
+					</button>
+					<button class="primary-button" type="button" data-start-question-count="20" disabled>
+						20問のゲームを始める
+					</button>
+				</div>
 			</div>
 			<button class="secondary-button" id="resume-saved-button" type="button" hidden>保存したゲームを再開</button>
-			<button class="primary-button" id="start-button" type="button" disabled>
-				選んだ問題数でゲームを始める
-			</button>
 		</section>
 
 		<section class="panel learning-progress-panel" id="learning-progress-panel" aria-labelledby="learning-progress-title">

@@ -1,8 +1,6 @@
 const chapterSelect = document.querySelector("#chapter-select");
 const selectionModeSelect = document.querySelector("#selection-mode");
-const questionCountSelect = document.querySelector("#question-count");
-const questionCountHelp = document.querySelector("#question-count-help");
-const startButton = document.querySelector("#start-button");
+const startButtons = document.querySelectorAll("button[data-start-question-count]");
 const startPanel = document.querySelector(".start-panel");
 const resumeSavedButton = document.querySelector("#resume-saved-button");
 const startQuestionButton = document.querySelector("#start-question-button");
@@ -85,17 +83,15 @@ async function loadChapters() {
 
 		chapterSelect.disabled = false;
 		selectionModeSelect.disabled = false;
-		questionCountSelect.disabled = false;
-		startButton.disabled = false;
+		startButtons.forEach((button) => { button.disabled = false; });
 		message.textContent = "学習テーマを選んでゲームを始めてください。";
-		updateQuestionCountDisplay();
 		await restoreSavedGame();
 	} catch (error) {
 		showError(error);
 	}
 }
 
-async function startGame(sessionType = "STANDARD", chapterIdOverride = null) {
+async function startGame(sessionType = "STANDARD", chapterIdOverride = null, questionCountOverride = null) {
 	if (gameStartInProgress) {
 		return;
 	}
@@ -103,7 +99,7 @@ async function startGame(sessionType = "STANDARD", chapterIdOverride = null) {
 	const trainingButtons = chapterProgressList.querySelectorAll("button[data-training-chapter-id]");
 	trainingButtons.forEach((button) => { button.disabled = true; });
 	stopTimer();
-	startButton.disabled = true;
+	startButtons.forEach((button) => { button.disabled = true; });
 	gamePanel.hidden = true;
 	stageResultPanel.hidden = true;
 	gameResultPanel.hidden = true;
@@ -117,10 +113,10 @@ async function startGame(sessionType = "STANDARD", chapterIdOverride = null) {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				chapterId: Number(chapterIdOverride ?? chapterSelect.value),
-				// 画面で選んだ合計問題数を送ります。Java側では5問ずつStageに分けます。
+				// 押したボタンの問題数を送り、Java側で5問ずつStageに分けます。
 				questionCount: sessionType === "WEAK_TRAINING"
 					? Number(trainingQuestionCountSelect.value)
-					: Number(questionCountSelect.value),
+					: questionCountOverride,
 				selectionMode: sessionType === "WEAK_TRAINING" ? "RANDOM" : selectionModeSelect.value,
 				sessionType
 			})
@@ -138,7 +134,7 @@ async function startGame(sessionType = "STANDARD", chapterIdOverride = null) {
 		showError(error);
 	} finally {
 		gameStartInProgress = false;
-		startButton.disabled = chapterSelect.disabled;
+		startButtons.forEach((button) => { button.disabled = chapterSelect.disabled; });
 		trainingButtons.forEach((button) => {
 			button.disabled = Number(button.dataset.weakQuestionCount) === 0;
 		});
@@ -869,10 +865,9 @@ async function restoreSavedGame(forceResume = false) {
 			return;
 		}
 		resumeSavedButton.hidden = false;
-		startButton.disabled = true;
+		startButtons.forEach((button) => { button.disabled = true; });
 		chapterSelect.disabled = true;
 		selectionModeSelect.disabled = true;
-		questionCountSelect.disabled = true;
 		message.textContent = "保存したゲームがあります。再開ボタンから続きを遊べます。";
 		return;
 	}
@@ -927,18 +922,17 @@ function difficultyLabel(difficulty) {
 	}[difficulty] || "Javaの問題";
 }
 
-function updateQuestionCountDisplay() {
-	// Stageは5問ですが、ここではゲーム全体の問題数を選びます。
-	questionCountHelp.textContent = "5問ずつStageを進みます。どの出題方法でも5・10・15・20問から選べます。";
-	startButton.textContent = `${questionCountSelect.value}問のゲームを始める`;
-}
-
 function showError(error) {
 	message.classList.add("error");
 	message.textContent = error.message;
 }
 
-startButton.addEventListener("click", () => startGame());
+startButtons.forEach((button) => {
+	button.addEventListener("click", () => {
+		// ボタンに書かれた問題数を使ってゲームを始めます。
+		startGame("STANDARD", null, Number(button.dataset.startQuestionCount));
+	});
+});
 loadLearningProgressButton.addEventListener("click", loadLearningProgress);
 reviewItems.addEventListener("change", (event) => {
 	if (!(event.target instanceof HTMLSelectElement)
@@ -959,8 +953,6 @@ chapterProgressList.addEventListener("click", (event) => {
 		startGame("WEAK_TRAINING", button.dataset.trainingChapterId);
 	}
 });
-selectionModeSelect.addEventListener("change", updateQuestionCountDisplay);
-questionCountSelect.addEventListener("change", updateQuestionCountDisplay);
 trainingQuestionCountSelect.addEventListener("change", updateTrainingButtonLabels);
 startQuestionButton.addEventListener("click", startCurrentQuestion);
 answerDetailedExplanationDetails.addEventListener("toggle", updateAnswerExplanationPause);
