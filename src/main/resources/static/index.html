@@ -61,14 +61,17 @@
 			</div>
 			<div class="question-heading">
 				<p class="eyebrow" id="question-type">問題</p>
-				<h2 id="question-title"></h2>
+				<h2 id="question-title" tabindex="-1"></h2>
 			</div>
 			<pre class="code-block" id="code-block" hidden><code></code></pre>
 			<div class="choices-heading">選択肢</div>
 			<ol class="choices" id="choices"></ol>
 			<button class="primary-button" id="start-question-button" type="button" hidden>
-				Enter またはクリックで問題開始
+				Enter またはクリックで3・2・1の後に5問開始
 			</button>
+			<div class="countdown" id="countdown" hidden aria-live="assertive" aria-atomic="true">
+				<span id="countdown-value"></span>
+			</div>
 			<section class="answer-result" id="answer-result" hidden aria-live="polite">
 				<h3 id="answer-result-title"></h3>
 				<p id="answer-result-details"></p>
@@ -82,13 +85,13 @@
 				<p id="short-explanation"></p>
 			</details>
 			<p class="game-note">
-				Enterでタイマーを開始します。単一選択はA～Gキーまたは選択肢のクリック、複数選択はA～Gキーまたはクリックで選び、Enterで確定します。
+				各Stageの最初にEnterを押すと3・2・1の後に開始します。回答結果を2秒表示して次の問題へ進みます。単一選択はA～Gキーまたはクリック、複数選択は選択後にEnterで確定します。
 			</p>
 		</section>
 
 		<section class="panel result-panel" id="stage-result-panel" hidden aria-labelledby="stage-result-title">
 			<p class="eyebrow">STAGE RESULT</p>
-			<h2 id="stage-result-title">Stage Clear</h2>
+			<h2 id="stage-result-title" tabindex="-1">Stage Clear</h2>
 			<p id="stage-result-summary"></p>
 			<p id="stage-result-combo"></p>
 			<button class="primary-button" id="next-stage-button" type="button" hidden>次のStageへ進む</button>

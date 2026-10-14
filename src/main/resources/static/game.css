@@ -150,6 +150,26 @@ summary:focus-visible {
 	margin-top: 20px;
 }
 
+.countdown {
+	display: grid;
+	min-height: 180px;
+	margin: 20px 0;
+	place-items: center;
+	border-radius: 16px;
+	background: #eef0ff;
+	color: #33449f;
+}
+
+.countdown[hidden] {
+	display: none;
+}
+
+.countdown span {
+	font-size: clamp(4rem, 18vw, 7rem);
+	font-weight: 800;
+	line-height: 1;
+}
+
 .result-panel {
 	margin-top: 20px;
 	line-height: 1.7;
@@ -325,6 +345,23 @@ summary:focus-visible {
 
 .answer-result .incorrect-result {
 	color: #a32735;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.countdown span {
+		animation: countdown-pop 0.25s ease-out;
+	}
+
+	@keyframes countdown-pop {
+		from {
+			transform: scale(0.82);
+			opacity: 0.45;
+		}
+		to {
+			transform: scale(1);
+			opacity: 1;
+		}
+	}
 }
 
 .explanation {

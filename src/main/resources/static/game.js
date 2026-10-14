@@ -22,6 +22,8 @@ const gameResultPanel = document.querySelector("#game-result-panel");
 const pausePanel = document.querySelector("#pause-panel");
 const reviewPanel = document.querySelector("#review-panel");
 const reviewItems = document.querySelector("#review-items");
+const countdown = document.querySelector("#countdown");
+const countdownValue = document.querySelector("#countdown-value");
 const choicesElement = document.querySelector("#choices");
 const answerResult = document.querySelector("#answer-result");
 const answerResultTitle = document.querySelector("#answer-result-title");
@@ -35,6 +37,7 @@ let questionState = "WAITING_TO_START";
 let selectedChoiceIds = new Set();
 let timerInterval = null;
 let timerDeadline = null;
+let answerAdvanceTimeout = null;
 
 async function requestJson(url, options = {}) {
 	const response = await fetch(url, options);
@@ -103,7 +106,7 @@ async function startGame() {
 		localStorage.setItem("gameSessionId", String(gameSessionId));
 		const current = await getCurrentGame();
 		showQuestion(current);
-		message.textContent = "問題を読み込みました。Enterで問題を開始してください。";
+		message.textContent = "Enterで3・2・1を始めます。その後は5問を続けて解きます。";
 		startPanel.hidden = true;
 		gamePanel.scrollIntoView({ behavior: "smooth", block: "start" });
 	} catch (error) {
@@ -120,10 +123,15 @@ async function getCurrentGame() {
 
 function showQuestion(current) {
 	stopTimer();
+	clearAnswerAdvanceTimeout();
+	countdown.hidden = true;
 	message.classList.remove("error");
 	currentGame = current;
 	questionState = current.questionState;
 	selectedChoiceIds = new Set();
+	startQuestionButton.textContent = current.questionNumber === 1
+			? "Enter またはクリックで3・2・1の後に5問開始"
+			: "クリックでこの問題を開始";
 	document.querySelector("#question-progress").textContent =
 		`Stage ${current.currentStageNumber} / ${current.totalStageCount} · 問題 ${current.questionNumber} / ${current.totalQuestionsInStage}`;
 	document.querySelector("#score-status").textContent = `スコア ${current.score}`;
@@ -161,7 +169,8 @@ function showQuestion(current) {
 	document.querySelector(".explanation").hidden = true;
 	answerResult.hidden = true;
 	nextQuestionButton.hidden = true;
-	startQuestionButton.hidden = questionState !== "WAITING_TO_START";
+	startQuestionButton.hidden = questionState !== "WAITING_TO_START"
+			|| current.questionNumber !== 1;
 	startQuestionButton.disabled = questionState !== "WAITING_TO_START";
 	timerStatus.textContent = "開始前";
 	gamePanel.hidden = false;
@@ -180,6 +189,11 @@ function showQuestion(current) {
 	}
 	if (questionState === "RESULT" && current.answerResult) {
 		showAnswerResult(current.answerResult);
+	} else if (questionState === "WAITING_TO_START" && current.questionNumber > 1) {
+		window.setTimeout(() => startCurrentQuestion(), 0);
+	}
+	if (questionState !== "RESULT") {
+		document.querySelector("#question-title").focus({ preventScroll: true });
 	}
 }
 
@@ -191,10 +205,15 @@ async function startCurrentQuestion() {
 	questionState = "STARTING";
 	startQuestionButton.disabled = true;
 	message.classList.remove("error");
-	message.textContent = "問題を開始しています...";
+	message.textContent = currentGame.questionNumber === 1
+			? "3・2・1のカウントダウンを始めます..."
+			: "次の問題を開始しています...";
 	updateChoiceControls();
 
 	try {
+		if (currentGame.questionNumber === 1) {
+			await runStageCountdown();
+		}
 		const started = await requestJson(
 			`/api/stage-questions/${currentGame.stageQuestionId}/start`,
 			{ method: "POST" }
@@ -206,12 +225,39 @@ async function startCurrentQuestion() {
 		startTimer(started.remainingTimeMs);
 		updateChoiceControls();
 	} catch (error) {
+		countdown.hidden = true;
 		questionState = "WAITING_TO_START";
+		startQuestionButton.hidden = false;
+		startQuestionButton.textContent = currentGame.questionNumber === 1
+				? "再試行：Enterまたはクリックで開始"
+			: "再試行：Enterまたはクリックでこの問題を開始";
 		showError(error);
 		updateChoiceControls();
 	} finally {
 		startQuestionButton.disabled = false;
 	}
+}
+
+async function runStageCountdown() {
+	countdown.hidden = false;
+	for (const value of ["3", "2", "1"]) {
+		countdownValue.textContent = value;
+		await delay(1000);
+	}
+	countdownValue.textContent = "スタート";
+	await delay(300);
+	countdown.hidden = true;
+}
+
+function delay(milliseconds) {
+	return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function clearAnswerAdvanceTimeout() {
+	if (answerAdvanceTimeout !== null) {
+		window.clearTimeout(answerAdvanceTimeout);
+	}
+	answerAdvanceTimeout = null;
 }
 
 function startTimer(remainingTimeMs) {
@@ -343,21 +389,27 @@ function showAnswerResult(result) {
 	if (result.stageClear) {
 		answerResultTitle.textContent = result.perfect ? "PERFECT！ Stage Clear" : "Stage Clear";
 		nextQuestionButton.hidden = false;
-		nextQuestionButton.textContent = "Stage結果を見る";
-		message.textContent = "Stageをクリアしました。結果を確認してください。";
+		nextQuestionButton.textContent = "Stage結果を見る（自動で表示します）";
+		message.textContent = "Stage結果を表示しています...";
 		nextQuestionButton.focus();
 	} else {
 		nextQuestionButton.hidden = false;
-		nextQuestionButton.textContent = "次の問題へ";
-		message.textContent = "回答結果を確認し、次の問題へ進んでください。";
+		nextQuestionButton.textContent = "次の問題へ（自動で進みます）";
+		message.textContent = "回答結果を確認してください。2秒後に次の問題へ進みます。";
 		nextQuestionButton.focus();
 	}
+	clearAnswerAdvanceTimeout();
+	answerAdvanceTimeout = window.setTimeout(() => {
+		answerAdvanceTimeout = null;
+		showNextQuestion();
+	}, 2000);
 }
 
 async function showNextQuestion() {
-	if (questionState !== "RESULT" || !currentGame) {
+	if (questionState !== "RESULT" || !currentGame || nextQuestionButton.disabled) {
 		return;
 	}
+	clearAnswerAdvanceTimeout();
 	nextQuestionButton.disabled = true;
 	try {
 		if (currentGame.questionNumber === currentGame.totalQuestionsInStage) {
@@ -366,9 +418,7 @@ async function showNextQuestion() {
 		}
 		const next = await getCurrentGame();
 		showQuestion(next);
-		message.textContent = currentGame.questionNumber === 1
-			? "次のStageを開始しました。Enterで問題を開始してください。"
-			: "Enterで次の問題を開始してください。";
+		message.textContent = "次の問題を自動で開始します。";
 	} catch (error) {
 		showError(error);
 	} finally {
@@ -392,6 +442,7 @@ async function showStageResult() {
 	gamePanel.hidden = true;
 	stageResultPanel.hidden = false;
 	stageResultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+	document.querySelector("#stage-result-title").focus({ preventScroll: true });
 	message.textContent = result.gameCompleted
 		? "最終Stageの結果です。Game Resultへ進んでください。"
 		: "Stage結果を確認し、次のStageへ進んでください。";
@@ -427,7 +478,7 @@ async function startNextStage() {
 		const next = await getCurrentGame();
 		stageResultPanel.hidden = true;
 		showQuestion(next);
-		message.textContent = "次のStageを開始しました。Enterで問題を開始してください。";
+		message.textContent = "次のStageです。Enterで3・2・1を始めてください。";
 		gamePanel.scrollIntoView({ behavior: "smooth", block: "start" });
 	} catch (error) {
 		showError(error);

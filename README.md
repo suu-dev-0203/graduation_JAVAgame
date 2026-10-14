@@ -264,20 +264,22 @@ flowchart TB
 
 ## 12. 制限時間
 
-制限時間は問題ごとの `Question.timeLimitSeconds` で管理します。問題が表示されただけではタイマーを開始せず、**Enterを押して問題開始を確定し、Start APIが成功した時点からカウントを開始**します。
+制限時間は問題ごとの `Question.timeLimitSeconds` で管理します。Stageの1問目でEnterを押すと3・2・1のカウントダウンを表示し、その後Start APIが成功した時点からタイマーを開始します。2～5問目は回答後に自動で始まり、各問の開始Enterは不要です。
 
 Stage側に別の制限時間は持たせません。
 
 ### Timer開始の流れ
 
 ```text
-1. 問題を表示
+1. Stageの1問目を表示
 2. WAITING_TO_START
-3. Enter
-4. POST /api/stage-questions/{stageQuestionId}/start
-5. JavaがstartedAtを記録
-6. 200 OKを返す
-7. JavaScriptが返却されたremainingTimeMsを基準にTimer表示を開始
+3. Enterを押す
+4. 3・2・1を表示
+5. POST /api/stage-questions/{stageQuestionId}/start
+6. JavaがstartedAtを記録
+7. 200 OKを返す
+8. JavaScriptが返却されたremainingTimeMsを基準にTimer表示を開始
+9. 回答後に結果を2秒表示し、2～5問目を続けて開始
 ```
 
 `WAITING_TO_START`ではTimerが未開始のため、`remainingTimeMs`は`null`で返却します。
@@ -631,11 +633,15 @@ flowchart LR
 ```mermaid
 stateDiagram-v2
     [*] --> WAITING_TO_START
-    WAITING_TO_START --> ANSWERING: Start API成功
+    WAITING_TO_START --> STARTING: Stageの1問目でEnter
+    STARTING --> ANSWERING: 3・2・1の後にStart API成功
     ANSWERING --> SUBMITTING: 回答確定 / TIME UP
     SUBMITTING --> RESULT: API成功
-    RESULT --> WAITING_TO_START: 次の問題
+    RESULT --> STARTING: 結果を2秒表示後、次の問題を自動開始
+    RESULT --> STAGE_RESULT: 5問目の結果を2秒表示後
 ```
+
+3・2・1の表示はStageの1問目の前だけです。回答結果を2秒表示した後、2～5問目は開始Enterなしで次へ進みます。5問目の結果を表示した後はStage Resultへ移り、次Stageがある場合は画面のボタンで開始します。複数選択問題では選択肢を選んだ後のEnterで回答を確定します。
 
 `SUBMITTING`中は、選択肢・Enter・A～Gキーなどの入力をすべてロックします。これにより、連打や二重送信を防ぎます。
 
@@ -1685,22 +1691,25 @@ Review APIはGameSessionが`COMPLETED`になった後だけ利用できます。
 
 ```text
 WAITING_TO_START
-    ↓ Enter
-POST /api/stage-questions/{stageQuestionId}/start
-    ↓ 200 OK
+    ↓ Stageの1問目でEnter
+STARTING（3・2・1を表示）
+    ↓ Start API成功
 ANSWERING
     ↓ 回答キー / Enter / TIME UP
 SUBMITTING
     ↓ POST /api/answers
 RESULT
-    ↓ 次の問題
-WAITING_TO_START
+    ↓ 2秒後に次問を自動開始
+STARTING（2～5問目はカウントダウンなし）
+    ↓ 5問目の結果を2秒表示
+STAGE_RESULT
 ```
 
-- `WAITING_TO_START`：問題は表示済みだがTimerは開始しない
+- `WAITING_TO_START`：Stageの1問目を表示済み。Enterを待っている
+- `STARTING`：Stageの1問目はカウントダウン中。2～5問目は次の問題のStart APIを呼び出し中
 - `ANSWERING`：Timer表示中。単一選択はキー入力で送信、複数選択はEnterで送信
 - `SUBMITTING`：送信中。A～G・Enter・送信操作をすべてロック
-- `RESULT`：回答結果とGameEffectを表示し、次問題またはStage Resultへ進む
+- `RESULT`：回答結果を2秒表示し、自動で次問題またはStage Resultへ進む
 
 正誤・時間・HP・Combo・Score・Stage Clear・PerfectはJava側が正です。JavaScriptは入力・表示・Timer表示・演出だけを担当します。
 
@@ -2022,7 +2031,9 @@ Stage 1をプレイ
 Stage Result
 ↓
 残りStageあり？
- ├─ Yes → POST /api/game-sessions/{id}/advance-stage
+ ├─ Yes → 学習者が「次のStageへ進む」ボタンを押す
+ │         ↓
+ │       POST /api/game-sessions/{id}/advance-stage
  │         ↓
  │       次StageSession作成
  │       StageQuestionを5件作成
@@ -2677,6 +2688,9 @@ AIを活用：問題案、解説案、エラー原因調査、設計確認、コ
 - 15問：3 Stage完了
 - 20問：4 Stage完了
 - Stage 1から順番に進み、Stage Resultのボタンで次のStageを開始する
+- Stageの1問目だけEnter後に3・2・1を表示する
+- 回答結果を2秒表示後、次の問題が自動で始まる
+- 5問目の後にStage Resultを表示し、次Stageはボタンを押した場合だけ始まる
 
 ### APIテスト
 
