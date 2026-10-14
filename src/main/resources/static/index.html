@@ -40,6 +40,7 @@
 					<option value="20">20問</option>
 				</select>
 			</div>
+			<button class="secondary-button" id="resume-saved-button" type="button" hidden>保存したゲームを再開</button>
 			<button class="primary-button" id="start-button" type="button" disabled>
 				5問のゲームを始める
 			</button>
@@ -56,6 +57,7 @@
 				<span id="enemy-status">敵HP 5</span>
 				<span id="combo-status">Combo 0</span>
 				<span id="timer-status" role="timer">開始前</span>
+				<button class="secondary-button" id="pause-button" type="button" hidden>一時停止</button>
 			</div>
 			<div class="question-heading">
 				<p class="eyebrow" id="question-type">問題</p>
@@ -91,6 +93,14 @@
 			<p id="stage-result-combo"></p>
 			<button class="primary-button" id="next-stage-button" type="button" hidden>次のStageへ進む</button>
 			<button class="primary-button" id="finish-game-button" type="button" hidden>Game Resultを見る</button>
+		</section>
+
+		<section class="panel result-panel" id="pause-panel" hidden aria-labelledby="pause-title">
+			<p class="eyebrow">PAUSE</p>
+			<h2 id="pause-title">一時停止中</h2>
+			<p>時間は止まっています。続きから再開するか、ゲームを終了できます。</p>
+			<button class="primary-button" id="resume-button" type="button">ゲームを再開</button>
+			<button class="secondary-button" id="abandon-button" type="button">タイトルへ戻る</button>
 		</section>
 
 		<section class="panel result-panel" id="game-result-panel" hidden aria-labelledby="game-result-title">

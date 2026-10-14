@@ -1,5 +1,6 @@
 package com.example.graduation_java_game;
 
+import java.time.Duration;
 import java.time.Instant;
 
 import jakarta.persistence.Column;
@@ -148,5 +149,22 @@ public class StageQuestion {
 	/** 問題の一時停止時間の合計をミリ秒で返します。 */
 	public long getTotalPausedMs() {
 		return totalPausedMs;
+	}
+
+	public void pause(Instant pauseTime) {
+		if (pauseTime == null || startedAt == null || answeredAt != null || pausedAt != null) {
+			throw new IllegalStateException("回答中の問題だけ一時停止できます。");
+		}
+		pausedAt = pauseTime;
+	}
+
+	public long resume(Instant resumeTime) {
+		if (resumeTime == null || pausedAt == null || answeredAt != null) {
+			throw new IllegalStateException("一時停止中の問題だけ再開できます。");
+		}
+		long pausedDurationMs = Math.max(0, Duration.between(pausedAt, resumeTime).toMillis());
+		totalPausedMs += pausedDurationMs;
+		pausedAt = null;
+		return pausedDurationMs;
 	}
 }

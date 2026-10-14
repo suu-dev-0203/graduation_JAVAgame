@@ -78,4 +78,8 @@ public class AnswerHistory {
 	public boolean isTimeout() {
 		return timeout;
 	}
+
+	public long getAnswerTimeMs() {
+		return answerTimeMs;
+	}
 }

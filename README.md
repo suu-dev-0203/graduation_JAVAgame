@@ -1328,19 +1328,21 @@ POST /api/answers
 POST /api/stage-sessions/{stageSessionId}/pause
 POST /api/stage-sessions/{stageSessionId}/resume
 POST /api/game-sessions/{gameSessionId}/advance-stage
+POST /api/game-sessions/{gameSessionId}/abandon
 GET  /api/game-sessions/{gameSessionId}/stages/{stageNumber}/result
 GET  /api/game-sessions/{gameSessionId}/result
 GET  /api/game-sessions/{gameSessionId}/review
 ```
 
-補助APIとして、Chapter一覧取得とHome終了時のABANDONED処理を実装できます。これらは上記の「主ゲームAPI」には含めません。
+補助APIとしてChapter一覧取得があります。
 
 ```text
-GET  /api/chapters
-POST /api/game-sessions/{gameSessionId}/abandon
+GET /api/chapters
 ```
 
 `/abandon`はHome終了時にのみ使用し、再開対象にはしません。
+
+PauseとResumeは、回答中の問題があるStageSessionに対して実行します。両APIは更新後の`CurrentGameResponse`を返し、ResumeではJava側がPause時間を差し引いた最新の`remainingTimeMs`を返します。`/abandon`は進行中または一時停止中のゲームだけを`ABANDONED`にし、保存済みのAnswerHistoryは削除しません。
 
 ### APIで使うIDのルール
 
@@ -1433,6 +1435,8 @@ Response：
   "score": 0,
   "gameSessionStatus": "PLAYING",
   "stageSessionStatus": "PLAYING",
+  "answerResult": null,
+  "answerResult": null,
   "question": {
     "questionId": 501,
     "questionType": "SINGLE_A_E",
@@ -1451,6 +1455,8 @@ Response：
   "miniGameType": "CODE_TARGET"
 }
 ```
+
+現在の問題がすでに回答済みの場合は、`answerResult`にも保存済みの回答判定を含めます。Refresh後も回答を再送せず、正誤やStage Clear状態を画面に戻すために使用します。
 
 `Choice.correct`はクライアントへ返しません。
 

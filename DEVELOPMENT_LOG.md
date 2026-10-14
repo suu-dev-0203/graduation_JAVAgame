@@ -762,3 +762,19 @@ READMEのAPI一覧にStage Result APIを加え、Game ResultとStage Resultの�
 ### 3. 動作確認
 
 Javaのテストを28件実行し、すべて成功した。Stageを完了する前はStage／Gameの結果を取得できないこと、5問すべて正解したときにStage Resultが正解5問・500点・最大Combo 5・Perfectとなること、Game Resultが完了Stage 1・正解5問・合計500点・Perfect Stage 1回を返すことをAPIテストで確認した。ブラウザーでもStage Result、Game Result、次Stage／タイトルへの移動を確認する。
+
+## STEP 16：一時停止・再開・中断と再読み込み復元を追加する
+
+### 1. 何を作ったか
+
+回答中に「一時停止」を押すと、専用のPause画面へ移るようにした。Pause中は回答を受け付けず、Timerも止まる。「ゲームを再開」を押すと同じ問題に戻り、Pauseしていた時間を除いて残り時間を続ける。「タイトルへ戻る」を選んだ場合は確認を表示し、終了を確定するとゲームと現在Stageを`ABANDONED`として記録する。すでに保存した回答履歴は消さない。
+
+ゲームを開始するとGameSessionのIDだけをブラウザーに記録する。ページを再読み込みしたときは、そのIDでサーバーから現在の問題と状態を取得し、続けるかどうかを確認する。問題・得点・残り時間などの進行状況そのものは、ブラウザー内に保存した値ではなくサーバーの記録を使って復元する。回答済みの問題は回答を再送せず、保存済みの正誤結果を表示する。
+
+### 2. APIと状態の確認
+
+READMEに定めたPause／Resume APIと、Homeへ戻るときに使う`/abandon` APIを接続した。Pause時にはGameSession・StageSession・回答中のStageQuestionへ同じ時刻を記録し、Resume時には経過したPause時間を両方の記録へ加算する。ゲームとStageの状態が一致しない場合や、問題開始前・回答後にPauseしようとした場合は、APIがエラーを返す。
+
+### 3. 動作確認
+
+Javaのテストは30件すべて成功した。開始前のPause拒否、Pause中に残り時間が変わらないこと、同じ問題からResumeできること、GameSessionとStageSessionの状態がそろって更新されること、終了後の再Resume拒否をAPIテストで確認した。ブラウザーでも、回答中にPause画面へ移ること、ページ再読み込み後に再開確認が出ること、Pauseした問題から再開すること、終了確認後にタイトルへ戻ることを確認した。

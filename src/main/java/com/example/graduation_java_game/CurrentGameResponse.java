@@ -44,7 +44,8 @@ public record CurrentGameResponse(
 		String playerCharacterKey,
 		String enemyKey,
 		String fieldKey,
-		MiniGameType miniGameType) {
+		MiniGameType miniGameType,
+		AnswerResponse answerResult) {
 
 	/**
 	 * 画面表示に必要な問題データです。正解情報は意図的に含めません。

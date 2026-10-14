@@ -3,15 +3,20 @@ const selectionModeSelect = document.querySelector("#selection-mode");
 const questionCountSelect = document.querySelector("#question-count");
 const startButton = document.querySelector("#start-button");
 const startPanel = document.querySelector(".start-panel");
+const resumeSavedButton = document.querySelector("#resume-saved-button");
 const startQuestionButton = document.querySelector("#start-question-button");
 const nextQuestionButton = document.querySelector("#next-question-button");
 const nextStageButton = document.querySelector("#next-stage-button");
 const finishGameButton = document.querySelector("#finish-game-button");
 const returnHomeButton = document.querySelector("#return-home-button");
+const pauseButton = document.querySelector("#pause-button");
+const resumeButton = document.querySelector("#resume-button");
+const abandonButton = document.querySelector("#abandon-button");
 const message = document.querySelector("#message");
 const gamePanel = document.querySelector("#game-panel");
 const stageResultPanel = document.querySelector("#stage-result-panel");
 const gameResultPanel = document.querySelector("#game-result-panel");
+const pausePanel = document.querySelector("#pause-panel");
 const choicesElement = document.querySelector("#choices");
 const answerResult = document.querySelector("#answer-result");
 const answerResultTitle = document.querySelector("#answer-result-title");
@@ -63,6 +68,7 @@ async function loadChapters() {
 		startButton.disabled = false;
 		message.textContent = "学習テーマを選んでゲームを始めてください。";
 		updateQuestionCountOptions();
+		await restoreSavedGame();
 	} catch (error) {
 		showError(error);
 	}
@@ -88,6 +94,7 @@ async function startGame() {
 			})
 		});
 		gameSessionId = game.gameSessionId;
+		localStorage.setItem("gameSessionId", String(gameSessionId));
 		const current = await getCurrentGame();
 		showQuestion(current);
 		message.textContent = "問題を読み込みました。Enterで問題を開始してください。";
@@ -154,8 +161,19 @@ function showQuestion(current) {
 	gamePanel.hidden = false;
 	updateChoiceControls();
 
-	if (questionState === "ANSWERING" && current.remainingTimeMs != null) {
+	pauseButton.hidden = questionState !== "ANSWERING"
+			|| current.gameSessionStatus !== "PLAYING"
+			|| current.stageSessionStatus !== "PLAYING";
+	if (questionState === "ANSWERING"
+			&& current.gameSessionStatus === "PLAYING"
+			&& current.stageSessionStatus === "PLAYING"
+			&& current.remainingTimeMs != null) {
 		startTimer(current.remainingTimeMs);
+	} else if (current.gameSessionStatus === "PAUSED") {
+		timerStatus.textContent = "一時停止中";
+	}
+	if (questionState === "RESULT" && current.answerResult) {
+		showAnswerResult(current.answerResult);
 	}
 }
 
@@ -177,6 +195,7 @@ async function startCurrentQuestion() {
 		);
 		questionState = "ANSWERING";
 		startQuestionButton.hidden = true;
+		pauseButton.hidden = false;
 		message.textContent = "回答してください。";
 		startTimer(started.remainingTimeMs);
 		updateChoiceControls();
@@ -313,6 +332,7 @@ function showAnswerResult(result) {
 	answerResult.hidden = false;
 	document.querySelector(".explanation").hidden = true;
 	startQuestionButton.hidden = true;
+	pauseButton.hidden = true;
 
 	if (result.stageClear) {
 		answerResultTitle.textContent = result.perfect ? "PERFECT！ Stage Clear" : "Stage Clear";
@@ -411,14 +431,146 @@ async function startNextStage() {
 
 function returnToHome() {
 	gameSessionId = null;
+	localStorage.removeItem("gameSessionId");
 	currentGame = null;
 	questionState = "WAITING_TO_START";
 	gameResultPanel.hidden = true;
 	stageResultPanel.hidden = true;
+	pausePanel.hidden = true;
 	gamePanel.hidden = true;
 	startPanel.hidden = false;
 	message.textContent = "学習テーマを選んでゲームを始めてください。";
 	startPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function pauseCurrentGame() {
+	if (questionState !== "ANSWERING" || !currentGame) {
+		return;
+	}
+	pauseButton.disabled = true;
+	try {
+		await requestJson(
+			`/api/stage-sessions/${currentGame.stageSessionId}/pause`,
+			{ method: "POST" }
+		);
+		stopTimer();
+		gamePanel.hidden = true;
+		pausePanel.hidden = false;
+		pausePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+		message.textContent = "ゲームを一時停止しました。";
+	} catch (error) {
+		showError(error);
+	} finally {
+		pauseButton.disabled = false;
+	}
+}
+
+async function resumeCurrentGame() {
+	if (!currentGame) {
+		return;
+	}
+	resumeButton.disabled = true;
+	try {
+		const current = await requestJson(
+			`/api/stage-sessions/${currentGame.stageSessionId}/resume`,
+			{ method: "POST" }
+		);
+		pausePanel.hidden = true;
+		showQuestion(current);
+		message.textContent = current.questionState === "ANSWERING"
+			? "ゲームを再開しました。残り時間は一時停止前の続きから進みます。"
+			: "ゲームを再開しました。";
+		gamePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+		if (current.stageSessionStatus === "CLEARED") {
+			await showStageResult();
+		}
+	} catch (error) {
+		showError(error);
+	} finally {
+		resumeButton.disabled = false;
+	}
+}
+
+async function abandonCurrentGame(confirmBeforeEnd = true) {
+	if (!gameSessionId
+			|| (confirmBeforeEnd
+				&& !window.confirm("セーブされませんがゲームを終了しますか？"))) {
+		return;
+	}
+	abandonButton.disabled = true;
+	try {
+		await requestJson(
+			`/api/game-sessions/${gameSessionId}/abandon`,
+			{ method: "POST" }
+		);
+		returnToHome();
+		message.textContent = "ゲームを終了しました。保存済みの回答履歴は残っています。";
+	} catch (error) {
+		showError(error);
+	} finally {
+		abandonButton.disabled = false;
+	}
+}
+
+async function restoreSavedGame(forceResume = false) {
+	const savedGameSessionId = localStorage.getItem("gameSessionId");
+	if (!savedGameSessionId) {
+		return;
+	}
+	if (!forceResume && !window.confirm("続きから再開しますか？")) {
+		if (window.confirm("セーブされませんがゲームを終了しますか？")) {
+			gameSessionId = Number(savedGameSessionId);
+			await abandonCurrentGame(false);
+			return;
+		}
+		resumeSavedButton.hidden = false;
+		startButton.disabled = true;
+		chapterSelect.disabled = true;
+		selectionModeSelect.disabled = true;
+		questionCountSelect.disabled = true;
+		message.textContent = "保存したゲームがあります。再開ボタンから続きを遊べます。";
+		return;
+	}
+
+	gameSessionId = Number(savedGameSessionId);
+	try {
+		const current = await getCurrentGame();
+		if (current.gameSessionStatus === "COMPLETED"
+				|| current.gameSessionStatus === "ABANDONED") {
+			localStorage.removeItem("gameSessionId");
+			gameSessionId = null;
+			message.textContent = "前回のゲームは終了しています。新しいゲームを始めてください。";
+			return;
+		}
+		const playing = current.gameSessionStatus === "PLAYING"
+				&& current.stageSessionStatus === "PLAYING";
+		const paused = current.gameSessionStatus === "PAUSED"
+				&& current.stageSessionStatus === "PAUSED";
+		const cleared = current.gameSessionStatus === "PLAYING"
+				&& current.stageSessionStatus === "CLEARED";
+		if (!playing && !paused && !cleared) {
+			throw new Error("ゲームとStageの状態が一致しないため、安全に再開できません。");
+		}
+
+		resumeSavedButton.hidden = true;
+		startPanel.hidden = true;
+		showQuestion(current);
+		if (paused) {
+			gamePanel.hidden = true;
+			pausePanel.hidden = false;
+			pausePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+			message.textContent = "一時停止した状態から再開できます。";
+		} else if (cleared) {
+			await showStageResult();
+		} else {
+			gamePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+			message.textContent = current.questionState === "ANSWERING"
+				? "サーバーに保存された残り時間からゲームを再開しました。"
+				: "ゲームの続きです。Enterで問題を開始してください。";
+		}
+	} catch (error) {
+		showError(error);
+	}
 }
 
 function difficultyLabel(difficulty) {
@@ -449,6 +601,10 @@ startButton.addEventListener("click", startGame);
 selectionModeSelect.addEventListener("change", updateQuestionCountOptions);
 questionCountSelect.addEventListener("change", updateQuestionCountOptions);
 startQuestionButton.addEventListener("click", startCurrentQuestion);
+pauseButton.addEventListener("click", pauseCurrentGame);
+resumeButton.addEventListener("click", resumeCurrentGame);
+abandonButton.addEventListener("click", abandonCurrentGame);
+resumeSavedButton.addEventListener("click", () => restoreSavedGame(true));
 nextQuestionButton.addEventListener("click", showNextQuestion);
 nextStageButton.addEventListener("click", startNextStage);
 finishGameButton.addEventListener("click", showGameResult);
@@ -463,6 +619,9 @@ choicesElement.addEventListener("click", (event) => {
 	}
 });
 document.addEventListener("keydown", (event) => {
+	if (!pausePanel.hidden) {
+		return;
+	}
 	if (event.key === "Enter") {
 		if (questionState === "WAITING_TO_START") {
 			event.preventDefault();

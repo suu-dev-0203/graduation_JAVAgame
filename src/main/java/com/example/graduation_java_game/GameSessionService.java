@@ -231,6 +231,106 @@ public class GameSessionService {
 				gameSession.getStatus());
 	}
 
+	@Transactional
+	public CurrentGameResponse pause(Long stageSessionId) {
+		StageSession stageSession = stageSessionRepository.findById(stageSessionId)
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.NOT_FOUND,
+						"NOT_FOUND",
+						"指定されたStageSessionが見つかりません。"));
+		GameSession gameSession = stageSession.getGameSession();
+		StageQuestion currentQuestion = stageQuestionRepository
+				.findByStageSession_StageSessionIdAndQuestionOrder(
+						stageSessionId, stageSession.getCurrentQuestionIndex())
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.CONFLICT,
+						"INVALID_GAME_STATE",
+						"現在の問題が見つかりません。"));
+		if (gameSession.getStatus() != GameSessionStatus.PLAYING
+				|| stageSession.getStatus() != StageSessionStatus.PLAYING
+				|| currentQuestion.getStartedAt() == null
+				|| currentQuestion.getAnsweredAt() != null
+				|| currentQuestion.getPausedAt() != null) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"INVALID_GAME_STATE",
+					"回答中の問題だけ一時停止できます。");
+		}
+
+		Instant pausedAt = Instant.now();
+		gameSession.pause();
+		stageSession.pause(pausedAt);
+		currentQuestion.pause(pausedAt);
+		return findCurrent(gameSession.getGameSessionId());
+	}
+
+	@Transactional
+	public CurrentGameResponse resume(Long stageSessionId) {
+		StageSession stageSession = stageSessionRepository.findById(stageSessionId)
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.NOT_FOUND,
+						"NOT_FOUND",
+						"指定されたStageSessionが見つかりません。"));
+		GameSession gameSession = stageSession.getGameSession();
+		StageQuestion currentQuestion = stageQuestionRepository
+				.findByStageSession_StageSessionIdAndQuestionOrder(
+						stageSessionId, stageSession.getCurrentQuestionIndex())
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.CONFLICT,
+						"INVALID_GAME_STATE",
+						"現在の問題が見つかりません。"));
+		if (gameSession.getStatus() != GameSessionStatus.PAUSED
+				|| stageSession.getStatus() != StageSessionStatus.PAUSED
+				|| stageSession.getPausedAt() == null
+				|| !stageSession.getPausedAt().equals(currentQuestion.getPausedAt())) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"INVALID_GAME_STATE",
+					"Pause中のゲームと問題だけ再開できます。");
+		}
+
+		Instant resumedAt = Instant.now();
+		gameSession.resume();
+		stageSession.resume(resumedAt);
+		currentQuestion.resume(resumedAt);
+		return findCurrent(gameSession.getGameSessionId());
+	}
+
+	@Transactional
+	public GameSessionStatusResponse abandon(Long gameSessionId) {
+		GameSession gameSession = gameSessionRepository.findById(gameSessionId)
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.NOT_FOUND,
+						"NOT_FOUND",
+						"指定されたGameSessionが見つかりません。"));
+		StageSession stageSession = stageSessionRepository
+				.findByGameSession_GameSessionId(gameSessionId)
+				.stream()
+				.filter(candidate -> candidate.getStageDefinition().getStageNumber()
+						== gameSession.getCurrentStageNumber())
+				.findFirst()
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.CONFLICT,
+						"INVALID_GAME_STATE",
+						"現在のStage進行記録が見つかりません。"));
+		if ((gameSession.getStatus() != GameSessionStatus.PLAYING
+						&& gameSession.getStatus() != GameSessionStatus.PAUSED)
+				|| (stageSession.getStatus() != StageSessionStatus.PLAYING
+						&& stageSession.getStatus() != StageSessionStatus.PAUSED)
+				|| (gameSession.getStatus() == GameSessionStatus.PAUSED)
+						!= (stageSession.getStatus() == StageSessionStatus.PAUSED)) {
+			throw new GameApiException(
+					HttpStatus.CONFLICT,
+					"INVALID_GAME_STATE",
+					"進行中または一時停止中のゲームだけ終了できます。");
+		}
+
+		Instant abandonedAt = Instant.now();
+		gameSession.abandon(abandonedAt);
+		stageSession.abandon(abandonedAt);
+		return new GameSessionStatusResponse(gameSession.getStatus());
+	}
+
 	/**
 	 * ゲームIDから現在のStageと問題を探し、画面向けのデータにして返します。
 	 * Choice.correctは回答の正誤を決める情報なので、画面用DTOへ移しません。
@@ -264,6 +364,9 @@ public class GameSessionService {
 						"現在の問題が見つかりません。"));
 
 		Question question = stageQuestion.getQuestion();
+		AnswerResponse answerResult = stageQuestion.getAnsweredAt() == null
+				? null
+				: findAnswerResult(stageQuestion, stageSession, gameSession);
 		List<CurrentGameResponse.ChoiceResponse> choices = choiceRepository
 				.findByQuestion_QuestionIdOrderByChoiceOrder(question.getQuestionId())
 				.stream()
@@ -305,7 +408,54 @@ public class GameSessionService {
 				stageSession.getStageDefinition().getPlayerCharacterKey(),
 				stageSession.getStageDefinition().getEnemyKey(),
 				stageSession.getStageDefinition().getFieldKey(),
-				stageSession.getStageDefinition().getMiniGameType());
+				stageSession.getStageDefinition().getMiniGameType(),
+				answerResult);
+	}
+
+	private AnswerResponse findAnswerResult(
+			StageQuestion stageQuestion,
+			StageSession stageSession,
+			GameSession gameSession) {
+		AnswerHistory history = answerHistoryRepository
+				.findByStageQuestion_StageQuestionId(stageQuestion.getStageQuestionId())
+				.orElseThrow(() -> new GameApiException(
+						HttpStatus.CONFLICT,
+						"INVALID_GAME_STATE",
+						"回答済み問題の履歴が見つかりません。"));
+		int maxCombo = 0;
+		int currentCombo = 0;
+		for (AnswerHistory stageHistory : answerHistoryRepository
+				.findByStageSession_StageSessionIdOrderByStageQuestion_QuestionOrder(
+						stageSession.getStageSessionId())) {
+			currentCombo = stageHistory.isCorrect() ? currentCombo + 1 : 0;
+			maxCombo = Math.max(maxCombo, currentCombo);
+		}
+		boolean stageClear = stageSession.getStatus() == StageSessionStatus.CLEARED;
+		boolean perfect = stageClear && stageSession.getCorrectCount() == 5;
+		String effectType = perfect
+				? "PERFECT"
+				: history.isTimeout() ? "TIME_UP" : history.isCorrect() ? "HIT" : "MISS";
+		Long nextStageQuestionId = stageClear
+				? null
+				: stageQuestionRepository
+						.findByStageSession_StageSessionIdAndQuestionOrder(
+								stageSession.getStageSessionId(),
+								stageQuestion.getQuestionOrder() + 1)
+						.map(StageQuestion::getStageQuestionId)
+						.orElse(null);
+		return new AnswerResponse(
+				history.isCorrect(),
+				history.isTimeout(),
+				stageSession.getEnemyHp(),
+				stageSession.getCombo(),
+				gameSession.getScore(),
+				effectType,
+				stageSession.getCorrectCount(),
+				stageSession.getCorrectCount() * 100,
+				maxCombo,
+				stageClear,
+				perfect,
+				nextStageQuestionId);
 	}
 
 	/**

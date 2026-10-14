@@ -1,5 +1,6 @@
 package com.example.graduation_java_game;
 
+import java.time.Duration;
 import java.time.Instant;
 
 import jakarta.persistence.Column;
@@ -187,5 +188,34 @@ public class StageSession {
 		} else {
 			currentQuestionIndex++;
 		}
+	}
+
+	public void pause(Instant pauseTime) {
+		if (pauseTime == null || status != StageSessionStatus.PLAYING) {
+			throw new IllegalStateException("プレイ中のStageだけ一時停止できます。");
+		}
+		pausedAt = pauseTime;
+		status = StageSessionStatus.PAUSED;
+	}
+
+	public long resume(Instant resumeTime) {
+		if (resumeTime == null || status != StageSessionStatus.PAUSED || pausedAt == null) {
+			throw new IllegalStateException("一時停止中のStageだけ再開できます。");
+		}
+		long pausedDurationMs = Math.max(0, Duration.between(pausedAt, resumeTime).toMillis());
+		totalPausedMs += pausedDurationMs;
+		pausedAt = null;
+		status = StageSessionStatus.PLAYING;
+		return pausedDurationMs;
+	}
+
+	public void abandon(Instant abandonedAt) {
+		if (abandonedAt == null
+				|| (status != StageSessionStatus.PLAYING && status != StageSessionStatus.PAUSED)) {
+			throw new IllegalStateException("進行中のStageだけ終了できます。");
+		}
+		endedAt = abandonedAt;
+		pausedAt = null;
+		status = StageSessionStatus.ABANDONED;
 	}
 }

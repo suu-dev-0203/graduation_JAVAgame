@@ -106,6 +106,26 @@ summary:focus-visible {
 	cursor: pointer;
 }
 
+.secondary-button {
+	min-height: 48px;
+	padding: 10px 18px;
+	border: 1px solid #cbd3e4;
+	border-radius: 10px;
+	background: #fff;
+	color: #33449f;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.secondary-button:hover:not(:disabled) {
+	background: #f0f2ff;
+}
+
+.secondary-button:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
 .primary-button:hover:not(:disabled) {
 	background: #33449f;
 }

@@ -860,6 +860,62 @@ class GraduationJavaGameApplicationTests {
 				.andExpect(jsonPath("$.totalScore").value(500))
 				.andExpect(jsonPath("$.perfectStageCount").value(1))
 				.andExpect(jsonPath("$.status").value("COMPLETED"));
+		CurrentGameResponse completedQuestion =
+				gameSessionService.findCurrent(startedGame.gameSessionId());
+		assertTrue(completedQuestion.answerResult().correct());
+		assertTrue(completedQuestion.answerResult().stageClear());
+	}
+
+	/** Pause中は時間を止め、Resume後も同じ問題から続き、終了状態を保存します。 */
+	@Test
+	@Transactional
+	void pauseResumeAndAbandonKeepServerSessionStateConsistent() throws Exception {
+		Chapter chapter = createChapterWithQuestions(5);
+		createStageDefinition(chapter, 1);
+		createChoicesForQuestions(chapter);
+		GameSessionCreateResponse startedGame = gameSessionService.create(
+				new GameSessionCreateRequest(chapter.getChapterId(), 5));
+		CurrentGameResponse current = gameSessionService.findCurrent(startedGame.gameSessionId());
+
+		mockMvc.perform(post(
+				"/api/stage-sessions/{stageSessionId}/pause", current.stageSessionId()))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
+		mockMvc.perform(post("/api/stage-questions/{id}/start", current.stageQuestionId()))
+				.andExpect(status().isOk());
+		mockMvc.perform(post(
+				"/api/stage-sessions/{stageSessionId}/pause", current.stageSessionId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.gameSessionStatus").value("PAUSED"))
+				.andExpect(jsonPath("$.stageSessionStatus").value("PAUSED"))
+				.andExpect(jsonPath("$.questionState").value("ANSWERING"));
+
+		CurrentGameResponse paused = gameSessionService.findCurrent(startedGame.gameSessionId());
+		Thread.sleep(30);
+		assertEquals(
+				paused.remainingTimeMs(),
+				gameSessionService.findCurrent(startedGame.gameSessionId()).remainingTimeMs());
+		mockMvc.perform(post(
+				"/api/stage-sessions/{stageSessionId}/resume", current.stageSessionId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.gameSessionStatus").value("PLAYING"))
+				.andExpect(jsonPath("$.stageSessionStatus").value("PLAYING"))
+				.andExpect(jsonPath("$.stageQuestionId").value(current.stageQuestionId()));
+
+		mockMvc.perform(post(
+				"/api/game-sessions/{gameSessionId}/abandon", startedGame.gameSessionId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("ABANDONED"));
+		assertEquals(
+				StageSessionStatus.ABANDONED,
+				stageSessionRepository.findById(current.stageSessionId()).orElseThrow().getStatus());
+		assertEquals(
+				GameSessionStatus.ABANDONED,
+				gameSessionRepository.findById(startedGame.gameSessionId()).orElseThrow().getStatus());
+		mockMvc.perform(post(
+				"/api/stage-sessions/{stageSessionId}/resume", current.stageSessionId()))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("INVALID_GAME_STATE"));
 	}
 
 	/** 存在しないゲームIDで現在状態を要求した場合、404を返すことを確認します。 */

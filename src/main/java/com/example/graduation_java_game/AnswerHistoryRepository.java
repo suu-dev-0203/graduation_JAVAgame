@@ -1,6 +1,7 @@
 package com.example.graduation_java_game;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -10,6 +11,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface AnswerHistoryRepository extends JpaRepository<AnswerHistory, Long> {
 
 	boolean existsByStageQuestion_StageQuestionId(Long stageQuestionId);
+
+	Optional<AnswerHistory> findByStageQuestion_StageQuestionId(Long stageQuestionId);
 
 	List<AnswerHistory> findByStageSession_StageSessionIdOrderByStageQuestion_QuestionOrder(
 			Long stageSessionId);

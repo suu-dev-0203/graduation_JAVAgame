@@ -55,6 +55,14 @@ public class GameSessionController {
 	}
 
 	/**
+	 * 一時停止中のゲームをABANDONEDとして終了します。
+	 */
+	@PostMapping("/{gameSessionId}/abandon")
+	public GameSessionStatusResponse abandon(@PathVariable Long gameSessionId) {
+		return gameSessionService.abandon(gameSessionId);
+	}
+
+	/**
 	 * Stage Clear後、次のStageが残っているゲームを進めます。
 	 */
 	@PostMapping("/{gameSessionId}/advance-stage")

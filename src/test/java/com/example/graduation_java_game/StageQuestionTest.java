@@ -38,4 +38,21 @@ class StageQuestionTest {
 		assertThrows(IllegalArgumentException.class, () -> stageQuestion.start(null));
 		assertNull(stageQuestion.getStartedAt());
 	}
+
+	/** Pause中の時間を記録し、Resume後の累積Pause時間に加えることを確認します。 */
+	@Test
+	void resumeAddsPausedDurationWithoutResettingQuestionStart() {
+		StageQuestion stageQuestion = new StageQuestion(null, null, 1);
+		Instant startedAt = Instant.parse("2026-10-13T01:00:00Z");
+		Instant pausedAt = startedAt.plusSeconds(5);
+		Instant resumedAt = pausedAt.plusSeconds(15);
+
+		assertTrue(stageQuestion.start(startedAt));
+		stageQuestion.pause(pausedAt);
+		assertEquals(pausedAt, stageQuestion.getPausedAt());
+		assertEquals(15_000, stageQuestion.resume(resumedAt));
+		assertNull(stageQuestion.getPausedAt());
+		assertEquals(15_000, stageQuestion.getTotalPausedMs());
+		assertEquals(startedAt, stageQuestion.getStartedAt());
+	}
 }

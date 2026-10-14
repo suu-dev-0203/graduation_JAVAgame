@@ -189,4 +189,29 @@ public class GameSession {
 		status = GameSessionStatus.COMPLETED;
 		endedAt = completedAt;
 	}
+
+	public void pause() {
+		if (status != GameSessionStatus.PLAYING) {
+			throw new IllegalStateException("プレイ中のゲームだけ一時停止できます。");
+		}
+		status = GameSessionStatus.PAUSED;
+	}
+
+	public void resume() {
+		if (status != GameSessionStatus.PAUSED) {
+			throw new IllegalStateException("一時停止中のゲームだけ再開できます。");
+		}
+		status = GameSessionStatus.PLAYING;
+	}
+
+	public void abandon(Instant abandonedAt) {
+		if (abandonedAt == null) {
+			throw new IllegalArgumentException("ゲーム終了時刻は必須です。");
+		}
+		if (status != GameSessionStatus.PLAYING && status != GameSessionStatus.PAUSED) {
+			throw new IllegalStateException("進行中のゲームだけ終了できます。");
+		}
+		status = GameSessionStatus.ABANDONED;
+		endedAt = abandonedAt;
+	}
 }
