@@ -139,6 +139,7 @@ function showQuestion(current) {
 	answerResult.hidden = true;
 	nextQuestionButton.hidden = true;
 	startQuestionButton.hidden = questionState !== "WAITING_TO_START";
+	startQuestionButton.disabled = questionState !== "WAITING_TO_START";
 	timerStatus.textContent = "開始前";
 	gamePanel.hidden = false;
 	updateChoiceControls();
