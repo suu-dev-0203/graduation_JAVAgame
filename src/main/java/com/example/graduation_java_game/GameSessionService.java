@@ -3,11 +3,7 @@ package com.example.graduation_java_game;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -27,7 +23,8 @@ import com.example.graduation_java_game.GameApiDtos.StageResultResponse;
 import com.example.graduation_java_game.GameApiDtos.StartStageQuestionResponse;
 
 /**
- * ゲーム開始時に必要なデータを確認し、最初のGameSessionとStageSessionを作ります。
+ * ゲームの開始、Stage進行、一時停止、結果の取得を担当します。
+ * 問題の候補を集めて並べる処理は、GameQuestionSelectorに依頼します。
  */
 @Service
 public class GameSessionService {
@@ -36,7 +33,7 @@ public class GameSessionService {
 	private static final List<Integer> ALLOWED_QUESTION_COUNTS = List.of(5, 10, 15, 20);
 
 	private final ChapterRepository chapterRepository;
-	private final QuestionRepository questionRepository;
+	private final GameQuestionSelector gameQuestionSelector;
 	private final ChoiceRepository choiceRepository;
 	private final StageDefinitionRepository stageDefinitionRepository;
 	private final GameSessionRepository gameSessionRepository;
@@ -49,7 +46,7 @@ public class GameSessionService {
 
 	public GameSessionService(
 			ChapterRepository chapterRepository,
-			QuestionRepository questionRepository,
+			GameQuestionSelector gameQuestionSelector,
 			ChoiceRepository choiceRepository,
 			StageDefinitionRepository stageDefinitionRepository,
 			GameSessionRepository gameSessionRepository,
@@ -60,7 +57,7 @@ public class GameSessionService {
 			QuestionMasteryRepository questionMasteryRepository,
 			LearningProgressService learningProgressService) {
 		this.chapterRepository = chapterRepository;
-		this.questionRepository = questionRepository;
+		this.gameQuestionSelector = gameQuestionSelector;
 		this.choiceRepository = choiceRepository;
 		this.stageDefinitionRepository = stageDefinitionRepository;
 		this.gameSessionRepository = gameSessionRepository;
@@ -71,6 +68,8 @@ public class GameSessionService {
 		this.questionMasteryRepository = questionMasteryRepository;
 		this.learningProgressService = learningProgressService;
 	}
+
+	// --- ゲーム開始 ---
 
 	/**
 	 * 入力内容と必要な問題・Stage設定を確認したうえでゲームを開始します。
@@ -116,16 +115,18 @@ public class GameSessionService {
 						"NO_WEAK_QUESTIONS",
 						"この学習テーマには苦手・超苦手に分類された問題がありません。");
 			}
-			chapterQuestions = selectWeakTrainingQuestionsForStage(weakQuestions, List.of());
+			chapterQuestions = gameQuestionSelector.selectWeakTrainingQuestionsForStage(
+					weakQuestions, List.of());
 		} else {
-			List<Question> availableQuestions = findQuestionsForMode(chapter.getChapterId(), selectionMode);
+			List<Question> availableQuestions = gameQuestionSelector.findQuestionsForMode(
+					chapter.getChapterId(), selectionMode);
 			if (availableQuestions.size() < questionCount) {
 				throw new GameApiException(
 						HttpStatus.CONFLICT,
 						"INSUFFICIENT_QUESTIONS",
 						"選択した難易度に必要な問題がありません。問題数または難易度を変更してください。");
 			}
-			chapterQuestions = prioritizeQuestions(
+			chapterQuestions = gameQuestionSelector.prioritizeQuestions(
 					chapter.getChapterId(), availableQuestions, Set.of());
 		}
 
@@ -173,8 +174,10 @@ public class GameSessionService {
 				sessionType);
 	}
 
+	// --- Stage進行 ---
+
 	/**
-	 * Stage Clear済みのゲームに、同じ難易度の未使用問題で次Stageを作成します。
+	 * Stage Clear済みのゲームに、次の5問を用意してStageを進めます。
 	 */
 	@Transactional
 	public AdvanceStageResponse advanceStage(Long gameSessionId) {
@@ -237,14 +240,14 @@ public class GameSessionService {
 					.stream()
 					.filter(question -> !usedQuestionIds.contains(question.getQuestionId()))
 					.toList();
-			remainingQuestions = selectWeakTrainingQuestionsForStage(
+			remainingQuestions = gameQuestionSelector.selectWeakTrainingQuestionsForStage(
 					unplayedWeakQuestions,
-					findDistinctQuestions(allSessionQuestions));
+					gameQuestionSelector.findDistinctQuestions(allSessionQuestions));
 		} else {
-			List<Question> availableQuestions = findQuestionsForMode(
+			List<Question> availableQuestions = gameQuestionSelector.findQuestionsForMode(
 					gameSession.getChapter().getChapterId(),
 					gameSession.getSelectionMode());
-			remainingQuestions = prioritizeQuestions(
+			remainingQuestions = gameQuestionSelector.prioritizeQuestions(
 					gameSession.getChapter().getChapterId(),
 					availableQuestions,
 					usedQuestionIds);
@@ -285,6 +288,8 @@ public class GameSessionService {
 				gameSession.getTotalStageCount(),
 				gameSession.getStatus());
 	}
+
+	// --- 一時停止・再開・中断 ---
 
 	@Transactional
 	public CurrentGameResponse pause(Long stageSessionId) {
@@ -385,6 +390,8 @@ public class GameSessionService {
 		stageSession.abandon(abandonedAt);
 		return new GameSessionStatusResponse(gameSession.getStatus());
 	}
+
+	// --- 現在の状態と結果の取得 ---
 
 	/**
 	 * ゲームIDから現在のStageと問題を探し、画面向けのデータにして返します。
@@ -708,6 +715,8 @@ public class GameSessionService {
 				choices);
 	}
 
+	// --- 問題開始 ---
+
 	/**
 	 * 現在の問題を初めて開始し、サーバーの開始時刻と残り時間を返します。
 	 */
@@ -748,6 +757,8 @@ public class GameSessionService {
 				remainingTimeMs);
 	}
 
+	// --- 共通の確認と計算 ---
+
 	/** 問題開始前はnullを返し、開始後はサーバーの時刻から残り時間を計算します。 */
 	private Long calculateRemainingTimeMs(StageQuestion stageQuestion, Question question) {
 		if (stageQuestion.getStartedAt() == null) {
@@ -779,129 +790,6 @@ public class GameSessionService {
 					"INVALID_REQUEST",
 					"questionCountは5、10、15、20のいずれかを指定してください。");
 		}
-	}
-
-	private List<Question> findQuestionsForMode(Long chapterId, QuestionSelectionMode mode) {
-		List<Question> questions = questionRepository.findByChapter_ChapterId(chapterId);
-		QuestionDifficulty selectedDifficulty = mode.difficultyOrNull();
-		return selectedDifficulty == null
-				? questions
-				: questions.stream()
-						.filter(question -> question.getDifficulty() == selectedDifficulty)
-						.toList();
-	}
-
-	private List<Question> prioritizeQuestions(
-			Long chapterId,
-			List<Question> questions,
-			Set<Long> excludedQuestionIds) {
-		Map<Long, AnswerHistory> latestHistoryByQuestion = new HashMap<>();
-		for (AnswerHistory history : answerHistoryRepository
-				.findByStageQuestion_Question_Chapter_ChapterId(chapterId)) {
-			Long questionId = history.getStageQuestion().getQuestion().getQuestionId();
-			AnswerHistory currentLatest = latestHistoryByQuestion.get(questionId);
-			if (currentLatest == null || isLaterHistory(history, currentLatest)) {
-				latestHistoryByQuestion.put(questionId, history);
-			}
-		}
-
-		Map<Long, QuestionMastery> savedMastery = new HashMap<>();
-		for (QuestionMastery mastery : questionMasteryRepository
-				.findByQuestion_Chapter_ChapterId(chapterId)) {
-			savedMastery.put(mastery.getQuestion().getQuestionId(), mastery);
-		}
-
-		List<Question> unanswered = new ArrayList<>();
-		List<Question> veryWeak = new ArrayList<>();
-		List<Question> weak = new ArrayList<>();
-		List<Question> almost = new ArrayList<>();
-		List<Question> cleared = new ArrayList<>();
-		for (Question question : questions) {
-			if (excludedQuestionIds.contains(question.getQuestionId())) {
-				continue;
-			}
-			AnswerHistory latestHistory = latestHistoryByQuestion.get(question.getQuestionId());
-			QuestionMastery mastery = savedMastery.get(question.getQuestionId());
-			MasteryStatus status = mastery != null
-					? mastery.getStatus()
-					: latestHistory == null
-						? MasteryStatus.UNSEEN
-						: latestHistory.isCorrect() ? MasteryStatus.OK : MasteryStatus.WEAK;
-			switch (status) {
-				case UNSEEN -> unanswered.add(question);
-				case VERY_WEAK -> veryWeak.add(question);
-				case WEAK -> weak.add(question);
-				case ALMOST -> almost.add(question);
-				case OK -> cleared.add(question);
-			}
-		}
-
-		// 未出題、超苦手、苦手、あと一歩、OKの順で出題候補を並べます。
-		Collections.shuffle(unanswered);
-		Collections.shuffle(veryWeak);
-		Collections.shuffle(weak);
-		Collections.shuffle(almost);
-		Collections.shuffle(cleared);
-		List<Question> prioritized = new ArrayList<>(
-				unanswered.size() + veryWeak.size() + weak.size() + almost.size() + cleared.size());
-		prioritized.addAll(unanswered);
-		prioritized.addAll(veryWeak);
-		prioritized.addAll(weak);
-		prioritized.addAll(almost);
-		prioritized.addAll(cleared);
-		return prioritized;
-	}
-
-	/** 未出題の苦手問題を優先し、5問に足りない分は今回の特訓で出した問題から補います。 */
-	private List<Question> selectWeakTrainingQuestionsForStage(
-			List<Question> unplayedWeakQuestions,
-			List<Question> previouslySelectedQuestions) {
-		// まだ出していない苦手問題を先に選び、足りない分だけ既出問題を使います。
-		List<Question> shuffledWeakQuestions = new ArrayList<>(unplayedWeakQuestions);
-		Collections.shuffle(shuffledWeakQuestions);
-		int firstSelectionCount = Math.min(QUESTIONS_PER_STAGE, shuffledWeakQuestions.size());
-		List<Question> selectedQuestions = new ArrayList<>(
-				shuffledWeakQuestions.subList(0, firstSelectionCount));
-		if (selectedQuestions.size() == QUESTIONS_PER_STAGE) {
-			return selectedQuestions;
-		}
-
-		List<Question> repeatCandidates = new ArrayList<>(previouslySelectedQuestions.isEmpty()
-				? unplayedWeakQuestions
-				: previouslySelectedQuestions);
-		if (repeatCandidates.isEmpty()) {
-			throw new GameApiException(
-					HttpStatus.CONFLICT,
-					"NO_WEAK_QUESTIONS",
-					"次のStageで使える苦手問題がありません。");
-		}
-		Collections.shuffle(repeatCandidates);
-		int repeatIndex = 0;
-		while (selectedQuestions.size() < QUESTIONS_PER_STAGE) {
-			selectedQuestions.add(repeatCandidates.get(repeatIndex % repeatCandidates.size()));
-			repeatIndex++;
-		}
-		return selectedQuestions;
-	}
-
-	private List<Question> findDistinctQuestions(List<StageQuestion> stageQuestions) {
-		Set<Long> questionIds = new HashSet<>();
-		List<Question> distinctQuestions = new ArrayList<>();
-		for (StageQuestion stageQuestion : stageQuestions) {
-			Question question = stageQuestion.getQuestion();
-			if (questionIds.add(question.getQuestionId())) {
-				distinctQuestions.add(question);
-			}
-		}
-		return distinctQuestions;
-	}
-
-	private boolean isLaterHistory(AnswerHistory candidate, AnswerHistory current) {
-		int answerTimeComparison = candidate.getStageQuestion().getAnsweredAt()
-				.compareTo(current.getStageQuestion().getAnsweredAt());
-		return answerTimeComparison > 0
-				|| (answerTimeComparison == 0
-						&& candidate.getAnswerHistoryId() > current.getAnswerHistoryId());
 	}
 
 	/** 選んだ問題数を最後まで遊べるだけのStage設定がChapterにあるか確認します。 */
