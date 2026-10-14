@@ -148,7 +148,6 @@ async function getCurrentGame() {
 function showQuestion(current) {
 	stopTimer();
 	clearAnswerAdvanceTimeout();
-	document.body.classList.add("game-active");
 	countdown.hidden = true;
 	message.classList.remove("error");
 	currentGame = current;
@@ -576,7 +575,6 @@ async function startNextStage() {
 
 function returnToHome() {
 	gameSessionId = null;
-	document.body.classList.remove("game-active");
 	localStorage.removeItem("gameSessionId");
 	currentGame = null;
 	questionState = "WAITING_TO_START";

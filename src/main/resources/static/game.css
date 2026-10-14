@@ -23,11 +23,11 @@ select {
 .page {
 	width: min(100% - 32px, 760px);
 	margin: 0 auto;
-	padding: 40px 0 28px;
+	padding: 14px 0 12px;
 }
 
 .page-header {
-	margin-bottom: 24px;
+	margin-bottom: 10px;
 }
 
 .eyebrow {
@@ -45,8 +45,8 @@ p {
 }
 
 .page-header h1 {
-	margin-bottom: 8px;
-	font-size: clamp(2rem, 8vw, 3rem);
+	margin-bottom: 4px;
+	font-size: clamp(1.75rem, 6vw, 2.5rem);
 }
 
 .page-header > p:last-child {
@@ -55,7 +55,7 @@ p {
 }
 
 .panel {
-	padding: clamp(20px, 5vw, 32px);
+	padding: clamp(16px, 4vw, 24px);
 	border: 1px solid #e1e6f0;
 	border-radius: 20px;
 	background: #fff;
@@ -64,7 +64,7 @@ p {
 
 .start-panel h2,
 .question-heading h2 {
-	margin-bottom: 20px;
+	margin-bottom: 8px;
 }
 
 .form-row {
@@ -136,8 +136,8 @@ summary:focus-visible {
 }
 
 .notice {
-	min-height: 24px;
-	margin: 14px 2px;
+	min-height: 20px;
+	margin: 8px 2px;
 	color: #59647a;
 }
 
@@ -147,7 +147,7 @@ summary:focus-visible {
 }
 
 .game-panel {
-	margin-top: 20px;
+	margin-top: 8px;
 }
 
 .countdown {
@@ -235,40 +235,40 @@ summary:focus-visible {
 	display: flex;
 	flex-wrap: wrap;
 	justify-content: space-between;
-	gap: 12px;
-	padding-bottom: 16px;
+	gap: 8px;
+	padding-bottom: 8px;
 	border-bottom: 1px solid #e7eaf2;
 	color: #4657b8;
 	font-weight: 700;
 }
 
 .question-heading {
-	padding-top: 24px;
+	padding-top: 8px;
 }
 
 .question-heading h2 {
-	font-size: clamp(1.25rem, 5vw, 1.7rem);
-	line-height: 1.6;
+	font-size: clamp(1.1rem, 3.5vw, 1.4rem);
+	line-height: 1.35;
 	overflow-wrap: anywhere;
 }
 
 .code-block {
 	overflow-x: auto;
-	padding: 16px;
+	padding: 10px;
 	border-radius: 12px;
 	background: #17213c;
 	color: #edf1ff;
-	font: 0.95rem/1.7 Consolas, "Cascadia Code", monospace;
+	font: 0.9rem/1.45 Consolas, "Cascadia Code", monospace;
 	white-space: pre-wrap;
 }
 
 .choices-heading {
-	margin: 20px 0 10px;
+	margin: 8px 0 5px;
 }
 
 .choices {
 	display: grid;
-	gap: 10px;
+	gap: 6px;
 	margin: 0;
 	padding: 0;
 	list-style: none;
@@ -276,17 +276,17 @@ summary:focus-visible {
 }
 
 .choices li {
-	min-height: 52px;
+	min-height: 0;
 }
 
 .choice-button {
 	display: grid;
 	width: 100%;
-	min-height: 52px;
-	grid-template-columns: 38px 1fr;
-	gap: 12px;
+	min-height: 40px;
+	grid-template-columns: 28px 1fr;
+	gap: 8px;
 	align-items: center;
-	padding: 9px 12px;
+	padding: 5px 8px;
 	border: 1px solid #dfe4ef;
 	border-radius: 12px;
 	background: #fbfcff;
@@ -308,8 +308,8 @@ summary:focus-visible {
 
 .choice-letter {
 	display: grid;
-	width: 32px;
-	height: 32px;
+	width: 26px;
+	height: 26px;
 	place-items: center;
 	border-radius: 9px;
 	background: #e9ecfb;
@@ -323,32 +323,34 @@ summary:focus-visible {
 }
 
 .answer-result {
-	margin-top: 20px;
-	padding: 16px;
+	margin-top: 6px;
+	padding: 8px 10px;
 	border-radius: 12px;
 	background: #f2f4fc;
-	line-height: 1.7;
+	line-height: 1.35;
 }
 
 .answer-result h3 {
-	margin: 0 0 8px;
+	margin: 0 0 4px;
 	color: #33449f;
 }
 
 .answer-result p {
-	margin: 8px 0 14px;
+	margin: 2px 0 5px;
 }
 
 .answer-choices {
-	margin-top: 12px;
+	gap: 5px;
+	margin: 8px 0;
 }
 
 .answer-choices li {
+	padding: 4px 7px;
 	white-space: pre-wrap;
 }
 
 .answer-detailed-explanation {
-	margin: 14px 0;
+	margin: 4px 0;
 }
 
 .answer-detailed-explanation summary {
@@ -372,159 +374,19 @@ summary:focus-visible {
 	color: #a32735;
 }
 
-/* 問題画面の余白を小さくし、質問と回答結果を一画面で見やすくします。 */
-#game-panel {
-	padding: 18px clamp(14px, 3vw, 24px);
-}
-
-#game-panel .game-status {
-	gap: 8px;
-	padding-bottom: 8px;
-	font-size: 0.9rem;
-}
-
-#game-panel .question-heading {
-	padding-top: 10px;
-}
-
-#game-panel .question-heading h2 {
-	margin-bottom: 8px;
-	line-height: 1.4;
-}
-
-#game-panel .code-block {
-	padding: 10px;
-	font-size: 0.88rem;
-	line-height: 1.45;
-}
-
-#game-panel .choices-heading {
-	margin: 10px 0 6px;
-}
-
-#game-panel .choices {
-	gap: 6px;
-}
-
-#game-panel .choices li {
-	min-height: 0;
-}
-
-#game-panel .choice-button {
-	min-height: 36px;
-	grid-template-columns: 28px 1fr;
-	gap: 8px;
-	padding: 4px 8px;
-}
-
-#game-panel .choice-letter {
-	width: 26px;
-	height: 26px;
-}
-
-#game-panel .answer-result {
-	margin-top: 10px;
-	padding: 10px 12px;
-	line-height: 1.45;
-}
-
-#game-panel .answer-result p {
-	margin: 4px 0 8px;
-}
-
-#game-panel .answer-choices {
-	gap: 5px;
-	margin: 8px 0;
-}
-
-#game-panel .answer-choices li {
-	padding: 4px 7px;
-}
-
-#game-panel .answer-detailed-explanation {
-	margin: 8px 0;
-}
-
-#game-panel .game-note {
-	margin-top: 6px;
-	padding: 5px 8px;
-	font-size: 0.74rem;
-	line-height: 1.3;
-}
-
-/* ゲーム中は上部の案内とパネルを小さくし、回答画面の縦の空きを減らします。 */
-body.game-active .page {
-	padding-top: 12px;
-	padding-bottom: 8px;
-}
-
-body.game-active .page-header {
-	margin-bottom: 6px;
-}
-
-body.game-active .page-header .eyebrow,
-body.game-active .page-header > p:last-child {
-	display: none;
-}
-
-body.game-active .page-header h1 {
-	margin-bottom: 0;
-	font-size: clamp(1.5rem, 4vw, 2rem);
-}
-
-body.game-active .notice {
-	min-height: 0;
-	margin: 4px 2px 6px;
-	font-size: 0.88rem;
-	line-height: 1.35;
-}
-
-body.game-active #game-panel {
-	margin-top: 6px;
-	padding: 10px clamp(12px, 2.5vw, 18px);
-}
-
-body.game-active #game-panel .game-status {
-	gap: 5px;
-	padding-bottom: 5px;
-	font-size: 0.82rem;
-}
-
-body.game-active #game-panel .question-heading {
-	padding-top: 5px;
-}
-
-body.game-active #game-panel .question-heading h2 {
-	margin-bottom: 4px;
-	font-size: clamp(1rem, 3vw, 1.3rem);
-	line-height: 1.3;
-}
-
-body.game-active #game-panel .answer-result {
-	margin-top: 6px;
-	padding: 8px 10px;
-	line-height: 1.35;
-}
-
-body.game-active #game-panel .answer-result h3 {
-	margin-bottom: 4px;
-}
-
-body.game-active #game-panel .answer-result p {
-	margin: 2px 0 5px;
-}
-
-body.game-active #game-panel .answer-detailed-explanation {
-	margin: 4px 0;
-}
-
-body.game-active #game-panel .answer-result .primary-button {
+.answer-result .primary-button {
 	min-height: 40px;
 	padding: 7px 12px;
 }
 
-body.game-active footer {
-	display: none;
+.game-note {
+	margin: 6px 0 0;
+	padding: 5px 8px;
+	border-radius: 10px;
+	background: #f2f4fc;
+	color: #59647a;
+	font-size: 0.74rem;
+	line-height: 1.3;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -578,7 +440,7 @@ body.game-active footer {
 }
 
 footer {
-	padding: 24px 4px 0;
+	padding: 10px 4px 0;
 	color: #69738a;
 	font-size: 0.85rem;
 }
