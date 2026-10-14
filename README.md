@@ -264,24 +264,27 @@ flowchart TB
 
 ## 12. 制限時間
 
-制限時間は問題ごとの `Question.timeLimitSeconds` で管理します。Stageの1問目でEnterを押すと3・2・1のカウントダウンを表示し、その後Start APIが成功した時点からタイマーを開始します。2～5問目は回答後に自動で始まり、各問の開始Enterは不要です。
+制限時間は問題ごとの `Question.timeLimitSeconds` で管理します。Stageの1問目では問題文・コード・選択肢を隠した状態でEnterを押し、3・2・1の後に「スタート」と問題を表示します。その後Start APIが成功した時点からタイマーを開始します。2～5問目は回答後に自動で始まり、各問の開始Enterは不要です。
 
 Stage側に別の制限時間は持たせません。
 
 ### Timer開始の流れ
 
 ```text
-1. Stageの1問目を表示
-2. WAITING_TO_START
+1. Stageの1問目を読み込む（問題文・コード・選択肢は隠す）
+2. WAITING_TO_STARTでEnterを待つ
 3. Enterを押す
-4. 3・2・1を表示
-5. POST /api/stage-questions/{stageQuestionId}/start
-6. JavaがstartedAtを記録
-7. 200 OKを返す
-8. JavaScriptが返却されたremainingTimeMsを基準にTimer表示を開始
-9. 回答後に正解選択肢と短い解説を表示
-10. 2秒後に次の問題へ進む。詳しい解説を開いている間は自動進行を止め、閉じた後に2秒の待ち時間を再開
+4. 問題文・コード・選択肢を隠し、3・2・1を表示
+5. 「スタート」を表示してから問題文と選択肢を表示
+6. POST /api/stage-questions/{stageQuestionId}/start
+7. JavaがstartedAtを記録
+8. 200 OKを返す
+9. JavaScriptが返却されたremainingTimeMsを基準にTimer表示を開始
+10. 回答後に正解選択肢と短い解説を表示
+11. 2秒後に次の問題へ進む。詳しい解説を開いている間は自動進行を止め、閉じた後に2秒の待ち時間を再開
 ```
+
+カウントダウン中は問題文・コード・選択肢を表示しません。最初のStage問題では「スタート」の表示に合わせて問題内容を表示します。2～5問目にはカウントダウンを挟まず、問題を表示してからタイマーを開始します。
 
 `WAITING_TO_START`ではTimerが未開始のため、`remainingTimeMs`は`null`で返却します。
 
@@ -635,14 +638,15 @@ flowchart LR
 stateDiagram-v2
     [*] --> WAITING_TO_START
     WAITING_TO_START --> STARTING: Stageの1問目でEnter
-    STARTING --> ANSWERING: 3・2・1の後にStart API成功
+    STARTING --> STARTING: 3・2・1の後に「スタート」と問題を表示
+    STARTING --> ANSWERING: Start API成功
     ANSWERING --> SUBMITTING: 回答確定 / TIME UP
     SUBMITTING --> RESULT: API成功
     RESULT --> STARTING: 結果を2秒表示後、次の問題を自動開始
     RESULT --> STAGE_RESULT: 5問目の結果を2秒表示後
 ```
 
-3・2・1の表示はStageの1問目の前だけです。回答結果を2秒表示した後、2～5問目は開始Enterなしで次へ進みます。5問目の結果を表示した後はStage Resultへ移り、次Stageがある場合は画面のボタンで開始します。複数選択問題では選択肢を選んだ後のEnterで回答を確定します。
+3・2・1の表示はStageの1問目の前だけです。Stageの1問目はカウントダウン中に問題文・コード・選択肢を隠し、「スタート」の表示に合わせて問題を見せます。回答結果を2秒表示した後、2～5問目は開始Enterなしで次へ進みます。5問目の結果を表示した後はStage Resultへ移り、次Stageがある場合は画面のボタンで開始します。複数選択問題では選択肢を選んだ後のEnterで回答を確定します。
 
 `SUBMITTING`中は、選択肢・Enter・A～Gキーなどの入力をすべてロックします。これにより、連打や二重送信を防ぎます。
 
@@ -1701,7 +1705,9 @@ Review APIはGameSessionが`COMPLETED`になった後だけ利用できます。
 ```text
 WAITING_TO_START
     ↓ Stageの1問目でEnter
-STARTING（3・2・1を表示）
+STARTING（問題を隠して3・2・1を表示）
+    ↓ 「スタート」を表示
+問題文・選択肢を表示
     ↓ Start API成功
 ANSWERING
     ↓ 回答キー / Enter / TIME UP
@@ -1716,8 +1722,8 @@ STARTING（2～5問目はカウントダウンなし）
 STAGE_RESULT
 ```
 
-- `WAITING_TO_START`：Stageの1問目を表示済み。Enterを待っている
-- `STARTING`：Stageの1問目はカウントダウン中。2～5問目は次の問題のStart APIを呼び出し中
+- `WAITING_TO_START`：Stageの1問目の問題文・コード・選択肢を隠し、Enterを待っている
+- `STARTING`：Stageの1問目は問題を隠してカウントダウン中。「スタート」で問題を表示する。2～5問目は次の問題のStart APIを呼び出し中
 - `ANSWERING`：Timer表示中。単一選択はキー入力で送信、複数選択はEnterで送信
 - `SUBMITTING`：送信中。A～G・Enter・送信操作をすべてロック
 - `RESULT`：正解選択肢と短い解説を表示する。詳しい解説を開いている間は自動進行を停止し、閉じてから2秒後に次問題またはStage Resultへ進む
@@ -2702,6 +2708,7 @@ AIを活用：問題案、解説案、エラー原因調査、設計確認、コ
 - 20問：4 Stage完了
 - Stage 1から順番に進み、Stage Resultのボタンで次のStageを開始する
 - Stageの1問目だけEnter後に3・2・1を表示する
+- カウントダウン中は問題を隠し、「スタート」の表示後に問題を出す
 - 回答結果を2秒表示後、次の問題が自動で始まる
 - 詳しい解説を開くと自動進行が止まり、閉じると2秒後に進む
 - 回答前のAPIには正解選択肢や詳しい解説が含まれない

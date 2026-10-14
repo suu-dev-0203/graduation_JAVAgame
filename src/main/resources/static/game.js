@@ -24,6 +24,7 @@ const reviewPanel = document.querySelector("#review-panel");
 const reviewItems = document.querySelector("#review-items");
 const countdown = document.querySelector("#countdown");
 const countdownValue = document.querySelector("#countdown-value");
+const questionContent = document.querySelector("#question-content");
 const choicesElement = document.querySelector("#choices");
 const answerResult = document.querySelector("#answer-result");
 const answerResultTitle = document.querySelector("#answer-result-title");
@@ -132,8 +133,10 @@ function showQuestion(current) {
 	currentGame = current;
 	questionState = current.questionState;
 	selectedChoiceIds = new Set();
+	questionContent.hidden = current.questionNumber === 1
+			&& questionState === "WAITING_TO_START";
 	startQuestionButton.textContent = current.questionNumber === 1
-			? "Enter またはクリックで3・2・1の後に5問開始"
+			? "Enter またはクリックで3・2・1を開始"
 			: "クリックでこの問題を開始";
 	document.querySelector("#question-progress").textContent =
 		`Stage ${current.currentStageNumber} / ${current.totalStageCount} · 問題 ${current.questionNumber} / ${current.totalQuestionsInStage}`;
@@ -196,7 +199,11 @@ function showQuestion(current) {
 		window.setTimeout(() => startCurrentQuestion(), 0);
 	}
 	if (questionState !== "RESULT") {
-		document.querySelector("#question-title").focus({ preventScroll: true });
+		if (questionContent.hidden) {
+			startQuestionButton.focus({ preventScroll: true });
+		} else {
+			document.querySelector("#question-title").focus({ preventScroll: true });
+		}
 	}
 }
 
@@ -207,6 +214,7 @@ async function startCurrentQuestion() {
 
 	questionState = "STARTING";
 	startQuestionButton.disabled = true;
+	startQuestionButton.hidden = true;
 	message.classList.remove("error");
 	message.textContent = currentGame.questionNumber === 1
 			? "3・2・1のカウントダウンを始めます..."
@@ -231,6 +239,7 @@ async function startCurrentQuestion() {
 		countdown.hidden = true;
 		questionState = "WAITING_TO_START";
 		startQuestionButton.hidden = false;
+		questionContent.hidden = currentGame.questionNumber === 1;
 		startQuestionButton.textContent = currentGame.questionNumber === 1
 				? "再試行：Enterまたはクリックで開始"
 			: "再試行：Enterまたはクリックでこの問題を開始";
@@ -248,6 +257,8 @@ async function runStageCountdown() {
 		await delay(1000);
 	}
 	countdownValue.textContent = "スタート";
+	questionContent.hidden = false;
+	document.querySelector("#question-title").focus({ preventScroll: true });
 	await delay(300);
 	countdown.hidden = true;
 }

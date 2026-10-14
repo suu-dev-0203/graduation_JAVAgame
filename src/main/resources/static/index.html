@@ -59,19 +59,21 @@
 				<span id="timer-status" role="timer">開始前</span>
 				<button class="secondary-button" id="pause-button" type="button" hidden>一時停止</button>
 			</div>
-			<div class="question-heading">
-				<p class="eyebrow" id="question-type">問題</p>
-				<h2 id="question-title" tabindex="-1"></h2>
-			</div>
-			<pre class="code-block" id="code-block" hidden><code></code></pre>
-			<div class="choices-heading">選択肢</div>
-			<ol class="choices" id="choices"></ol>
-			<button class="primary-button" id="start-question-button" type="button" hidden>
-				Enter またはクリックで3・2・1の後に5問開始
-			</button>
 			<div class="countdown" id="countdown" hidden aria-live="assertive" aria-atomic="true">
 				<span id="countdown-value"></span>
 			</div>
+			<div id="question-content">
+				<div class="question-heading">
+					<p class="eyebrow" id="question-type">問題</p>
+					<h2 id="question-title" tabindex="-1"></h2>
+				</div>
+				<pre class="code-block" id="code-block" hidden><code></code></pre>
+				<div class="choices-heading">選択肢</div>
+				<ol class="choices" id="choices"></ol>
+			</div>
+			<button class="primary-button" id="start-question-button" type="button" hidden>
+				Enter またはクリックでカウントダウンを開始
+			</button>
 			<section class="answer-result" id="answer-result" hidden aria-live="polite">
 				<h3 id="answer-result-title"></h3>
 				<p id="answer-result-details"></p>
@@ -90,7 +92,7 @@
 				<p id="short-explanation"></p>
 			</details>
 			<p class="game-note">
-				各Stageの最初にEnterを押すと3・2・1の後に開始します。回答結果を2秒表示して次の問題へ進みます。詳しい解説を開いている間は自動進行を停止します。単一選択はA～Gキーまたはクリック、複数選択は選択後にEnterで確定します。
+				各Stageの最初にEnterを押すと3・2・1・スタートの後に問題を表示します。回答結果を2秒表示して次の問題へ進みます。詳しい解説を開いている間は自動進行を停止します。単一選択はA～Gキーまたはクリック、複数選択は選択後にEnterで確定します。
 			</p>
 		</section>
 
