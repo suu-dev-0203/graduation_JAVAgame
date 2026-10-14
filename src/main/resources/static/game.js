@@ -1,6 +1,7 @@
 const chapterSelect = document.querySelector("#chapter-select");
 const selectionModeSelect = document.querySelector("#selection-mode");
 const questionCountSelect = document.querySelector("#question-count");
+const questionCountHelp = document.querySelector("#question-count-help");
 const startButton = document.querySelector("#start-button");
 const startPanel = document.querySelector(".start-panel");
 const resumeSavedButton = document.querySelector("#resume-saved-button");
@@ -116,6 +117,7 @@ async function startGame(sessionType = "STANDARD", chapterIdOverride = null) {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				chapterId: Number(chapterIdOverride ?? chapterSelect.value),
+				// 画面で選んだ合計問題数を送ります。Java側では5問ずつStageに分けます。
 				questionCount: sessionType === "WEAK_TRAINING"
 					? Number(trainingQuestionCountSelect.value)
 					: Number(questionCountSelect.value),
@@ -926,13 +928,18 @@ function difficultyLabel(difficulty) {
 }
 
 function updateQuestionCountOptions() {
-	const maximum = selectionModeSelect.value === "EASY" ? 15 : 20;
+	const isEasyMode = selectionModeSelect.value === "EASY";
+	// 入門の問題は15問までです。それ以外の出題方法では20問まで選べます。
+	const maximum = isEasyMode ? 15 : 20;
 	for (const option of questionCountSelect.options) {
 		option.disabled = Number(option.value) > maximum;
 	}
 	if (Number(questionCountSelect.value) > maximum) {
 		questionCountSelect.value = String(maximum);
 	}
+	questionCountHelp.textContent = isEasyMode
+		? "5問ずつStageを進みます。入門では5・10・15問から選べます。"
+		: "5問ずつStageを進みます。5・10・15・20問から選べます。";
 	startButton.textContent = `${questionCountSelect.value}問のゲームを始める`;
 }
 

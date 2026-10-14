@@ -33,17 +33,18 @@
 				</select>
 			</div>
 			<div class="form-row">
-				<label for="question-count">問題数</label>
-				<select id="question-count" disabled>
+				<label for="question-count">ゲーム全体の問題数</label>
+				<select id="question-count" aria-describedby="question-count-help" disabled>
 					<option value="5">5問</option>
 					<option value="10">10問</option>
 					<option value="15">15問</option>
 					<option value="20">20問</option>
 				</select>
+				<p id="question-count-help">5問ずつStageを進みます。入門は15問まで、ほかの出題方法は20問まで選べます。</p>
 			</div>
 			<button class="secondary-button" id="resume-saved-button" type="button" hidden>保存したゲームを再開</button>
 			<button class="primary-button" id="start-button" type="button" disabled>
-				5問のゲームを始める
+				選んだ問題数でゲームを始める
 			</button>
 		</section>
 
