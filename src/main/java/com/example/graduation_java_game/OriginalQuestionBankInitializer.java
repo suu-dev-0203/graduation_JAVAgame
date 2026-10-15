@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
 /**
- * demoプロファイルで17章分のオリジナル問題とStage設定を登録します。
+ * demoプロファイルで8章分のオリジナル問題とStage設定を登録します。
  */
 @Configuration
 @Profile("demo")
@@ -61,29 +61,29 @@ public class OriginalQuestionBankInitializer {
 								question -> question.getQuestionText(),
 								question -> question,
 								(first, duplicate) -> first));
-				for (QuestionDifficulty difficulty : QuestionDifficulty.values()) {
-					for (OriginalQuestionBank.BankQuestion bankQuestion
-							: OriginalQuestionBank.questionsFor(chapterSeed, difficulty)) {
-						if (existingQuestions.containsKey(bankQuestion.questionText())) {
-							continue;
-						}
-						Question question = questionRepository.save(new Question(
-								chapter,
-								QuestionType.SINGLE_A_E,
-								bankQuestion.difficulty(),
-								bankQuestion.questionText(),
-								null,
-								bankQuestion.timeLimitSeconds(),
-								bankQuestion.explanation(),
-								bankQuestion.explanation()));
-						existingQuestions.put(bankQuestion.questionText(), question);
-						for (int index = 0; index < bankQuestion.choices().size(); index++) {
-							choiceRepository.save(new Choice(
-									question,
-									bankQuestion.choices().get(index),
-									index + 1,
-									index == bankQuestion.correctChoiceIndex()));
-						}
+				for (OriginalQuestionBank.BankQuestion bankQuestion : chapterSeed.questions()) {
+					if (existingQuestions.containsKey(bankQuestion.questionText())) {
+						continue;
+					}
+					QuestionType questionType = bankQuestion.codeBlock() == null
+							? QuestionType.SINGLE_A_E
+							: QuestionType.CODE_SINGLE_A_E;
+					Question question = questionRepository.save(new Question(
+							chapter,
+							questionType,
+							bankQuestion.difficulty(),
+							bankQuestion.questionText(),
+							bankQuestion.codeBlock(),
+							bankQuestion.timeLimitSeconds(),
+							bankQuestion.explanation(),
+							bankQuestion.detailedExplanation()));
+					existingQuestions.put(bankQuestion.questionText(), question);
+					for (int index = 0; index < bankQuestion.choices().size(); index++) {
+						choiceRepository.save(new Choice(
+								question,
+								bankQuestion.choices().get(index),
+								index + 1,
+								index == bankQuestion.correctChoiceIndex()));
 					}
 				}
 			}

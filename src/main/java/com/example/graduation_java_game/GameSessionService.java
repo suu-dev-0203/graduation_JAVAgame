@@ -703,6 +703,7 @@ public class GameSessionService {
 				stageQuestion.getStageSession().getStageDefinition().getStageNumber(),
 				stageQuestion.getQuestionOrder(),
 				question.getQuestionText(),
+				question.getCodeBlock(),
 				questionMasteryRepository.findByQuestion_QuestionId(question.getQuestionId())
 						.map(QuestionMastery::getStatus)
 						.orElse(history.isCorrect() ? MasteryStatus.OK : MasteryStatus.WEAK),

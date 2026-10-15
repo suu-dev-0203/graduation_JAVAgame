@@ -33,16 +33,11 @@ public class GameQuestionSelector {
 		this.questionMasteryRepository = questionMasteryRepository;
 	}
 
-	/** 選択された難易度に合う問題だけを集めます。 */
+	/** 選択された出題モードに合う問題だけを集めます。 */
 	List<Question> findQuestionsForMode(Long chapterId, QuestionSelectionMode mode) {
 		List<Question> questions = questionRepository.findByChapter_ChapterId(chapterId);
-		QuestionDifficulty selectedDifficulty = mode.difficultyOrNull();
-		if (selectedDifficulty == null) {
-			return questions;
-		}
-
 		return questions.stream()
-				.filter(question -> question.getDifficulty() == selectedDifficulty)
+				.filter(mode::matches)
 				.toList();
 	}
 

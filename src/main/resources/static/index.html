@@ -24,13 +24,14 @@
 				</select>
 			</div>
 			<div class="form-row">
-				<label for="selection-mode">出題方法</label>
+				<label for="selection-mode">出題モード</label>
 				<select id="selection-mode" disabled>
-					<option value="RANDOM">難易度おまかせ（ランダム）</option>
-					<option value="EASY">入門（簡単）</option>
-					<option value="ADVANCED">応用（難しい）</option>
-					<option value="BRONZE_STYLE">Java Bronze風（オリジナル問題）</option>
+					<option value="RANDOM">ランダム（全問から）</option>
+					<option value="BASIC">基礎（基本を確認）</option>
+					<option value="CODE_READING">コード読解（コード付き問題）</option>
+					<option value="PRACTICAL">実戦形式（応用・試験形式）</option>
 				</select>
+				<p id="selection-mode-help">全問題から出題します。</p>
 			</div>
 			<div class="form-row">
 				<p><strong id="question-count-title">ゲーム全体の問題数</strong></p>

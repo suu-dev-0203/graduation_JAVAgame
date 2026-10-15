@@ -1,6 +1,7 @@
 package com.example.graduation_java_game;
 
 import java.time.Instant;
+import java.util.Objects;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -128,15 +129,24 @@ public class GameSession {
 			GameSessionStatus status,
 			Instant startedAt,
 			Instant endedAt) {
-		this.chapter = chapter;
+		this.chapter = Objects.requireNonNull(chapter, "Chapterは必須です。");
+		if (questionCount <= 0) {
+			throw new IllegalArgumentException("問題数は1以上である必要があります。");
+		}
+		if (totalStageCount <= 0) {
+			throw new IllegalArgumentException("Stage数は1以上である必要があります。");
+		}
+		if (currentStageNumber < 1 || currentStageNumber > totalStageCount) {
+			throw new IllegalArgumentException("現在のStage番号は1以上、総Stage数以下である必要があります。");
+		}
 		this.questionCount = questionCount;
-		this.selectionMode = selectionMode;
-		this.sessionType = sessionType;
+		this.selectionMode = Objects.requireNonNull(selectionMode, "出題方法は必須です。");
+		this.sessionType = Objects.requireNonNull(sessionType, "ゲーム種別は必須です。");
 		this.totalStageCount = totalStageCount;
 		this.currentStageNumber = currentStageNumber;
 		this.score = score;
-		this.status = status;
-		this.startedAt = startedAt;
+		this.status = Objects.requireNonNull(status, "ゲーム状態は必須です。");
+		this.startedAt = Objects.requireNonNull(startedAt, "開始時刻は必須です。");
 		this.endedAt = endedAt;
 	}
 
@@ -175,9 +185,12 @@ public class GameSession {
 
 	/** 次の連番Stageへ進みます。 */
 	public void advanceToStage(int nextStageNumber) {
+		if (nextStageNumber < 1 || nextStageNumber > totalStageCount) {
+			throw new IllegalArgumentException("次のStage番号は1以上、総Stage数以下である必要があります。");
+		}
 		if (status != GameSessionStatus.PLAYING
 				|| nextStageNumber != currentStageNumber + 1
-				|| nextStageNumber > totalStageCount) {
+				|| currentStageNumber >= totalStageCount) {
 			throw new IllegalStateException("プレイ中のゲームを次のStageへ進められません。");
 		}
 		currentStageNumber = nextStageNumber;
@@ -218,6 +231,9 @@ public class GameSession {
 		}
 		if (status != GameSessionStatus.PLAYING) {
 			throw new IllegalStateException("プレイ中のゲームだけ完了できます。");
+		}
+		if (currentStageNumber != totalStageCount) {
+			throw new IllegalStateException("最終Stageをクリアしたゲームだけ完了できます。");
 		}
 		status = GameSessionStatus.COMPLETED;
 		endedAt = completedAt;

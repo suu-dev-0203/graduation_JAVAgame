@@ -78,12 +78,14 @@ async function loadChapters() {
 			const option = document.createElement("option");
 			option.value = chapter.chapterId;
 			option.textContent = chapter.name;
+			option.dataset.questionCounts = JSON.stringify(chapter.questionCounts);
+			option.dataset.selectionModeCounts = JSON.stringify(chapter.selectionModeCounts);
 			chapterSelect.append(option);
 		}
 
 		chapterSelect.disabled = false;
 		selectionModeSelect.disabled = false;
-		startButtons.forEach((button) => { button.disabled = false; });
+		updateStartQuestionOptions();
 		message.textContent = "学習テーマを選んでゲームを始めてください。";
 		await restoreSavedGame();
 	} catch (error) {
@@ -134,7 +136,7 @@ async function startGame(sessionType = "STANDARD", chapterIdOverride = null, que
 		showError(error);
 	} finally {
 		gameStartInProgress = false;
-		startButtons.forEach((button) => { button.disabled = chapterSelect.disabled; });
+		updateStartQuestionOptions();
 		trainingButtons.forEach((button) => {
 			button.disabled = Number(button.dataset.weakQuestionCount) === 0;
 		});
@@ -601,6 +603,7 @@ async function showReview() {
 			const card = document.createElement("article");
 			const heading = document.createElement("h3");
 			const question = document.createElement("p");
+			const codeBlock = item.codeBlock ? document.createElement("pre") : null;
 			const outcome = document.createElement("p");
 			const answerTime = document.createElement("p");
 			const choices = document.createElement("ul");
@@ -612,6 +615,10 @@ async function showReview() {
 			heading.textContent = `Stage ${item.stageNumber} · 問題 ${item.questionNumber}`;
 			question.className = "review-question";
 			question.textContent = item.questionText;
+			if (codeBlock) {
+				codeBlock.className = "review-code";
+				codeBlock.textContent = item.codeBlock;
+			}
 			outcome.className = "review-answer";
 			outcome.textContent = item.timeout
 				? "結果：時間切れ"
@@ -648,7 +655,11 @@ async function showReview() {
 			masterySelect.value = item.masteryStatus;
 			masterySelect.dataset.previousStatus = item.masteryStatus;
 			masteryLabel.append(masterySelect);
-			card.append(heading, question, outcome, answerTime, choices, explanation, masteryLabel);
+			card.append(heading, question);
+			if (codeBlock) {
+				card.append(codeBlock);
+			}
+			card.append(outcome, answerTime, choices, explanation, masteryLabel);
 			reviewItems.append(card);
 		}
 		gameResultPanel.hidden = true;
@@ -921,10 +932,33 @@ async function restoreSavedGame(forceResume = false) {
 
 function difficultyLabel(difficulty) {
 	return {
-		EASY: "入門問題",
+		EASY: "基礎問題",
 		ADVANCED: "応用問題",
-		BRONZE_STYLE: "Java Bronze風オリジナル問題"
+		BRONZE_STYLE: "実戦問題"
 	}[difficulty] || "Javaの問題";
+}
+
+function updateStartQuestionOptions() {
+	const selectedChapter = chapterSelect.selectedOptions[0];
+	if (!selectedChapter || chapterSelect.disabled) {
+		startButtons.forEach((button) => { button.disabled = true; });
+		return;
+	}
+
+	const modeCounts = JSON.parse(selectedChapter.dataset.selectionModeCounts || "{}");
+	const availableCount = modeCounts[selectionModeSelect.value] || 0;
+	startButtons.forEach((button) => {
+		button.disabled = Number(button.dataset.startQuestionCount) > availableCount;
+	});
+
+	document.querySelector("#selection-mode-help").textContent = {
+		RANDOM: "すべての問題から、未出題や苦手な問題を優先して出題します。",
+		BASIC: "基本知識を確認する問題を出題します。",
+		CODE_READING: "コードブロック付きの問題だけを出題します。",
+		PRACTICAL: "応用問題と実戦問題を組み合わせて出題します。"
+	}[selectionModeSelect.value] || "";
+	document.querySelector("#question-count-help").textContent =
+		`このモードで遊べる問題は${availableCount}問です。5問ずつStageを進みます。`;
 }
 
 function showError(error) {
@@ -938,6 +972,8 @@ startButtons.forEach((button) => {
 		startGame("STANDARD", null, Number(button.dataset.startQuestionCount));
 	});
 });
+chapterSelect.addEventListener("change", updateStartQuestionOptions);
+selectionModeSelect.addEventListener("change", updateStartQuestionOptions);
 loadLearningProgressButton.addEventListener("click", loadLearningProgress);
 reviewItems.addEventListener("change", (event) => {
 	if (!(event.target instanceof HTMLSelectElement)

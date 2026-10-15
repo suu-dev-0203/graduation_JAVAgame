@@ -39,10 +39,11 @@ public class Question {
 	@Column(nullable = false)
 	private QuestionDifficulty difficulty;
 
-	@Column(nullable = false)
+	@Column(nullable = false, length = 1000)
 	private String questionText;
 
 	/** 問題文と一緒に表示するコードです。コード問題以外では空の場合があります。 */
+	@Column(length = 4000)
 	private String codeBlock;
 
 	/** 回答に使える制限時間を秒で表します。 */
@@ -50,11 +51,11 @@ public class Question {
 	private int timeLimitSeconds;
 
 	/** 回答後に画面で見せる短い説明です。 */
-	@Column(nullable = false)
+	@Column(nullable = false, length = 1000)
 	private String shortExplanation;
 
 	/** 問題の詳しい解説文です。 */
-	@Column(nullable = false)
+	@Column(nullable = false, length = 5000)
 	private String detailedExplanation;
 
 	protected Question() {

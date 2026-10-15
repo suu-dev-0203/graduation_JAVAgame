@@ -2,6 +2,7 @@ package com.example.graduation_java_game;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import com.example.graduation_java_game.AnswerDtos.AnswerResponse;
 
@@ -13,7 +14,12 @@ public final class GameApiDtos {
 	}
 
 	/** Chapter一覧APIでブラウザーに返すデータです。 */
-	public record ChapterResponse(Long chapterId, String name, String description) {
+	public record ChapterResponse(
+			Long chapterId,
+			String name,
+			String description,
+			Map<QuestionDifficulty, Integer> questionCounts,
+			Map<QuestionSelectionMode, Integer> selectionModeCounts) {
 	}
 
 	/** ゲーム開始APIでブラウザーから受け取る値です。 */
@@ -141,6 +147,7 @@ public final class GameApiDtos {
 				int stageNumber,
 				int questionNumber,
 				String questionText,
+				String codeBlock,
 				MasteryStatus masteryStatus,
 				List<Long> selectedChoiceIds,
 				List<Long> correctChoiceIds,

@@ -106,6 +106,19 @@ summary:focus-visible {
 	cursor: pointer;
 }
 
+#start-question-button {
+	display: block;
+	width: min(100%, 240px);
+	min-height: 56px;
+	margin: 24px auto 0;
+	padding: 14px 24px;
+	font-size: 1.1rem;
+}
+
+#start-question-button[hidden] {
+	display: none;
+}
+
 .secondary-button {
 	min-height: 48px;
 	padding: 10px 18px;
@@ -200,6 +213,16 @@ summary:focus-visible {
 .review-question {
 	font-weight: 700;
 	overflow-wrap: anywhere;
+}
+
+.review-code {
+	overflow-x: auto;
+	padding: 10px;
+	border-radius: 12px;
+	background: #17213c;
+	color: #edf1ff;
+	font: 0.9rem/1.45 Consolas, "Cascadia Code", monospace;
+	white-space: pre-wrap;
 }
 
 .review-choices {

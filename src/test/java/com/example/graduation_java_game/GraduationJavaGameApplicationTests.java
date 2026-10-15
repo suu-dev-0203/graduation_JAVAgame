@@ -18,6 +18,7 @@ import com.example.graduation_java_game.GameApiDtos.GameSessionCreateRequest;
 import com.example.graduation_java_game.GameApiDtos.GameSessionCreateResponse;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -93,7 +94,9 @@ class GraduationJavaGameApplicationTests {
 	void homePageReturnsTheGameScreen() throws Exception {
 		mockMvc.perform(get("/index.html"))
 				.andExpect(status().isOk())
-				.andExpect(content().string(containsString("id=\"start-button\"")))
+				.andExpect(content().string(containsString("id=\"selection-mode\"")))
+				.andExpect(content().string(containsString("value=\"CODE_READING\"")))
+				.andExpect(content().string(containsString("value=\"PRACTICAL\"")))
 				.andExpect(content().string(containsString("id=\"game-panel\"")));
 	}
 
@@ -109,7 +112,14 @@ class GraduationJavaGameApplicationTests {
 				.andExpect(jsonPath("$", hasSize(1)))
 				.andExpect(jsonPath("$[0].chapterId").isNumber())
 				.andExpect(jsonPath("$[0].name").value("Java Bronze 基礎"))
-				.andExpect(jsonPath("$[0].description").value("基本文法を学びます。"));
+				.andExpect(jsonPath("$[0].description").value("基本文法を学びます。"))
+				.andExpect(jsonPath("$[0].questionCounts.EASY").value(0))
+				.andExpect(jsonPath("$[0].questionCounts.ADVANCED").value(0))
+				.andExpect(jsonPath("$[0].questionCounts.BRONZE_STYLE").value(0))
+				.andExpect(jsonPath("$[0].selectionModeCounts.RANDOM").value(0))
+				.andExpect(jsonPath("$[0].selectionModeCounts.BASIC").value(0))
+				.andExpect(jsonPath("$[0].selectionModeCounts.CODE_READING").value(0))
+				.andExpect(jsonPath("$[0].selectionModeCounts.PRACTICAL").value(0));
 	}
 
 	/** 回答時の自動分類と、Review用APIから分類を変更できることを確認します。 */
@@ -521,6 +531,7 @@ class GraduationJavaGameApplicationTests {
 		for (int index = 0; index < 15; index++) {
 			saveTestQuestion(chapter, QuestionDifficulty.EASY, index);
 		}
+
 		for (int index = 0; index < 20; index++) {
 			saveTestQuestion(chapter, QuestionDifficulty.ADVANCED, index + 15);
 			saveTestQuestion(chapter, QuestionDifficulty.BRONZE_STYLE, index + 35);
@@ -596,6 +607,63 @@ class GraduationJavaGameApplicationTests {
 		mockMvc.perform(post(
 				"/api/game-sessions/{id}/advance-stage", createdGame.gameSessionId()))
 				.andExpect(status().isConflict());
+	}
+
+	/** 新しい出題モードが、問題の特徴に合う集合を数え、選択することを確認します。 */
+	@Test
+	@Transactional
+	void modernQuestionModesCountAndSelectMatchingQuestions() throws Exception {
+		Chapter chapter = chapterRepository.save(new Chapter("出題モード", "選択テスト"));
+		createStageDefinition(chapter, 1);
+		for (int index = 0; index < 5; index++) {
+			questionRepository.save(new Question(
+					chapter,
+					QuestionType.SINGLE_A_E,
+					QuestionDifficulty.EASY,
+					"基礎問題 " + index,
+					null,
+					20,
+					"短い解説です。",
+					"詳しい解説です。"));
+			questionRepository.save(new Question(
+					chapter,
+					QuestionType.CODE_SINGLE_A_E,
+					QuestionDifficulty.ADVANCED,
+					"コード読解問題 " + index,
+					"int value = " + index + ";",
+					20,
+					"短い解説です。",
+					"詳しい解説です。"));
+			questionRepository.save(new Question(
+					chapter,
+					QuestionType.SINGLE_A_E,
+					QuestionDifficulty.BRONZE_STYLE,
+					"実戦問題 " + index,
+					null,
+					20,
+					"短い解説です。",
+					"詳しい解説です。"));
+		}
+
+		mockMvc.perform(get("/api/chapters"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].selectionModeCounts.RANDOM").value(15))
+				.andExpect(jsonPath("$[0].selectionModeCounts.BASIC").value(5))
+				.andExpect(jsonPath("$[0].selectionModeCounts.CODE_READING").value(5))
+				.andExpect(jsonPath("$[0].selectionModeCounts.PRACTICAL").value(10));
+
+		for (QuestionSelectionMode mode : List.of(
+				QuestionSelectionMode.BASIC,
+				QuestionSelectionMode.CODE_READING,
+				QuestionSelectionMode.PRACTICAL)) {
+			GameSessionCreateResponse game = gameSessionService.create(
+					new GameSessionCreateRequest(chapter.getChapterId(), 5, mode));
+			CurrentGameResponse current = gameSessionService.findCurrent(game.gameSessionId());
+			Question selected = stageQuestionRepository.findById(current.stageQuestionId())
+					.orElseThrow()
+					.getQuestion();
+			assertTrue(mode.matches(selected), mode.toString());
+		}
 	}
 
 	/** 新しい問題を優先し、間違えた問題を正解済み問題より先に再出題することを確認します。 */
@@ -978,7 +1046,7 @@ class GraduationJavaGameApplicationTests {
 	@Test
 	@Transactional
 	void completingFiveCorrectAnswersClearsStageAndGame() throws Exception {
-		Chapter chapter = createChapterWithQuestions(5);
+		Chapter chapter = createChapterWithQuestions(5, "int zero = 0;\nint n = 1 / zero;");
 		createStageDefinition(chapter, 1);
 		createChoicesForQuestions(chapter);
 		GameSessionCreateResponse startedGame = gameSessionService.create(
@@ -1071,6 +1139,8 @@ class GraduationJavaGameApplicationTests {
 				.andExpect(jsonPath("$.items[0].answerTimeMs").isNumber())
 				.andExpect(jsonPath("$.items[0].detailedExplanation").value("詳しい解説です。"))
 				.andExpect(jsonPath("$.items[0].choices", hasSize(2)))
+				.andExpect(jsonPath("$.items[*].codeBlock",
+						hasItem("int zero = 0;\nint n = 1 / zero;")))
 				.andExpect(jsonPath("$.items[4].questionNumber").value(5));
 		CurrentGameResponse completedQuestion =
 				gameSessionService.findCurrent(startedGame.gameSessionId());
@@ -1146,14 +1216,19 @@ class GraduationJavaGameApplicationTests {
 
 	/** テスト用のChapterと、指定された個数の問題をDBに準備します。 */
 	private Chapter createChapterWithQuestions(int questionCount) {
+		return createChapterWithQuestions(questionCount, null);
+	}
+
+	private Chapter createChapterWithQuestions(int questionCount, String firstCodeBlock) {
 		Chapter chapter = chapterRepository.save(
 				new Chapter("Java Bronze 基礎", "基本文法を学びます。"));
 		for (int index = 1; index <= questionCount; index++) {
+			String codeBlock = index == 1 ? firstCodeBlock : null;
 			questionRepository.save(new Question(
 					chapter,
-					QuestionType.SINGLE_A_E,
+					codeBlock == null ? QuestionType.SINGLE_A_E : QuestionType.CODE_SINGLE_A_E,
 					"テスト問題 " + index,
-					null,
+					codeBlock,
 					20,
 					"短い解説です。",
 					"詳しい解説です。"));

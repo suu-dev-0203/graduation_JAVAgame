@@ -68,25 +68,52 @@ enum QuestionDifficulty {
 /** ゲーム開始時に選ぶ出題方法を表します。 */
 enum QuestionSelectionMode {
 	RANDOM,
+	BASIC,
+	CODE_READING,
+	PRACTICAL,
+	// Keep the original values readable for saved sessions and older API clients.
 	EASY,
 	ADVANCED,
 	BRONZE_STYLE;
 
+	private static final java.util.List<QuestionSelectionMode> AVAILABLE_MODES =
+			java.util.List.of(RANDOM, BASIC, CODE_READING, PRACTICAL);
+
+	public static java.util.List<QuestionSelectionMode> availableModes() {
+		return AVAILABLE_MODES;
+	}
+
 	public QuestionDifficulty difficultyOrNull() {
 		return switch (this) {
 			case RANDOM -> null;
-			case EASY -> QuestionDifficulty.EASY;
+			case BASIC, EASY -> QuestionDifficulty.EASY;
 			case ADVANCED -> QuestionDifficulty.ADVANCED;
 			case BRONZE_STYLE -> QuestionDifficulty.BRONZE_STYLE;
+			case CODE_READING, PRACTICAL -> null;
+		};
+	}
+
+	public boolean matches(Question question) {
+		return switch (this) {
+			case RANDOM -> true;
+			case BASIC, EASY -> question.getDifficulty() == QuestionDifficulty.EASY;
+			case CODE_READING -> question.getCodeBlock() != null
+					&& !question.getCodeBlock().isBlank();
+			case PRACTICAL -> question.getDifficulty() == QuestionDifficulty.ADVANCED
+					|| question.getDifficulty() == QuestionDifficulty.BRONZE_STYLE;
+			case ADVANCED -> question.getDifficulty() == QuestionDifficulty.ADVANCED;
+			case BRONZE_STYLE -> question.getDifficulty() == QuestionDifficulty.BRONZE_STYLE;
 		};
 	}
 
 	public String displayName() {
 		return switch (this) {
-			case RANDOM -> "難易度おまかせ（ランダム）";
-			case EASY -> "入門（簡単）";
-			case ADVANCED -> "応用（難しい）";
-			case BRONZE_STYLE -> "Java Bronze風（オリジナル問題）";
+			case RANDOM -> "ランダム（全問から）";
+			case BASIC, EASY -> "基礎";
+			case CODE_READING -> "コード読解";
+			case PRACTICAL -> "実戦形式";
+			case ADVANCED -> "応用";
+			case BRONZE_STYLE -> "旧Bronze形式";
 		};
 	}
 }
